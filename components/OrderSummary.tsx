@@ -3,13 +3,13 @@ import { useOrder } from '../context/OrderContext';
 import { useSettings } from '@/context/SettingsContext';
 
 const TrashIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
 );
 
 const OrderSummary: React.FC = () => {
-    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, collectionDate, collectionTime } = useOrder();
+    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime } = useOrder();
 
     const subtotal = cartTotal;
     // You can add delivery fees or other charges here
@@ -27,7 +27,7 @@ const OrderSummary: React.FC = () => {
         <aside className="sticky top-24">
             <div className="border border-gray-200 bg-gray-50/50 p-6 rounded-lg">
                 <h3 className="text-2xl font-serif font-bold text-brand-dark-gray border-b border-gray-200 pb-4 mb-4">Order Summary</h3>
-                
+
                 {cart.length === 0 ? (
                     <p className="text-brand-mid-gray text-center py-8">Your cart is empty</p>
                 ) : (
@@ -52,7 +52,7 @@ const OrderSummary: React.FC = () => {
                 )}
 
                 {cart.length > 0 && (
-                     <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
+                    <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
                         <div className="flex justify-between">
                             <span className="text-brand-mid-gray">Subtotal</span>
                             <span className="font-semibold text-brand-dark-gray">{settings?.currency}{subtotal.toFixed(2)}</span>
@@ -67,11 +67,14 @@ const OrderSummary: React.FC = () => {
                 <div className="mt-6 pt-4 border-t border-gray-200 text-sm space-y-2">
                     {orderType === 'delivery' && (
                         <>
-                           <div className="flex justify-between items-center"><span className="font-semibold">Method</span> <span className="bg-gray-200 px-2 py-0.5 rounded">Delivery</span></div>
-                           <div className="flex justify-between items-center"><span className="font-semibold">Postcode</span> <span>{postcode}</span></div>
+                            <div className="flex justify-between items-center"><span className="font-semibold">Method</span> <span className="bg-gray-200 px-2 py-0.5 rounded">Delivery</span></div>
+                            <div className="flex justify-between items-center"><span className="font-semibold">Postcode</span> <span>{postcode}</span></div>
+                            {deliveryDistance && (
+                                <div className="flex justify-between items-center"><span className="font-semibold">Distance</span> <span>{deliveryDistance.toFixed(1)} km</span></div>
+                            )}
                         </>
                     )}
-                     {orderType === 'collection' && (
+                    {orderType === 'collection' && (
                         <>
                             <div className="flex justify-between items-center"><span className="font-semibold">Method</span> <span className="bg-gray-200 px-2 py-0.5 rounded">Collection</span></div>
                             <div className="flex justify-between items-center"><span className="font-semibold">Date</span> <span>{formatDate(collectionDate)}</span></div>
@@ -80,7 +83,7 @@ const OrderSummary: React.FC = () => {
                     )}
                 </div>
 
-                <button 
+                <button
                     disabled={cart.length === 0}
                     className="w-full mt-6 bg-brand-dark-gray text-white py-3 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-mid-gray"
                 >

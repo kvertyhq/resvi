@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
+import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, GETADDRESS_API_BASE } from '../constants/delivery';
 
 // Types
 export interface MenuItemData {
@@ -20,6 +21,8 @@ interface OrderState {
   orderType: OrderType | null;
   postcode: string;
   deliveryAvailable: boolean | null;
+  deliveryDistance: number | null; // Distance in km
+  deliveryError: string | null;
   collectionDate: string;
   collectionTime: string;
   cart: CartItem[];
@@ -44,30 +47,99 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     orderType: null,
     postcode: '',
     deliveryAvailable: null,
+    deliveryDistance: null,
+    deliveryError: null,
     collectionDate: '',
     collectionTime: '',
     cart: [],
   });
 
   const setOrderType = (type: OrderType) => {
-    setState(s => ({ 
-        ...s, 
-        orderType: type,
-        // Reset other type's data
-        postcode: type === 'collection' ? '' : s.postcode,
-        deliveryAvailable: type === 'collection' ? null : s.deliveryAvailable,
-        collectionDate: type === 'delivery' ? '' : s.collectionDate,
-        collectionTime: type === 'delivery' ? '' : s.collectionTime,
+    setState(s => ({
+      ...s,
+      orderType: type,
+      // Reset other type's data
+      postcode: type === 'collection' ? '' : s.postcode,
+      deliveryAvailable: type === 'collection' ? null : s.deliveryAvailable,
+      deliveryDistance: type === 'collection' ? null : s.deliveryDistance,
+      deliveryError: type === 'collection' ? null : s.deliveryError,
+      collectionDate: type === 'delivery' ? '' : s.collectionDate,
+      collectionTime: type === 'delivery' ? '' : s.collectionTime,
     }));
   };
 
   const checkPostcode = async (postcode: string) => {
-    // Dummy check
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const isValid = postcode.trim().toUpperCase() === 'NW10 1AA';
-    setState(s => ({ ...s, postcode: postcode, deliveryAvailable: isValid }));
+    const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
+
+    if (!apiKey) {
+      setState(s => ({
+        ...s,
+        postcode,
+        deliveryAvailable: false,
+        deliveryDistance: null,
+        deliveryError: 'Configuration error. Please contact the restaurant.'
+      }));
+      return;
+    }
+
+    const cleanPostcode = postcode.trim().toUpperCase();
+
+    try {
+      // Call getaddress.io Distance API
+      const url = `${GETADDRESS_API_BASE}/distance/${encodeURIComponent(RESTAURANT_POSTCODE)}/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setState(s => ({
+            ...s,
+            postcode: cleanPostcode,
+            deliveryAvailable: false,
+            deliveryDistance: null,
+            deliveryError: 'Invalid postcode. Please check and try again.'
+          }));
+          return;
+        }
+
+        if (response.status === 401) {
+          setState(s => ({
+            ...s,
+            postcode: cleanPostcode,
+            deliveryAvailable: false,
+            deliveryDistance: null,
+            deliveryError: 'Configuration error. Please contact the restaurant.'
+          }));
+          return;
+        }
+
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const distanceMetres = data.metres;
+      const distanceKm = distanceMetres / 1000;
+      const isWithinRange = distanceKm <= MAX_DELIVERY_DISTANCE_KM;
+
+      setState(s => ({
+        ...s,
+        postcode: cleanPostcode,
+        deliveryAvailable: isWithinRange,
+        deliveryDistance: distanceKm,
+        deliveryError: null
+      }));
+
+    } catch (error) {
+      console.error('Error checking postcode:', error);
+      setState(s => ({
+        ...s,
+        postcode: cleanPostcode,
+        deliveryAvailable: false,
+        deliveryDistance: null,
+        deliveryError: 'Unable to verify postcode. Please try again or contact us.'
+      }));
+    }
   };
-  
+
   const setCollectionSlot = (date: string, time: string) => {
     setState(s => ({ ...s, collectionDate: date, collectionTime: time }));
   };
@@ -108,7 +180,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const clearCart = () => {
-    setState(s => ({...s, cart: []}));
+    setState(s => ({ ...s, cart: [] }));
   }
 
   const cartCount = useMemo(() => {

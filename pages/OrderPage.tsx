@@ -21,8 +21,8 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
-    const { orderType, setOrderType, postcode, deliveryAvailable, checkPostcode, setCollectionSlot } = useOrder();
-    
+    const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot } = useOrder();
+
     const [localPostcode, setLocalPostcode] = useState(postcode);
     const [isCheckingPostcode, setIsCheckingPostcode] = useState(false);
     const [localDate, setLocalDate] = useState('');
@@ -48,7 +48,7 @@ const OrderPage: React.FC = () => {
         }
         navigate('/menu');
     };
-    
+
     const handlePostcodeCheck = async () => {
         setIsCheckingPostcode(true);
         await checkPostcode(localPostcode);
@@ -104,14 +104,14 @@ const OrderPage: React.FC = () => {
                             <div className="animate-fade-in space-y-4">
                                 <p className="text-sm text-gray-600">Enter postcode to check availability</p>
                                 <div className="flex gap-2">
-                                    <input 
+                                    <input
                                         type="text"
                                         value={localPostcode}
                                         onChange={(e) => setLocalPostcode(e.target.value.toUpperCase())}
                                         placeholder="e.g. NW10 1AA"
                                         className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
                                     />
-                                    <button 
+                                    <button
                                         onClick={handlePostcodeCheck}
                                         disabled={isCheckingPostcode || !localPostcode}
                                         className="px-6 py-3 bg-brand-dark-gray text-white rounded-md font-semibold disabled:bg-gray-400 hover:bg-brand-mid-gray transition-colors"
@@ -119,23 +119,34 @@ const OrderPage: React.FC = () => {
                                         {isCheckingPostcode ? '...' : 'Check'}
                                     </button>
                                 </div>
-                                {deliveryAvailable === true && <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">Great! We deliver to your area.</p>}
-                                {deliveryAvailable === false && <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">Sorry, we don't deliver to this postcode yet.</p>}
+                                {deliveryAvailable === true && deliveryDistance && (
+                                    <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
+                                        Great! We deliver to your area ({deliveryDistance.toFixed(1)}km away).
+                                    </p>
+                                )}
+                                {deliveryAvailable === false && deliveryError && (
+                                    <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
+                                        {deliveryError}
+                                        {deliveryDistance && deliveryDistance > 5 && (
+                                            <span className="block mt-1">Your location is {deliveryDistance.toFixed(1)}km away. We only deliver within 5km.</span>
+                                        )}
+                                    </p>
+                                )}
                             </div>
                         )}
                         {orderType === 'collection' && (
-                           <div className="animate-fade-in space-y-4">
+                            <div className="animate-fade-in space-y-4">
                                 <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">Collection available today</p>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                         <div className="relative">
                                             <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
-                                            <input type="date" value={localDate} onChange={e => setLocalDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"/>
+                                            <input type="date" value={localDate} onChange={e => setLocalDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold" />
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1">Choose a collection date</p>
                                     </div>
-                                     <div>
+                                    <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
                                         <div className="relative">
                                             <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>

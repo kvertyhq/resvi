@@ -20,8 +20,8 @@ import { useSettings } from "../context/SettingsContext";
  */
 
 const SUPABASE_URL =
-  process.env.SUPABASE_URL + '/get_full_menu_grouped_by_category';
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+  import.meta.env.VITE_SUPABASE_URL + '/rest/v1/rpc/get_full_menu_grouped_by_category';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MenuItem: React.FC<{ item: MenuItemData }> = ({ item }) => {
   const { addToCart } = useOrder();
@@ -74,7 +74,7 @@ const MenuPage: React.FC = () => {
       setError(null);
 
       if (!SUPABASE_KEY) {
-        setError('Supabase key not found. Make sure process.env.SUPABASE_KEY is set.');
+        setError('Supabase key not found. Make sure VITE_SUPABASE_ANON_KEY is set.');
         setLoading(false);
         return;
       }
@@ -195,11 +195,10 @@ const MenuPage: React.FC = () => {
                       <button
                         key={category}
                         onClick={() => setActiveCategory(category)}
-                        className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
-                          activeCategory === category
-                            ? 'bg-brand-dark-gray text-white'
-                            : 'bg-gray-100 text-brand-dark-gray hover:bg-gray-200'
-                        }`}
+                        className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${activeCategory === category
+                          ? 'bg-brand-dark-gray text-white'
+                          : 'bg-gray-100 text-brand-dark-gray hover:bg-gray-200'
+                          }`}
                       >
                         {category}
                       </button>

@@ -30,7 +30,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
     today.setHours(0, 0, 0, 0);
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    
+
     const year = displayDate.getFullYear();
     const month = displayDate.getMonth();
 
@@ -46,10 +46,10 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
             dayDate.setHours(0, 0, 0, 0);
             const isSelected = selectedDate && dayDate.getTime() === selectedDate.getTime();
             const isPast = dayDate < today;
-            
+
             days.push(
-                <button 
-                    key={i} 
+                <button
+                    key={i}
                     disabled={isPast}
                     onClick={() => onDateSelect(dayDate)}
                     className={`p-3 text-center text-sm border
@@ -89,8 +89,8 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
                 </div>
             </div>
             <div className="text-right mt-6">
-                <button 
-                    onClick={onNext} 
+                <button
+                    onClick={onNext}
                     disabled={!selectedDate}
                     className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
@@ -106,11 +106,11 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
 const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext }) => {
     const times = ["12.00", "12.30", "1.00", "1.30", "8.00", "8.30", "9.00", "9.30"];
     const guests = [1, 2, 3, 4];
-    
+
     const baseButtonClasses = "p-3 border text-center font-semibold text-sm transition-colors";
     const inactiveClasses = "border-gray-300 bg-white hover:bg-gray-100";
     const activeClasses = "bg-brand-dark-gray text-white border-brand-dark-gray";
-    
+
     return (
         <div>
             <p className="font-bold text-sm text-brand-mid-gray mb-4">2/3 Select time and guests</p>
@@ -125,11 +125,11 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
                         ))}
                     </div>
                 </div>
-                
+
                 <div>
                     <p className="font-bold text-xs uppercase tracking-wider mb-2 text-brand-dark-gray">How many people?</p>
                     <div className="grid grid-cols-4 gap-2">
-                         {guests.map(num => (
+                        {guests.map(num => (
                             <button key={num} onClick={() => onGuestsSelect(num)} className={`${baseButtonClasses} ${selectedGuests === num ? activeClasses : inactiveClasses}`}>
                                 {num}
                             </button>
@@ -141,7 +141,7 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
                 <button onClick={onPrev} className="px-8 py-3 bg-gray-300 text-brand-dark-gray font-bold uppercase text-sm tracking-wider hover:bg-gray-400 transition-colors">
                     Prev
                 </button>
-                <button 
+                <button
                     onClick={onNext}
                     disabled={!selectedTime || !selectedGuests}
                     className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
@@ -156,7 +156,7 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
 // Step 3: Details
 const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => {
     const [termsAccepted, setTermsAccepted] = useState(false);
-    
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
@@ -175,7 +175,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
                     <input type="tel" name="phone" placeholder="Your Telephone" value={formData.phone} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
                 </div>
                 <div>
-                     <textarea name="notes" placeholder="Please provide any additional info" rows={4} value={formData.notes} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold"></textarea>
+                    <textarea name="notes" placeholder="Please provide any additional info" rows={4} value={formData.notes} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold"></textarea>
                 </div>
                 <div className="flex items-center">
                     <input type="checkbox" id="terms" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
@@ -186,7 +186,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
                     <button type="button" onClick={onPrev} className="px-8 py-3 bg-gray-300 text-brand-dark-gray font-bold uppercase text-sm tracking-wider hover:bg-gray-400 transition-colors">
                         Prev
                     </button>
-                    <button 
+                    <button
                         type="submit"
                         disabled={isSubmitDisabled}
                         className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
@@ -215,11 +215,11 @@ const BookingPage: React.FC = () => {
 
     const nextStep = () => setStep(s => s + 1);
     const prevStep = () => setStep(s => s - 1);
-    
+
     const handleDateSelect = (date: Date) => setBookingData(d => ({ ...d, date }));
     const handleTimeSelect = (time: string) => setBookingData(d => ({ ...d, time }));
     const handleGuestsSelect = (guests: number) => setBookingData(d => ({ ...d, guests }));
-    
+
     const formatDate = (date: Date | null): string => {
         if (!date) return '';
         return date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -239,16 +239,16 @@ const BookingPage: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
 
-        const SUPABASE_URL = process.env.SUPABASE_URL + '/create_booking';
-        const SUPABASE_KEY = process.env.SUPABASE_KEY;
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL + '/rest/v1/rpc/create_booking';
+        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
         if (!SUPABASE_KEY) {
-            console.error("Supabase API key is not defined. Make sure to set SUPABASE_KEY in your .env file.");
+            console.error("Supabase API key is not defined. Make sure to set VITE_SUPABASE_ANON_KEY in your .env file.");
             alert("Configuration error: Could not connect to the booking service. Please contact support.");
             setIsLoading(false);
             return;
         }
-        
+
         const payload = {
             p_booking_date: formatDate(bookingData.date),
             p_booking_time: formatTime(bookingData.time),
@@ -277,7 +277,7 @@ const BookingPage: React.FC = () => {
             }
 
             alert('Thank you for your reservation request! We will contact you shortly to confirm.');
-            
+
             // Reset form state on successful submission
             setStep(1);
             setBookingData({
@@ -297,70 +297,70 @@ const BookingPage: React.FC = () => {
             setIsLoading(false);
         }
     };
-    
-  return (
-    <div className="bg-white text-brand-dark-gray font-sans">
-      {/* Banner Section */}
-      <section className="bg-brand-mid-gray text-white py-16 text-center">
-        <DecorativeElement />
-        <h1 className="text-5xl font-serif">Reserve a Table</h1>
-        <p className="mt-2 text-gray-400">Per consequat adolescens ex cu nibh commune</p>
-      </section>
 
-      {/* Main Content Section */}
-      <section className="py-12 md:py-20 bg-gray-50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-32 -mt-20 transform rotate-45 opacity-5 pointer-events-none">
-            {/* Decorative background element */}
-        </div>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 xl:gap-16">
-            
-            {/* Image Placeholder */}
-            <div className="lg:col-span-2 flex items-center justify-center h-96 lg:h-auto">
-              <div className="bg-gray-200 w-full h-full flex items-center justify-center text-gray-500 text-lg tracking-widest uppercase">
-                Image Placeholder
-              </div>
-            </div>
+    return (
+        <div className="bg-white text-brand-dark-gray font-sans">
+            {/* Banner Section */}
+            <section className="bg-brand-mid-gray text-white py-16 text-center">
+                <DecorativeElement />
+                <h1 className="text-5xl font-serif">Reserve a Table</h1>
+                <p className="mt-2 text-gray-400">Per consequat adolescens ex cu nibh commune</p>
+            </section>
 
-            {/* Form Area */}
-            <div className="lg:col-span-3">
-              <h2 className="text-3xl font-serif text-brand-dark">Reserve a table</h2>
-              <p className="text-brand-mid-gray mb-6">or Call us at 0344 32423453</p>
-              
-              <div className="bg-gray-100 p-6 sm:p-8 shadow-lg rounded-sm">
-                {step === 1 && (
-                    <DateStep 
-                        selectedDate={bookingData.date}
-                        onDateSelect={handleDateSelect}
-                        onNext={nextStep}
-                    />
-                )}
-                {step === 2 && (
-                    <TimeGuestStep 
-                        selectedTime={bookingData.time}
-                        onTimeSelect={handleTimeSelect}
-                        selectedGuests={bookingData.guests}
-                        onGuestsSelect={handleGuestsSelect}
-                        onPrev={prevStep}
-                        onNext={nextStep}
-                    />
-                )}
-                {step === 3 && (
-                    <DetailsStep
-                        formData={bookingData}
-                        setFormData={setBookingData}
-                        onPrev={prevStep}
-                        onSubmit={handleSubmit}
-                        isLoading={isLoading}
-                    />
-                )}
-              </div>
-            </div>
-          </div>
+            {/* Main Content Section */}
+            <section className="py-12 md:py-20 bg-gray-50 relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mr-32 -mt-20 transform rotate-45 opacity-5 pointer-events-none">
+                    {/* Decorative background element */}
+                </div>
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 xl:gap-16">
+
+                        {/* Image Placeholder */}
+                        <div className="lg:col-span-2 flex items-center justify-center h-96 lg:h-auto">
+                            <div className="bg-gray-200 w-full h-full flex items-center justify-center text-gray-500 text-lg tracking-widest uppercase">
+                                Image Placeholder
+                            </div>
+                        </div>
+
+                        {/* Form Area */}
+                        <div className="lg:col-span-3">
+                            <h2 className="text-3xl font-serif text-brand-dark">Reserve a table</h2>
+                            <p className="text-brand-mid-gray mb-6">or Call us at 0344 32423453</p>
+
+                            <div className="bg-gray-100 p-6 sm:p-8 shadow-lg rounded-sm">
+                                {step === 1 && (
+                                    <DateStep
+                                        selectedDate={bookingData.date}
+                                        onDateSelect={handleDateSelect}
+                                        onNext={nextStep}
+                                    />
+                                )}
+                                {step === 2 && (
+                                    <TimeGuestStep
+                                        selectedTime={bookingData.time}
+                                        onTimeSelect={handleTimeSelect}
+                                        selectedGuests={bookingData.guests}
+                                        onGuestsSelect={handleGuestsSelect}
+                                        onPrev={prevStep}
+                                        onNext={nextStep}
+                                    />
+                                )}
+                                {step === 3 && (
+                                    <DetailsStep
+                                        formData={bookingData}
+                                        setFormData={setBookingData}
+                                        onPrev={prevStep}
+                                        onSubmit={handleSubmit}
+                                        isLoading={isLoading}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-      </section>
-    </div>
-  );
+    );
 };
 
 export default BookingPage;

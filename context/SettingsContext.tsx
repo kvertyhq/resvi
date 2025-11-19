@@ -31,15 +31,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
     async function loadSettings() {
       try {
         const res = await fetch(
-          process.env.SUPABASE_URL + "/get_restaurant_settings",
+          import.meta.env.VITE_SUPABASE_URL + "/rest/v1/rpc/get_restaurant_settings",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              apikey: process.env.SUPABASE_KEY!,
-              Authorization: `Bearer ${process.env.SUPABASE_KEY!}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`,
             },
-            body: JSON.stringify({ p_id: process.env.RESTAURANT_ID })
+            body: JSON.stringify({ p_id: import.meta.env.VITE_RESTAURANT_ID })
           }
         );
 

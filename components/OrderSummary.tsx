@@ -70,7 +70,7 @@ const OrderSummary: React.FC = () => {
                             <div className="flex justify-between items-center"><span className="font-semibold">Method</span> <span className="bg-gray-200 px-2 py-0.5 rounded">Delivery</span></div>
                             <div className="flex justify-between items-center"><span className="font-semibold">Postcode</span> <span>{postcode}</span></div>
                             {deliveryDistance && (
-                                <div className="flex justify-between items-center"><span className="font-semibold">Distance</span> <span>{deliveryDistance.toFixed(1)} km</span></div>
+                                <div className="flex justify-between items-center"><span className="font-semibold">Distance</span> <span>{(deliveryDistance * 0.621371).toFixed(1)} miles</span></div>
                             )}
                         </>
                     )}

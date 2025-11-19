@@ -121,14 +121,14 @@ const OrderPage: React.FC = () => {
                                 </div>
                                 {deliveryAvailable === true && deliveryDistance && (
                                     <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
-                                        Great! We deliver to your area ({deliveryDistance.toFixed(1)}km away).
+                                        Great! We deliver to your area ({(deliveryDistance * 0.621371).toFixed(1)} miles away).
                                     </p>
                                 )}
                                 {deliveryAvailable === false && deliveryError && (
                                     <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
                                         {deliveryError}
-                                        {deliveryDistance && deliveryDistance > 5 && (
-                                            <span className="block mt-1">Your location is {deliveryDistance.toFixed(1)}km away. We only deliver within 5km.</span>
+                                        {deliveryDistance && deliveryDistance > 8.04672 && (
+                                            <span className="block mt-1">Your location is {(deliveryDistance * 0.621371).toFixed(1)} miles away. We only deliver within 5 miles.</span>
                                         )}
                                     </p>
                                 )}

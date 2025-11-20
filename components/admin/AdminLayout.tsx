@@ -8,7 +8,9 @@ import {
     CalendarDays,
     Settings,
     LogOut,
-    Store
+    Store,
+    Layers,
+    Users // Added Users icon
 } from 'lucide-react';
 
 const AdminLayout: React.FC = () => {
@@ -90,6 +92,15 @@ const AdminLayout: React.FC = () => {
                             >
                                 <CalendarDays className="h-5 w-5 mr-3" />
                                 Bookings
+                            </NavLink>
+                        </li>
+                        <li>
+                            <NavLink
+                                to="/admin/customers"
+                                className={({ isActive }) => `flex items-center px-3 py-2 rounded-md transition-colors ${isActive ? 'bg-brand-gold text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}
+                            >
+                                <Users className="h-5 w-5 mr-3" />
+                                Customers
                             </NavLink>
                         </li>
                         <li>

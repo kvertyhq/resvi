@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { supabase } from '../supabaseClient';
 
 // Icons for calendar navigation
 const ChevronLeftIcon = () => (
@@ -161,7 +162,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const isSubmitDisabled = !formData.name || !formData.email || !formData.phone || !termsAccepted || isLoading;
+    const isSubmitDisabled = !formData.name || !formData.phone || !termsAccepted || isLoading;
 
     return (
         <div>
@@ -170,8 +171,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
                 <div>
                     <input type="text" name="name" placeholder="First and Last Name" value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input type="email" name="email" placeholder="Your Email" value={formData.email} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
+                <div className="grid grid-cols-1 gap-4">
                     <input type="tel" name="phone" placeholder="Your Telephone" value={formData.phone} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
                 </div>
                 <div>
@@ -208,7 +208,6 @@ const BookingPage: React.FC = () => {
         time: '',
         guests: 0,
         name: '',
-        email: '',
         phone: '',
         notes: '',
     });
@@ -239,41 +238,22 @@ const BookingPage: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
 
-        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL + '/rest/v1/rpc/create_booking';
-        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        if (!SUPABASE_KEY) {
-            console.error("Supabase API key is not defined. Make sure to set VITE_SUPABASE_ANON_KEY in your .env file.");
-            alert("Configuration error: Could not connect to the booking service. Please contact support.");
-            setIsLoading(false);
-            return;
-        }
-
-        const payload = {
-            p_booking_date: formatDate(bookingData.date),
-            p_booking_time: formatTime(bookingData.time),
-            p_guest_count: bookingData.guests,
-            p_table_count: calculateTables(bookingData.guests),
-            p_name: bookingData.name,
-            p_phone: bookingData.phone,
-            p_notes: bookingData.notes,
-            p_auto_confirm: false, // Defaulting to false as not specified in UI
-        };
-
         try {
-            const response = await fetch(SUPABASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const { error } = await supabase
+                .rpc('create_booking', {
+                    p_auto_confirm: false,
+                    p_booking_date: formatDate(bookingData.date),
+                    p_booking_time: formatTime(bookingData.time),
+                    p_guest_count: bookingData.guests,
+                    p_name: bookingData.name,
+                    p_notes: bookingData.notes,
+                    p_phone: bookingData.phone,
+                    p_table_count: calculateTables(bookingData.guests),
+                    p_user_id: null // Assuming guest booking for now, or could be session.user.id if auth implemented
+                });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'An unknown error occurred.');
+            if (error) {
+                throw error;
             }
 
             alert('Thank you for your reservation request! We will contact you shortly to confirm.');
@@ -285,7 +265,6 @@ const BookingPage: React.FC = () => {
                 time: '',
                 guests: 0,
                 name: '',
-                email: '',
                 phone: '',
                 notes: '',
             });

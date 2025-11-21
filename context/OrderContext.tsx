@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, GETADDRESS_API_BASE } from '../constants/delivery';
+import { supabase } from '../supabaseClient';
 
 // Types
 export interface MenuItemData {
@@ -36,6 +37,7 @@ interface OrderContextType extends OrderState {
   updateQuantity: (itemId: number, quantity: number) => void;
   removeFromCart: (itemId: number) => void;
   clearCart: () => void;
+  submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any }>;
   cartCount: number;
   cartTotal: number;
 }
@@ -183,6 +185,46 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(s => ({ ...s, cart: [] }));
   }
 
+  const submitOrder = async (orderDetails: any) => {
+    console.log('Submitting order with details:', orderDetails);
+    try {
+      const { data, error } = await supabase.rpc('create_order', {
+        p_delivery_address_id: null, // Passing null as we don't have an address management system yet
+        p_delivery_fee: orderDetails.deliveryFee,
+        p_items: state.cart.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price,
+          name: item.name
+        })),
+        p_mark_payment_completed: false,
+        p_name: orderDetails.name,
+        p_notes: `
+Address: ${orderDetails.address}
+Notes: ${orderDetails.notes}
+        `.trim(),
+        p_order_type: state.orderType,
+        p_payment_method: 'card', // Default to card
+        p_phone: orderDetails.phone,
+        p_restaurant_id: 1, // Default restaurant ID
+        p_scheduled_time: state.orderType === 'collection' ? `${state.collectionDate} ${state.collectionTime}` : null,
+        p_transaction_id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique transaction ID
+      });
+
+      if (error) {
+        console.error('Supabase RPC error:', error);
+        throw error;
+      }
+
+      console.log('Order submitted successfully:', data);
+      clearCart();
+      return { success: true };
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      return { success: false, error };
+    }
+  };
+
   const cartCount = useMemo(() => {
     return state.cart.reduce((total, item) => total + item.quantity, 0);
   }, [state.cart]);
@@ -202,6 +244,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateQuantity,
         removeFromCart,
         clearCart,
+        submitOrder,
         cartCount,
         cartTotal,
       }}

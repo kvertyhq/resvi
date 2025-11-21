@@ -45,7 +45,13 @@ const Header: React.FC = () => {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
                     <div className="flex-shrink-0">
-                        <NavLink to="/" className="text-xl font-serif tracking-widest">{settings?.name}</NavLink>
+                        <NavLink to="/" className="text-xl font-serif tracking-widest">
+                            {settings?.logo_url ? (
+                                <img src={settings.logo_url} alt={settings.name || 'Restaurant Logo'} className="h-12 w-auto object-contain" />
+                            ) : (
+                                settings?.name
+                            )}
+                        </NavLink>
                     </div>
 
                     <div className="hidden md:flex items-center space-x-8">
@@ -63,7 +69,7 @@ const Header: React.FC = () => {
             {isMenuOpen && (
                 <div className="md:hidden bg-brand-dark-gray">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col items-center">
-                       <NavLinks />
+                        <NavLinks />
                     </div>
                 </div>
             )}

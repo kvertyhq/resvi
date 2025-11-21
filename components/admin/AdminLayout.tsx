@@ -35,7 +35,7 @@ const AdminLayout: React.FC = () => {
             {/* Sidebar */}
             <aside className="w-64 bg-brand-dark-gray text-white flex flex-col">
                 <div className="p-6 border-b border-gray-700">
-                    <h1 className="text-2xl font-serif font-bold tracking-wider">Kverty Admin</h1>
+                    <h1 className="text-2xl font-serif font-bold tracking-wider">Daniel Sushi Admin</h1>
                 </div>
 
                 {/* Restaurant Selector */}

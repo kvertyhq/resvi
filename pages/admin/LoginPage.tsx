@@ -38,7 +38,7 @@ const LoginPage: React.FC = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
             <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-serif font-bold text-brand-dark-gray">Kverty Admin</h1>
+                    <h1 className="text-3xl font-serif font-bold text-brand-dark-gray">Daniel Sushi Admin</h1>
                     <p className="text-gray-500 mt-2">Sign in to manage your restaurant</p>
                 </div>
 

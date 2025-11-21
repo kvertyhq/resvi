@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useSettings } from '@/context/SettingsContext';
+import OrderFormModal, { OrderDetails } from './OrderFormModal';
 
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -9,11 +10,13 @@ const TrashIcon = () => (
 );
 
 const OrderSummary: React.FC = () => {
-    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime } = useOrder();
+    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder } = useOrder();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const subtotal = cartTotal;
-    // You can add delivery fees or other charges here
-    const total = subtotal;
+    const deliveryFee = orderType === 'delivery' ? 20 : 0;
+    const total = subtotal + deliveryFee;
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -22,6 +25,27 @@ const OrderSummary: React.FC = () => {
     }
 
     const { settings } = useSettings();
+
+    const handleOrderClick = () => {
+        setIsModalOpen(true);
+    };
+
+    const handleOrderSubmit = async (details: OrderDetails) => {
+        setIsLoading(true);
+        const result = await submitOrder({
+            ...details,
+            deliveryFee
+        });
+        setIsLoading(false);
+
+        if (result.success) {
+            setIsModalOpen(false);
+            alert('Order placed successfully!');
+            // Redirect or show success state
+        } else {
+            alert('Failed to place order. Please try again.');
+        }
+    };
 
     return (
         <aside className="sticky top-24">
@@ -57,7 +81,13 @@ const OrderSummary: React.FC = () => {
                             <span className="text-brand-mid-gray">Subtotal</span>
                             <span className="font-semibold text-brand-dark-gray">{settings?.currency}{subtotal.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-lg">
+                        {orderType === 'delivery' && (
+                            <div className="flex justify-between">
+                                <span className="text-brand-mid-gray">Delivery Fee</span>
+                                <span className="font-semibold text-brand-dark-gray">{settings?.currency}{deliveryFee.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-lg pt-2 border-t border-gray-100">
                             <span className="text-brand-dark-gray font-bold">TOTAL</span>
                             <span className="font-bold text-brand-dark-gray">{settings?.currency}{total.toFixed(2)}</span>
                         </div>
@@ -85,11 +115,20 @@ const OrderSummary: React.FC = () => {
 
                 <button
                     disabled={cart.length === 0}
+                    onClick={handleOrderClick}
                     className="w-full mt-6 bg-brand-dark-gray text-white py-3 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-mid-gray"
                 >
                     Order Now
                 </button>
             </div>
+
+            <OrderFormModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleOrderSubmit}
+                orderType={orderType || 'collection'}
+                isLoading={isLoading}
+            />
         </aside>
     );
 };

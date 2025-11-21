@@ -1,7 +1,9 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect } from 'react';
 // Context
 import { OrderProvider } from './context/OrderContext';
+import { SettingsProvider, useSettings } from "./context/SettingsContext";
+import { AdminProvider } from './context/AdminContext';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -9,8 +11,7 @@ import ContactPage from './pages/ContactPage';
 import OrderPage from './pages/OrderPage';
 import BookingPage from './pages/BookingPage';
 import MenuPage from './pages/MenuPage';
-import { SettingsProvider, useSettings } from "./context/SettingsContext";
-import { AdminProvider } from './context/AdminContext';
+import AboutPage from './pages/AboutPage';
 
 // Admin Pages
 import LoginPage from './pages/admin/LoginPage';
@@ -29,17 +30,10 @@ import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 
-// Placeholder pages
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="h-[50vh] flex items-center justify-center bg-gray-100">
-    <h1 className="text-4xl font-serif text-brand-dark-gray">{title}</h1>
-  </div>
-);
-
 const App: React.FC = () => {
   const { settings } = useSettings();
   useEffect(() => {
-    document.title = settings?.name;
+    document.title = settings?.name || 'Restaurant';
   }, [settings]);
   return (
     <HashRouter>
@@ -70,7 +64,7 @@ const App: React.FC = () => {
                 <div className="flex flex-col min-h-screen">
                   <Header />
                   <main className="flex-grow">
-                    <PlaceholderPage title="About Us" />
+                    <AboutPage />
                   </main>
                   <Footer />
                 </div>

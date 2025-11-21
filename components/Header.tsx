@@ -26,13 +26,13 @@ const Header: React.FC = () => {
     const navLinkClasses = "text-gray-300 hover:text-white transition duration-300 uppercase tracking-wider text-sm";
     const activeLinkClasses = "text-white";
 
-    const NavLinks = () => (
+    const NavLinks = ({ onLinkClick }: { onLinkClick?: () => void }) => (
         <>
-            <NavLink to="/" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`} end>Home</NavLink>
-            <NavLink to="/about" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>About Us</NavLink>
-            <NavLink to="/contact" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Contact Us</NavLink>
-            <NavLink to="/order" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Order Online</NavLink>
-            <NavLink to="/booking" className="px-5 py-2 border border-white text-white hover:bg-white hover:text-brand-dark transition duration-300 uppercase tracking-wider text-sm">Book a Table</NavLink>
+            <NavLink to="/" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`} end>Home</NavLink>
+            <NavLink to="/about" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>About Us</NavLink>
+            <NavLink to="/contact" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Contact Us</NavLink>
+            <NavLink to="/order" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Order Online</NavLink>
+            <NavLink to="/booking" onClick={onLinkClick} className="px-5 py-2 border border-white text-white hover:bg-white hover:text-brand-dark transition duration-300 uppercase tracking-wider text-sm">Book a Table</NavLink>
             <button className="text-white" aria-label="View cart">
                 <CartIcon />
             </button>
@@ -45,7 +45,7 @@ const Header: React.FC = () => {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
                     <div className="flex-shrink-0">
-                        <NavLink to="/" className="text-xl font-serif tracking-widest">
+                        <NavLink to="/" onClick={() => setIsMenuOpen(false)} className="text-xl font-serif tracking-widest">
                             {settings?.logo_url ? (
                                 <img src={settings.logo_url} alt={settings.name || 'Restaurant Logo'} className="h-12 w-auto object-contain" />
                             ) : (
@@ -69,7 +69,7 @@ const Header: React.FC = () => {
             {isMenuOpen && (
                 <div className="md:hidden bg-brand-dark-gray">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col items-center">
-                        <NavLinks />
+                        <NavLinks onLinkClick={() => setIsMenuOpen(false)} />
                     </div>
                 </div>
             )}

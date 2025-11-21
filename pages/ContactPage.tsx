@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useSettings } from '../context/SettingsContext';
+import { formatOpeningHours } from '../utils/formatOpeningHours';
 
 const ReservationIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
@@ -21,6 +23,7 @@ const DecorativeElement = () => (
 
 
 const ContactPage: React.FC = () => {
+  const { settings } = useSettings();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -73,17 +76,20 @@ const ContactPage: React.FC = () => {
             <InfoCard
               icon={<ReservationIcon />}
               title="Reservations"
-              lines={["+94 423-23-221 - reserve@foores.com", "- Or use the online form -"]}
+              lines={[`${settings?.phone || ''} - ${settings?.email || ''}`, "- Or use the online form -"]}
             />
             <InfoCard
               icon={<LocationIcon />}
               title="Address"
-              lines={["24 South Street, Yeovil BA20 1NN, England", "- Get Directions -"]}
+              lines={[`${settings?.address_line1 || ''}, ${settings?.address_line2 || ''}`, "- Get Directions -"]}
             />
             <InfoCard
               icon={<ClockIcon />}
               title="Opening Hours"
-              lines={["MON to FRI 9am-6pm | SAT 9am-2pm", "- Sunday Closed -"]}
+              lines={(() => {
+                if (!settings?.opening_hours) return ["MON to FRI 9am-6pm | SAT 9am-2pm", "- Sunday Closed -"];
+                return formatOpeningHours(settings.opening_hours);
+              })()}
             />
           </div>
         </div>

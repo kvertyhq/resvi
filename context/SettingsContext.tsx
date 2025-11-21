@@ -5,7 +5,20 @@ type Settings = {
   logo_url?: string;
   theme_color?: string;
   enable_booking?: boolean;
-  // add whatever fields your settings API returns
+  address_line1?: string;
+  address_line2?: string;
+  phone?: string;
+  email?: string;
+  name?: string;
+  opening_hours?: {
+    mon?: string[];
+    tue?: string[];
+    wed?: string[];
+    thu?: string[];
+    fri?: string[];
+    sat?: string[];
+    sun?: string[];
+  };
 };
 
 interface SettingsContextType {

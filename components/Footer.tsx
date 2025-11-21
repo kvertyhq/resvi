@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useSettings } from '@/context/SettingsContext';
+import { formatOpeningHours } from '@/utils/formatOpeningHours';
 
 
 import { Instagram, Facebook } from 'lucide-react';
@@ -30,8 +31,16 @@ const Footer: React.FC = () => {
                     {/* Opening Hours */}
                     <div>
                         <h3 className="text-white text-lg font-serif tracking-wider mb-4">Opening Hours</h3>
-                        <p>Mon - Sat: 10am - 11pm</p>
-                        <p>Sunday: Closed</p>
+                        {settings?.opening_hours ? (
+                            formatOpeningHours(settings.opening_hours).map((line, index) => (
+                                <p key={index}>{line}</p>
+                            ))
+                        ) : (
+                            <>
+                                <p>Mon - Sat: 10am - 11pm</p>
+                                <p>Sunday: Closed</p>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

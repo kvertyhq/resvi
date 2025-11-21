@@ -24,6 +24,7 @@ import SettingsPage from './pages/admin/SettingsPage';
 import ForgotPasswordPage from './pages/admin/ForgotPasswordPage';
 import ResetPasswordPage from './pages/admin/ResetPasswordPage';
 import CustomerManagementPage from './pages/admin/CustomerManagementPage';
+import ContactMessagesPage from './pages/admin/ContactMessagesPage';
 import { Navigate } from 'react-router-dom';
 
 // Components
@@ -108,6 +109,7 @@ const App: React.FC = () => {
                 <Route path="orders" element={<OrderManagementPage />} />
                 <Route path="bookings" element={<BookingManagementPage />} />
                 <Route path="customers" element={<CustomerManagementPage />} />
+                <Route path="messages" element={<ContactMessagesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Routes>

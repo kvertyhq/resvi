@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { formatOpeningHours } from '../utils/formatOpeningHours';
+import { supabase } from '../supabaseClient';
 
 const ReservationIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
@@ -38,20 +39,40 @@ const ContactPage: React.FC = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (formData.humanCheck !== '4') {
       alert('Incorrect answer to the human check question.');
       return;
     }
-    console.log('Form submitted:', formData);
-    alert('Thank you for your message! We will be in touch soon.');
-    setFormData({
-      name: '',
-      email: '',
-      message: '',
-      humanCheck: '',
-    });
+
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .insert([
+          {
+            name: formData.name,
+            email: formData.email,
+            message: formData.message,
+            user_agent: navigator.userAgent,
+            referrer: document.referrer,
+            processed: false
+          }
+        ]);
+
+      if (error) throw error;
+
+      alert('Thank you for your message! We will be in touch soon.');
+      setFormData({
+        name: '',
+        email: '',
+        message: '',
+        humanCheck: '',
+      });
+    } catch (error) {
+      console.error('Error submitting message:', error);
+      alert('Failed to send message. Please try again.');
+    }
   };
 
   return (

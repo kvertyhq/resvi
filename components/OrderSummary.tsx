@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useSettings } from '@/context/SettingsContext';
 import OrderFormModal, { OrderDetails } from './OrderFormModal';
+import OrderResultModal from './OrderResultModal';
 
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -13,6 +14,9 @@ const OrderSummary: React.FC = () => {
     const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder } = useOrder();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [resultModalOpen, setResultModalOpen] = useState(false);
+    const [resultType, setResultType] = useState<'success' | 'error'>('success');
+    const [resultMessage, setResultMessage] = useState('');
 
     const subtotal = cartTotal;
     const deliveryFee = orderType === 'delivery' ? 20 : 0;
@@ -34,16 +38,20 @@ const OrderSummary: React.FC = () => {
         setIsLoading(true);
         const result = await submitOrder({
             ...details,
-            deliveryFee
+            deliveryFee,
+            orderType: orderType || 'collection'
         });
         setIsLoading(false);
 
         if (result.success) {
             setIsModalOpen(false);
-            alert('Order placed successfully!');
-            // Redirect or show success state
+            setResultType('success');
+            setResultMessage('Your order has been successfully placed!');
+            setResultModalOpen(true);
         } else {
-            alert('Failed to place order. Please try again.');
+            setResultType('error');
+            setResultMessage('Failed to place order. Please try again.');
+            setResultModalOpen(true);
         }
     };
 
@@ -128,6 +136,13 @@ const OrderSummary: React.FC = () => {
                 onSubmit={handleOrderSubmit}
                 orderType={orderType || 'collection'}
                 isLoading={isLoading}
+            />
+
+            <OrderResultModal
+                isOpen={resultModalOpen}
+                onClose={() => setResultModalOpen(false)}
+                type={resultType}
+                message={resultMessage}
             />
         </aside>
     );

@@ -34,8 +34,11 @@ const SettingsPage: React.FC = () => {
         theme_color: '#000000',
         tax_rate: 0,
         max_booking_size: 10,
-        opening_hours: {} as Record<string, string[]> // JSONB
+        opening_hours: {} as Record<string, string[]>, // JSONB
+        collection_time_slots: {} as Record<string, string[]> // JSONB
     });
+
+    const [collectionRanges, setCollectionRanges] = useState<Record<string, { start: string, end: string }[]>>({});
 
     useEffect(() => {
         // Use env var for now as requested
@@ -44,6 +47,70 @@ const SettingsPage: React.FC = () => {
             fetchSettings(envRestaurantId);
         }
     }, []);
+
+    const parseSlotsToRanges = (slots: Record<string, string[]>) => {
+        const ranges: Record<string, { start: string, end: string }[]> = {};
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+        days.forEach(day => {
+            const daySlots = slots[day]?.sort() || [];
+            if (daySlots.length === 0) return;
+
+            const dayRanges: { start: string, end: string }[] = [];
+            let start = daySlots[0];
+            let prev = daySlots[0];
+
+            for (let i = 1; i < daySlots.length; i++) {
+                const current = daySlots[i];
+                const prevDate = new Date(`2000-01-01T${prev}`);
+                const currentDate = new Date(`2000-01-01T${current}`);
+                const diff = (currentDate.getTime() - prevDate.getTime()) / (1000 * 60);
+
+                if (diff > 30) {
+                    // End of a contiguous block
+                    // For the range end, we add 30 mins to the last slot to represent the closing time
+                    const endDate = new Date(prevDate.getTime() + 30 * 60000);
+                    const endString = endDate.toTimeString().slice(0, 5);
+                    dayRanges.push({ start, end: endString });
+                    start = current;
+                }
+                prev = current;
+            }
+            // Push the last range
+            const lastDate = new Date(`2000-01-01T${prev}`);
+            const lastEndDate = new Date(lastDate.getTime() + 30 * 60000);
+            const lastEndString = lastEndDate.toTimeString().slice(0, 5);
+            dayRanges.push({ start, end: lastEndString });
+
+            ranges[day] = dayRanges;
+        });
+        return ranges;
+    };
+
+    const generateSlots = (ranges: Record<string, { start: string, end: string }[]>) => {
+        const slots: Record<string, string[]> = {};
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+        days.forEach(day => {
+            const dayRanges = ranges[day];
+            if (!dayRanges || dayRanges.length === 0) return;
+
+            const daySlots: string[] = [];
+            dayRanges.forEach(range => {
+                if (!range.start || !range.end) return;
+
+                let current = new Date(`2000-01-01T${range.start}`);
+                const end = new Date(`2000-01-01T${range.end}`);
+
+                while (current < end) {
+                    daySlots.push(current.toTimeString().slice(0, 5));
+                    current = new Date(current.getTime() + 30 * 60000);
+                }
+            });
+            slots[day] = [...new Set(daySlots)].sort();
+        });
+        return slots;
+    };
 
     const fetchSettings = async (id: string) => {
         setLoading(true);
@@ -86,8 +153,13 @@ const SettingsPage: React.FC = () => {
                         theme_color: settings.theme_color || '#000000',
                         tax_rate: settings.tax_rate || 0,
                         max_booking_size: settings.max_booking_size || 10,
-                        opening_hours: settings.opening_hours || {}
+                        opening_hours: settings.opening_hours || {},
+                        collection_time_slots: settings.collection_time_slots || {}
                     });
+
+                    if (settings.collection_time_slots) {
+                        setCollectionRanges(parseSlotsToRanges(settings.collection_time_slots));
+                    }
                 }
             }
         } catch (err: any) {
@@ -106,6 +178,42 @@ const SettingsPage: React.FC = () => {
         }));
     };
 
+    const handleRangeChange = (day: string, index: number, field: 'start' | 'end', value: string) => {
+        setCollectionRanges(prev => {
+            const newRanges = { ...prev };
+            // Create a shallow copy of the array for the specific day to avoid mutation
+            const dayRanges = [...(newRanges[day] || [])];
+
+            // Ensure object exists at index
+            if (!dayRanges[index]) dayRanges[index] = { start: '', end: '' };
+
+            dayRanges[index] = { ...dayRanges[index], [field]: value };
+            newRanges[day] = dayRanges;
+            return newRanges;
+        });
+    };
+
+    const addRange = (day: string) => {
+        setCollectionRanges(prev => {
+            const newRanges = { ...prev };
+            // Create a shallow copy of the array for the specific day to avoid mutation
+            const dayRanges = [...(newRanges[day] || [])];
+            dayRanges.push({ start: '', end: '' });
+            newRanges[day] = dayRanges;
+            return newRanges;
+        });
+    };
+
+    const removeRange = (day: string, index: number) => {
+        setCollectionRanges(prev => {
+            const newRanges = { ...prev };
+            if (newRanges[day]) {
+                newRanges[day] = newRanges[day].filter((_, i) => i !== index);
+            }
+            return newRanges;
+        });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         // Use env var for update
@@ -115,10 +223,14 @@ const SettingsPage: React.FC = () => {
         setLoading(true);
         setMessage(null);
 
+        // Generate slots from ranges
+        const generatedSlots = generateSlots(collectionRanges);
+        const dataToSave = { ...formData, collection_time_slots: generatedSlots };
+
         try {
             const { error } = await supabase
                 .from('restaurant_settings')
-                .update(formData)
+                .update(dataToSave)
                 .eq('id', targetId);
 
             if (error) throw error;
@@ -250,6 +362,48 @@ const SettingsPage: React.FC = () => {
                                     <input type="number" name="collection_time_estimate" value={formData.collection_time_estimate} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Collection Time Slots */}
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Collection Time Slots</h3>
+                        <p className="text-sm text-gray-500 mb-4">Define the available time ranges for collection. These will be converted into 30-minute slots.</p>
+                        <div className="space-y-4">
+                            {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => (
+                                <div key={day} className="border-b border-gray-100 pb-4 last:border-0">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="w-24 text-sm font-bold text-gray-700 capitalize">{day}</label>
+                                        <button type="button" onClick={() => addRange(day)} className="text-xs text-brand-gold hover:text-brand-dark-gray font-medium">
+                                            + Add Range
+                                        </button>
+                                    </div>
+                                    {collectionRanges[day]?.map((range, index) => (
+                                        <div key={index} className="flex items-center space-x-2 mb-2">
+                                            <input
+                                                type="time"
+                                                value={range.start}
+                                                onChange={(e) => handleRangeChange(day, index, 'start', e.target.value)}
+                                                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                            />
+                                            <span className="text-gray-400">-</span>
+                                            <input
+                                                type="time"
+                                                value={range.end}
+                                                onChange={(e) => handleRangeChange(day, index, 'end', e.target.value)}
+                                                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                            />
+                                            <button type="button" onClick={() => removeRange(day, index)} className="text-red-500 hover:text-red-700">
+                                                <span className="sr-only">Remove</span>
+                                                &times;
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!collectionRanges[day] || collectionRanges[day].length === 0) && (
+                                        <p className="text-xs text-gray-400 italic">No slots defined</p>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
 

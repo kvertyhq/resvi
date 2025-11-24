@@ -188,11 +188,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const submitOrder = async (orderDetails: any) => {
     console.log('Submitting order with details:', orderDetails);
     try {
-      const { data, error } = await supabase.rpc('create_order', {
-        p_delivery_address_id: null, // Passing null as we don't have an address management system yet
+      // Use orderType passed in details or fall back to state
+      // Default to 'collection' if both are missing to match UI behavior
+      const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
+
+      const { data, error } = await supabase.rpc('create_order_by_phone', {
+        p_delivery_address_id: null,
         p_delivery_fee: orderDetails.deliveryFee,
         p_items: state.cart.map(item => ({
-          id: item.id,
+          menu_item_id: item.id,
           quantity: item.quantity,
           price: item.price,
           name: item.name
@@ -203,12 +207,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 Address: ${orderDetails.address}
 Notes: ${orderDetails.notes}
         `.trim(),
-        p_order_type: state.orderType,
-        p_payment_method: 'card', // Default to card
+        p_order_type: finalOrderType,
+        p_payment_method: 'card',
         p_phone: orderDetails.phone,
-        p_restaurant_id: 1, // Default restaurant ID
-        p_scheduled_time: state.orderType === 'collection' ? `${state.collectionDate} ${state.collectionTime}` : null,
-        p_transaction_id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique transaction ID
+        p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+        p_scheduled_time: (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) ? `${state.collectionDate} ${state.collectionTime}` : null,
+        p_transaction_id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
 
       if (error) {
@@ -216,9 +220,17 @@ Notes: ${orderDetails.notes}
         throw error;
       }
 
-      console.log('Order submitted successfully:', data);
-      clearCart();
-      return { success: true };
+      // Check if the RPC returned success: true
+      // The RPC might return data directly or wrapped, depending on definition.
+      // Assuming the user said "response has 'success': true", we check for that property.
+      if (data && data.success === true) {
+        console.log('Order submitted successfully:', data);
+        clearCart();
+        return { success: true };
+      } else {
+        console.warn('Order submission returned data but success was not true:', data);
+        return { success: false, error: data };
+      }
     } catch (error) {
       console.error('Error submitting order:', error);
       return { success: false, error };

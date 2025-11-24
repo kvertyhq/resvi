@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
+import { useSettings } from '../context/SettingsContext';
 
 const DeliveryIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -21,6 +22,7 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
+    const { settings } = useSettings();
     const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot } = useOrder();
 
     const [localPostcode, setLocalPostcode] = useState(postcode);
@@ -64,7 +66,7 @@ const OrderPage: React.FC = () => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-160px)] font-sans">
             {/* Left Panel */}
-            <div className="bg-brand-dark-gray text-white flex items-center justify-center p-8 relative overflow-hidden min-h-[40vh] lg:min-h-full bg-cover bg-center" style={{ backgroundImage: "url('https://picsum.photos/1200/800?grayscale&blur=1')" }}>
+            <div className="bg-brand-dark-gray text-white flex items-center justify-center p-8 relative overflow-hidden min-h-[40vh] lg:min-h-full bg-cover bg-center" style={{ backgroundImage: "url('https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/674.jpg')" }}>
                 <div className="absolute inset-0 bg-black opacity-60"></div>
                 <div className="relative z-10 text-center">
                     <h1 className="text-5xl md:text-6xl font-serif tracking-wider">Let's get your order started</h1>
@@ -152,10 +154,29 @@ const OrderPage: React.FC = () => {
                                             <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
                                             <select value={localTime} onChange={e => setLocalTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
                                                 <option value="" disabled>Select a time</option>
-                                                {timeSlots.map(time => <option key={time} value={time}>{time}</option>)}
+                                                {(() => {
+                                                    if (!localDate || !settings?.collection_time_slots) return null;
+
+                                                    const date = new Date(localDate);
+                                                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+                                                    const slots = settings.collection_time_slots[dayName] || [];
+
+                                                    return slots.map((slot) => (
+                                                        <option key={slot} value={slot}>{slot}</option>
+                                                    ));
+                                                })()}
                                             </select>
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-1">We'll have it ready for the start of the slot</p>
+                                        {localDate && settings?.collection_time_slots && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {(() => {
+                                                    const date = new Date(localDate);
+                                                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+                                                    const slots = settings.collection_time_slots[dayName];
+                                                    return !slots || slots.length === 0 ? "No slots available for this day" : "";
+                                                })()}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>

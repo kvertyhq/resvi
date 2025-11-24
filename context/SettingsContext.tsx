@@ -19,6 +19,7 @@ type Settings = {
     sat?: string[];
     sun?: string[];
   };
+  collection_time_slots?: Record<string, string[]>;
 };
 
 interface SettingsContextType {

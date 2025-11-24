@@ -1,67 +1,123 @@
 import React, { useState, useEffect } from 'react';
-import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
 import { Clock, CheckCircle, Truck, XCircle, Filter } from 'lucide-react';
 
 interface Order {
-    id: number;
+    id: string;
+    user_id: string;
     created_at: string;
+    updated_at: string;
     status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
-    total: number;
-    customer_name?: string; // Assuming these might exist or be joined
-    items_count?: number;
+    total_amount: number;
+    payment_status: 'unpaid' | 'paid' | 'refunded';
     order_type: 'delivery' | 'collection';
+    restaurant_id: string;
+    delivery_address_id: string | null;
+    scheduled_time: string | null;
+    notes: string | null;
+    metadata: {
+        subtotal: number;
+        tax: number;
+        delivery_fee: number;
+    };
+    profiles?: {
+        full_name: string | null;
+        phone: string | null;
+    };
 }
 
 const OrderManagementPage: React.FC = () => {
-    const { selectedRestaurantId } = useAdmin();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
     useEffect(() => {
-        if (selectedRestaurantId) {
-            fetchOrders();
+        fetchOrders();
 
-            // Realtime Subscription
-            const channel = supabase
-                .channel('public:orders')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-                    console.log('Realtime update:', payload);
-                    fetchOrders(); // Refresh list on any change
-                })
-                .subscribe();
+        // Realtime Subscription
+        const channel = supabase
+            .channel('public:orders')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+                console.log('Realtime update:', payload);
+                fetchOrders(); // Refresh list on any change
+            })
+            .subscribe();
 
-            return () => {
-                supabase.removeChannel(channel);
-            };
-        }
-    }, [selectedRestaurantId]);
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     const fetchOrders = async () => {
         setLoading(true);
-        // Mock data for now as table structure might vary, but this simulates the fetch
-        // const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+        try {
+            const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+            console.log('Fetching orders for restaurant ID:', restaurantId, '(from env variable)');
 
-        // Simulated Data
-        const mockOrders: Order[] = [
-            { id: 1024, created_at: new Date().toISOString(), status: 'pending', total: 45.50, customer_name: 'John Doe', items_count: 3, order_type: 'delivery' },
-            { id: 1023, created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(), status: 'preparing', total: 22.00, customer_name: 'Jane Smith', items_count: 2, order_type: 'collection' },
-            { id: 1022, created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(), status: 'ready', total: 68.90, customer_name: 'Bob Johnson', items_count: 5, order_type: 'delivery' },
-            { id: 1021, created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(), status: 'delivered', total: 34.20, customer_name: 'Alice Brown', items_count: 2, order_type: 'delivery' },
-        ];
+            const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    profiles:user_id (
+                        full_name,
+                        phone
+                    )
+                `)
+                .eq('restaurant_id', restaurantId)
+                .order('created_at', { ascending: false });
 
-        setOrders(mockOrders);
-        setLoading(false);
+            if (error) {
+                console.error('Error fetching orders:', error);
+                setOrders([]);
+            } else {
+                console.log('Fetched', data?.length || 0, 'orders for restaurant', restaurantId);
+                setOrders(data || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch orders:', err);
+            setOrders([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const updateStatus = async (id: number, newStatus: string) => {
-        // await supabase.from('orders').update({ status: newStatus }).eq('id', id);
-        // Optimistic update for mock
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as any } : o));
+    const updateStatus = async (id: string, newStatus: string) => {
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error updating order status:', error);
+                alert('Failed to update order status');
+            } else {
+                // Optimistic update
+                setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as any } : o));
+            }
+        } catch (err) {
+            console.error('Failed to update order:', err);
+            alert('Failed to update order status');
+        }
     };
 
     const filteredOrders = filterStatus === 'all' ? orders : orders.filter(o => o.status === filterStatus);
+
+    // Helper function to parse notes field
+    const parseNotesField = (notesString: string | null) => {
+        if (!notesString) return { address: null, notes: null };
+
+        const addressMatch = notesString.match(/Address:\s*(.+?)(?=\nNotes:|$)/s);
+        const notesMatch = notesString.match(/Notes:\s*(.+?)$/s);
+
+        const address = addressMatch?.[1]?.trim() || null;
+        const notes = notesMatch?.[1]?.trim() || null;
+
+        return {
+            address: address && address !== '' ? address : null,
+            notes: notes && notes !== '' ? notes : null
+        };
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -100,18 +156,61 @@ const OrderManagementPage: React.FC = () => {
                     <div key={order.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                         <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
-                                <span className="font-bold text-lg text-gray-900">#{order.id}</span>
+                                <span className="font-bold text-lg text-gray-900">#{order.id.substring(0, 8)}</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                     {order.status}
+                                </span>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${order.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
+                                    order.payment_status === 'refunded' ? 'bg-gray-100 text-gray-700' :
+                                        'bg-orange-100 text-orange-700'
+                                    }`}>
+                                    {order.payment_status}
                                 </span>
                                 <span className="text-sm text-gray-500 flex items-center">
                                     <Clock className="h-4 w-4 mr-1" />
                                     {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
-                            <div className="text-gray-600 text-sm">
-                                <span className="font-semibold">{order.customer_name}</span> • {order.items_count} items • <span className="font-semibold">£{order.total.toFixed(2)}</span>
-                                <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 uppercase">{order.order_type}</span>
+                            <div className="text-gray-600 text-sm space-y-1">
+                                <div>
+                                    <span className="font-semibold">{order.profiles?.full_name || 'Guest'}</span>
+                                    {order.profiles?.phone && <span className="ml-2 text-gray-500">• {order.profiles.phone}</span>}
+                                </div>
+                                <div>
+                                    <span className="font-semibold">Total: £{order.total_amount.toFixed(2)}</span>
+                                    <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 uppercase">{order.order_type}</span>
+                                    {order.scheduled_time && (
+                                        <span className="ml-2 text-xs text-gray-500">
+                                            Scheduled: {new Date(order.scheduled_time).toLocaleString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Subtotal: £{order.metadata.subtotal.toFixed(2)} •
+                                    Tax: £{order.metadata.tax.toFixed(2)}
+                                    {order.metadata.delivery_fee > 0 && ` • Delivery: £${order.metadata.delivery_fee.toFixed(2)}`}
+                                </div>
+                                {(() => {
+                                    const { address, notes } = parseNotesField(order.notes);
+                                    return (
+                                        <>
+                                            {order.order_type === 'delivery' && (
+                                                <div className="text-xs mt-1">
+                                                    <span className="font-medium text-gray-700">Address: </span>
+                                                    <span className="text-gray-600">
+                                                        {address || <span className="italic text-gray-400">Not available</span>}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="text-xs mt-1">
+                                                <span className="font-medium text-gray-700">Notes: </span>
+                                                <span className="text-gray-600 italic">
+                                                    {notes || <span className="text-gray-400">Not applicable</span>}
+                                                </span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 

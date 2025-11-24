@@ -7,7 +7,7 @@ interface Order {
     user_id: string;
     created_at: string;
     updated_at: string;
-    status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+    status: 'pending' | 'confirmed' | 'preparing' | 'out_for_delivery' | 'completed' | 'cancelled';
     total_amount: number;
     payment_status: 'unpaid' | 'paid' | 'refunded';
     order_type: 'delivery' | 'collection';
@@ -122,12 +122,35 @@ const OrderManagementPage: React.FC = () => {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'pending': return 'bg-yellow-100 text-yellow-800';
+            case 'confirmed': return 'bg-cyan-100 text-cyan-800';
             case 'preparing': return 'bg-blue-100 text-blue-800';
-            case 'ready': return 'bg-purple-100 text-purple-800';
-            case 'delivered': return 'bg-green-100 text-green-800';
+            case 'out_for_delivery': return 'bg-purple-100 text-purple-800';
+            case 'completed': return 'bg-green-100 text-green-800';
             case 'cancelled': return 'bg-red-100 text-red-800';
             default: return 'bg-gray-100 text-gray-800';
         }
+    };
+
+    const formatStatus = (status: string) => {
+        return status
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    };
+
+    const getOrderProgress = (order: Order) => {
+        const deliverySteps = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'completed'];
+        const collectionSteps = ['pending', 'confirmed', 'preparing', 'completed'];
+
+        const steps = order.order_type === 'delivery' ? deliverySteps : collectionSteps;
+        const currentIndex = steps.indexOf(order.status);
+
+        return steps.map((step, index) => ({
+            name: formatStatus(step),
+            status: order.status === 'cancelled' ? 'cancelled' :
+                index < currentIndex ? 'completed' :
+                    index === currentIndex ? 'current' : 'upcoming'
+        }));
     };
 
     return (
@@ -143,9 +166,10 @@ const OrderManagementPage: React.FC = () => {
                     >
                         <option value="all">All Statuses</option>
                         <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
                         <option value="preparing">Preparing</option>
-                        <option value="ready">Ready</option>
-                        <option value="delivered">Delivered</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
+                        <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
@@ -158,7 +182,7 @@ const OrderManagementPage: React.FC = () => {
                             <div className="flex items-center space-x-3 mb-2">
                                 <span className="font-bold text-lg text-gray-900">#{order.id.substring(0, 8)}</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
-                                    {order.status}
+                                    {formatStatus(order.status)}
                                 </span>
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${order.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
                                     order.payment_status === 'refunded' ? 'bg-gray-100 text-gray-700' :
@@ -190,6 +214,37 @@ const OrderManagementPage: React.FC = () => {
                                     Tax: £{order.metadata.tax.toFixed(2)}
                                     {order.metadata.delivery_fee > 0 && ` • Delivery: £${order.metadata.delivery_fee.toFixed(2)}`}
                                 </div>
+
+                                {/* Order Progress Indicator */}
+                                {order.status !== 'cancelled' && (
+                                    <div className="mt-3 mb-2">
+                                        <div className="flex items-center justify-between">
+                                            {getOrderProgress(order).map((step, index, array) => (
+                                                <React.Fragment key={step.name}>
+                                                    <div className="flex flex-col items-center">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${step.status === 'completed' ? 'bg-green-500 text-white' :
+                                                                step.status === 'current' ? 'bg-blue-500 text-white' :
+                                                                    'bg-gray-200 text-gray-500'
+                                                            }`}>
+                                                            {step.status === 'completed' ? '✓' : index + 1}
+                                                        </div>
+                                                        <div className={`mt-1 text-xs text-center max-w-[80px] ${step.status === 'current' ? 'font-semibold text-blue-600' :
+                                                                step.status === 'completed' ? 'text-green-600' :
+                                                                    'text-gray-400'
+                                                            }`}>
+                                                            {step.name}
+                                                        </div>
+                                                    </div>
+                                                    {index < array.length - 1 && (
+                                                        <div className={`flex-1 h-0.5 mx-2 ${step.status === 'completed' ? 'bg-green-500' : 'bg-gray-200'
+                                                            }`} />
+                                                    )}
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {(() => {
                                     const { address, notes } = parseNotesField(order.notes);
                                     return (
@@ -216,21 +271,31 @@ const OrderManagementPage: React.FC = () => {
 
                         <div className="mt-4 md:mt-0 flex items-center space-x-2">
                             {order.status === 'pending' && (
+                                <button onClick={() => updateStatus(order.id, 'confirmed')} className="bg-cyan-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-cyan-700 transition-colors">
+                                    Confirm Order
+                                </button>
+                            )}
+                            {order.status === 'confirmed' && (
                                 <button onClick={() => updateStatus(order.id, 'preparing')} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
                                     Start Preparing
                                 </button>
                             )}
-                            {order.status === 'preparing' && (
-                                <button onClick={() => updateStatus(order.id, 'ready')} className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors">
-                                    Mark Ready
+                            {order.status === 'preparing' && order.order_type === 'delivery' && (
+                                <button onClick={() => updateStatus(order.id, 'out_for_delivery')} className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors">
+                                    Out for Delivery
                                 </button>
                             )}
-                            {order.status === 'ready' && (
-                                <button onClick={() => updateStatus(order.id, 'delivered')} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
+                            {order.status === 'preparing' && order.order_type === 'collection' && (
+                                <button onClick={() => updateStatus(order.id, 'completed')} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
+                                    Mark as Ready
+                                </button>
+                            )}
+                            {order.status === 'out_for_delivery' && (
+                                <button onClick={() => updateStatus(order.id, 'completed')} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
                                     Complete Order
                                 </button>
                             )}
-                            {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                            {order.status !== 'cancelled' && order.status !== 'completed' && (
                                 <button onClick={() => updateStatus(order.id, 'cancelled')} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                     Cancel
                                 </button>

@@ -27,6 +27,12 @@ interface OrderState {
   collectionDate: string;
   collectionTime: string;
   cart: CartItem[];
+  deliveryFee: number;
+  deliverySettings: {
+    delivery_fee: number;
+    delivery_fee_mode: 'flat' | 'per_km' | 'zone';
+    delivery_minimum: number;
+  } | null;
 }
 
 interface OrderContextType extends OrderState {
@@ -54,7 +60,66 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     collectionDate: '',
     collectionTime: '',
     cart: [],
+    deliveryFee: 0,
+    deliverySettings: null,
   });
+
+  // Fetch delivery settings on mount
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+      if (!restaurantId) return;
+
+      const { data, error } = await supabase
+        .from('restaurant_settings')
+        .select('delivery_fee, delivery_fee_mode, delivery_minimum')
+        .eq('id', restaurantId)
+        .single();
+
+      if (data) {
+        setState(s => ({
+          ...s,
+          deliverySettings: {
+            delivery_fee: data.delivery_fee || 0,
+            delivery_fee_mode: data.delivery_fee_mode || 'flat',
+            delivery_minimum: data.delivery_minimum || 0
+          }
+        }));
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Calculate delivery fee whenever relevant state changes
+  React.useEffect(() => {
+    if (!state.deliverySettings || state.orderType !== 'delivery') {
+      if (state.deliveryFee !== 0) setState(s => ({ ...s, deliveryFee: 0 }));
+      return;
+    }
+
+    const { delivery_fee, delivery_fee_mode, delivery_minimum } = state.deliverySettings;
+    const cartValue = state.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+
+    // Check for free delivery threshold
+    if (delivery_minimum > 0 && cartValue >= delivery_minimum) {
+      if (state.deliveryFee !== 0) setState(s => ({ ...s, deliveryFee: 0 }));
+      return;
+    }
+
+    let fee = 0;
+    if (delivery_fee_mode === 'flat') {
+      fee = delivery_fee;
+    } else if (delivery_fee_mode === 'per_km' && state.deliveryDistance) {
+      fee = delivery_fee * state.deliveryDistance;
+      // Optional: Round up to nearest 0.50 or similar? For now, keep exact or 2 decimals.
+      fee = Math.round(fee * 100) / 100;
+    }
+
+    // Ensure fee doesn't change if it's already correct to avoid loops
+    if (state.deliveryFee !== fee) {
+      setState(s => ({ ...s, deliveryFee: fee }));
+    }
+  }, [state.deliverySettings, state.orderType, state.deliveryDistance, state.cart]);
 
   const setOrderType = (type: OrderType) => {
     setState(s => ({
@@ -194,7 +259,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const { data, error } = await supabase.rpc('create_order_by_phone', {
         p_delivery_address_id: null,
-        p_delivery_fee: orderDetails.deliveryFee,
+        p_delivery_fee: state.deliveryFee,
         p_items: state.cart.map(item => ({
           menu_item_id: item.id,
           quantity: item.quantity,

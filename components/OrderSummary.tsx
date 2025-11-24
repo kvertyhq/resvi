@@ -11,7 +11,7 @@ const TrashIcon = () => (
 );
 
 const OrderSummary: React.FC = () => {
-    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder } = useOrder();
+    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder, deliveryFee } = useOrder();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -19,8 +19,8 @@ const OrderSummary: React.FC = () => {
     const [resultMessage, setResultMessage] = useState('');
 
     const subtotal = cartTotal;
-    const deliveryFee = orderType === 'delivery' ? 20 : 0;
-    const total = subtotal + deliveryFee;
+    const deliveryFeeDisplay = orderType === 'delivery' ? deliveryFee : 0;
+    const total = subtotal + deliveryFeeDisplay;
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -38,7 +38,7 @@ const OrderSummary: React.FC = () => {
         setIsLoading(true);
         const result = await submitOrder({
             ...details,
-            deliveryFee,
+            deliveryFee: deliveryFeeDisplay,
             orderType: orderType || 'collection'
         });
         setIsLoading(false);
@@ -92,7 +92,7 @@ const OrderSummary: React.FC = () => {
                         {orderType === 'delivery' && (
                             <div className="flex justify-between">
                                 <span className="text-brand-mid-gray">Delivery Fee</span>
-                                <span className="font-semibold text-brand-dark-gray">{settings?.currency}{deliveryFee.toFixed(2)}</span>
+                                <span className="font-semibold text-brand-dark-gray">{settings?.currency}{deliveryFeeDisplay.toFixed(2)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-lg pt-2 border-t border-gray-100">

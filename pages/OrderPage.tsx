@@ -23,7 +23,7 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
-    const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot } = useOrder();
+    const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot, deliveryFee } = useOrder();
 
     const [localPostcode, setLocalPostcode] = useState(postcode);
     const [isCheckingPostcode, setIsCheckingPostcode] = useState(false);
@@ -124,6 +124,9 @@ const OrderPage: React.FC = () => {
                                 {deliveryAvailable === true && deliveryDistance && (
                                     <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
                                         Great! We deliver to your area ({(deliveryDistance * 0.621371).toFixed(1)} miles away).
+                                        <span className="block mt-1 font-medium">
+                                            Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
+                                        </span>
                                     </p>
                                 )}
                                 {deliveryAvailable === false && deliveryError && (

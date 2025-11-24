@@ -35,7 +35,10 @@ const SettingsPage: React.FC = () => {
         tax_rate: 0,
         max_booking_size: 10,
         opening_hours: {} as Record<string, string[]>, // JSONB
-        collection_time_slots: {} as Record<string, string[]> // JSONB
+        collection_time_slots: {} as Record<string, string[]>, // JSONB
+        delivery_fee: 0,
+        delivery_fee_mode: 'flat',
+        delivery_minimum: 0
     });
 
     const [collectionRanges, setCollectionRanges] = useState<Record<string, { start: string, end: string }[]>>({});
@@ -154,7 +157,10 @@ const SettingsPage: React.FC = () => {
                         tax_rate: settings.tax_rate || 0,
                         max_booking_size: settings.max_booking_size || 10,
                         opening_hours: settings.opening_hours || {},
-                        collection_time_slots: settings.collection_time_slots || {}
+                        collection_time_slots: settings.collection_time_slots || {},
+                        delivery_fee: settings.delivery_fee || 0,
+                        delivery_fee_mode: settings.delivery_fee_mode || 'flat',
+                        delivery_minimum: settings.delivery_minimum || 0
                     });
 
                     if (settings.collection_time_slots) {
@@ -362,6 +368,44 @@ const SettingsPage: React.FC = () => {
                                     <input type="number" name="collection_time_estimate" value={formData.collection_time_estimate} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                                 </div>
                             </div>
+
+                            {/* Delivery Settings */}
+                            {formData.delivery_available && (
+                                <div className="col-span-2 bg-gray-50 p-4 rounded-md border border-gray-200 mt-2">
+                                    <h4 className="text-sm font-medium text-gray-900 mb-3">Delivery Configuration</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Fee Mode</label>
+                                            <select name="delivery_fee_mode" value={formData.delivery_fee_mode} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold">
+                                                <option value="flat">Flat Fee</option>
+                                                <option value="per_km">Per KM</option>
+                                                <option value="zone">Zone Based</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                {formData.delivery_fee_mode === 'flat' ? 'Delivery Fee' :
+                                                    formData.delivery_fee_mode === 'per_km' ? 'Fee per KM' : 'Base Fee'}
+                                            </label>
+                                            <div className="relative rounded-md shadow-sm">
+                                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                    <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
+                                                </div>
+                                                <input type="number" name="delivery_fee" value={formData.delivery_fee} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Order</label>
+                                            <div className="relative rounded-md shadow-sm">
+                                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                    <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
+                                                </div>
+                                                <input type="number" name="delivery_minimum" value={formData.delivery_minimum} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

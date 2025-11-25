@@ -19,12 +19,16 @@ export const validateUKPhone = (phone: string): string | null => {
         cleanPhone = cleanPhone.substring(1);
     }
 
-    // Check for UK prefix variations
+    // Remove 44 prefix if present
     if (cleanPhone.startsWith('44')) {
-        cleanPhone = '0' + cleanPhone.substring(2);
+        cleanPhone = cleanPhone.substring(2);
     }
 
-    // Now cleanPhone should start with 0
+    // Ensure it starts with 0, if not add it (standardizing to 07...)
+    if (!cleanPhone.startsWith('0')) {
+        cleanPhone = '0' + cleanPhone;
+    }
+
     // UK mobile numbers start with 07 and are 11 digits long
     if (/^07[0-9]{9}$/.test(cleanPhone)) {
         // Format to +44

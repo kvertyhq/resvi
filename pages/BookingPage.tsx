@@ -173,7 +173,12 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
                     <input type="text" name="name" placeholder="First and Last Name" value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
                 </div>
                 <div className="grid grid-cols-1 gap-4">
-                    <input type="tel" name="phone" placeholder="Your Telephone" value={formData.phone} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
+                    <div className="flex">
+                        <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                            +44
+                        </span>
+                        <input type="tel" name="phone" placeholder="7123 456789" value={formData.phone} onChange={handleChange} className="flex-1 min-w-0 block w-full p-3 border border-gray-300 rounded-r-md focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
+                    </div>
                 </div>
                 <div>
                     <textarea name="notes" placeholder="Please provide any additional info" rows={4} value={formData.notes} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold"></textarea>
@@ -239,9 +244,11 @@ const BookingPage: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
 
-        const validatedPhone = validateUKPhone(bookingData.phone);
+        // Prepend +44 to the user input for validation
+        const fullPhone = '+44' + bookingData.phone;
+        const validatedPhone = validateUKPhone(fullPhone);
         if (!validatedPhone) {
-            alert('Please enter a valid UK mobile number (e.g., 07123 456789).');
+            alert('Please enter a valid UK mobile number (e.g., 7123 456789).');
             setIsLoading(false);
             return;
         }
@@ -291,7 +298,7 @@ const BookingPage: React.FC = () => {
             <section className="bg-brand-mid-gray text-white py-16 text-center">
                 <DecorativeElement />
                 <h1 className="text-5xl font-serif">Reserve a Table</h1>
-                <p className="mt-2 text-gray-400">Per consequat adolescens ex cu nibh commune</p>
+                <p className="mt-2 text-gray-400">Book a table for a memorable dining experience</p>
             </section>
 
             {/* Main Content Section */}
@@ -304,9 +311,11 @@ const BookingPage: React.FC = () => {
 
                         {/* Image Placeholder */}
                         <div className="lg:col-span-2 flex items-center justify-center h-96 lg:h-auto">
-                            <div className="bg-gray-200 w-full h-full flex items-center justify-center text-gray-500 text-lg tracking-widest uppercase">
-                                Image Placeholder
-                            </div>
+                            <img
+                                src="https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg"
+                                alt="Restaurant Interior"
+                                className="w-full h-full object-cover rounded-sm shadow-lg"
+                            />
                         </div>
 
                         {/* Form Area */}

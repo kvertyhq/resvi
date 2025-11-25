@@ -36,9 +36,11 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
         e.preventDefault();
         setError(null);
 
-        const validatedPhone = validateUKPhone(formData.phone);
+        // Prepend +44 to the user input for validation
+        const fullPhone = '+44' + formData.phone;
+        const validatedPhone = validateUKPhone(fullPhone);
         if (!validatedPhone) {
-            setError('Please enter a valid UK mobile number (e.g., 07123 456789).');
+            setError('Please enter a valid UK mobile number (e.g., 7123 456789).');
             return;
         }
 
@@ -79,15 +81,20 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                        <input
-                            type="tel"
-                            name="phone"
-                            required
-                            value={formData.phone}
-                            onChange={handleChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent"
-                            placeholder="07123 456789"
-                        />
+                        <div className="flex">
+                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                                +44
+                            </span>
+                            <input
+                                type="tel"
+                                name="phone"
+                                required
+                                value={formData.phone}
+                                onChange={handleChange}
+                                className="flex-1 min-w-0 block w-full px-4 py-2 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent"
+                                placeholder="7123 456789"
+                            />
+                        </div>
                     </div>
 
                     {orderType === 'delivery' && (

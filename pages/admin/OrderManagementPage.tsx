@@ -4,6 +4,7 @@ import { Clock, CheckCircle, Truck, XCircle, Filter } from 'lucide-react';
 
 interface Order {
     id: string;
+    readable_id: number;
     user_id: string;
     created_at: string;
     updated_at: string;
@@ -180,7 +181,7 @@ const OrderManagementPage: React.FC = () => {
                     <div key={order.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                         <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
-                                <span className="font-bold text-lg text-gray-900">#{order.id.substring(0, 8)}</span>
+                                <span className="font-bold text-lg text-gray-900">#{order.readable_id}</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                     {formatStatus(order.status)}
                                 </span>
@@ -223,14 +224,14 @@ const OrderManagementPage: React.FC = () => {
                                                 <React.Fragment key={step.name}>
                                                     <div className="flex flex-col items-center">
                                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${step.status === 'completed' ? 'bg-green-500 text-white' :
-                                                                step.status === 'current' ? 'bg-blue-500 text-white' :
-                                                                    'bg-gray-200 text-gray-500'
+                                                            step.status === 'current' ? 'bg-blue-500 text-white' :
+                                                                'bg-gray-200 text-gray-500'
                                                             }`}>
                                                             {step.status === 'completed' ? '✓' : index + 1}
                                                         </div>
                                                         <div className={`mt-1 text-xs text-center max-w-[80px] ${step.status === 'current' ? 'font-semibold text-blue-600' :
-                                                                step.status === 'completed' ? 'text-green-600' :
-                                                                    'text-gray-400'
+                                                            step.status === 'completed' ? 'text-green-600' :
+                                                                'text-gray-400'
                                                             }`}>
                                                             {step.name}
                                                         </div>

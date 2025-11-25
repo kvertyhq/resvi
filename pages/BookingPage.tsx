@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
+import { validateUKPhone } from '../utils/validation';
 
 // Icons for calendar navigation
 const ChevronLeftIcon = () => (
@@ -238,6 +239,13 @@ const BookingPage: React.FC = () => {
         e.preventDefault();
         setIsLoading(true);
 
+        const validatedPhone = validateUKPhone(bookingData.phone);
+        if (!validatedPhone) {
+            alert('Please enter a valid UK mobile number (e.g., 07123 456789).');
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .rpc('create_booking', {
@@ -247,7 +255,7 @@ const BookingPage: React.FC = () => {
                     p_guest_count: bookingData.guests,
                     p_name: bookingData.name,
                     p_notes: bookingData.notes,
-                    p_phone: bookingData.phone,
+                    p_phone: validatedPhone,
                     p_table_count: calculateTables(bookingData.guests),
                     p_user_id: null // Assuming guest booking for now, or could be session.user.id if auth implemented
                 });

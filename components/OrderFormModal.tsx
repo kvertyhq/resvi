@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { validateUKPhone } from '../utils/validation';
 
 interface OrderFormModalProps {
     isOpen: boolean;
@@ -23,6 +24,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
         address: '',
         notes: ''
     });
+    const [error, setError] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
@@ -32,7 +34,18 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit(formData);
+        setError(null);
+
+        const validatedPhone = validateUKPhone(formData.phone);
+        if (!validatedPhone) {
+            setError('Please enter a valid UK mobile number (e.g., 07123 456789).');
+            return;
+        }
+
+        onSubmit({
+            ...formData,
+            phone: validatedPhone
+        });
     };
 
     return (
@@ -46,6 +59,11 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+                            {error}
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                         <input

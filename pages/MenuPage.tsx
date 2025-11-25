@@ -181,8 +181,6 @@ const MenuPage: React.FC = () => {
     groupedMenu,
   ]);
 
-  const featuredItem = useMemo(() => filteredItems[0], [filteredItems]);
-
   return (
     <div className="bg-white font-sans">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -220,45 +218,6 @@ const MenuPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Featured Item */}
-                {featuredItem && (
-                  <div className="mb-12 border-b border-gray-200 pb-8">
-                    <p className="text-brand-gold font-semibold text-sm uppercase tracking-widest mb-4">Chef's Special</p>
-                    <div className="flex flex-col md:flex-row gap-8 items-center">
-                      {featuredItem.image_url && (
-                        <div className="w-full md:w-1/2">
-                          <img
-                            src={featuredItem.image_url}
-                            alt={featuredItem.name}
-                            className="w-full h-64 md:h-80 object-cover rounded-xl shadow-lg"
-                          />
-                        </div>
-                      )}
-                      <div className={`flex-1 ${!featuredItem.image_url ? 'w-full' : ''}`}>
-                        <h2 className="text-4xl font-serif text-brand-dark font-bold">{featuredItem.name}</h2>
-                        <p className="text-brand-mid-gray mt-4 text-lg leading-relaxed">{featuredItem.description}</p>
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          {featuredItem.tags?.map(tag => (
-                            <span key={tag} className="text-sm bg-yellow-50 text-yellow-800 px-3 py-1 rounded-full border border-yellow-100">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-6 mt-8">
-                          <p className="text-3xl font-bold text-brand-dark">{settings?.currency}{(featuredItem.price ?? 0).toFixed(2)}</p>
-                          <button
-                            onClick={() => addToCart(featuredItem)}
-                            className="bg-brand-gold text-white px-8 py-3 rounded-lg font-semibold tracking-wide hover:bg-brand-dark-gray transition-colors shadow-md"
-                            disabled={(featuredItem as any).is_available === false}
-                          >
-                            {(featuredItem as any).is_available === false ? 'Unavailable' : 'Add to Order'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Menu List */}
                 <div>
                   <h3 className="text-3xl font-serif font-bold text-brand-dark">{activeCategory || 'Menu'}</h3>
@@ -272,15 +231,15 @@ const MenuPage: React.FC = () => {
                 </div>
               </>
             )}
-          </div>
+          </div >
 
           {/* Right side - Order Summary */}
-          <div className="lg:col-span-1">
+          < div className="lg:col-span-1" >
             <OrderSummary />
-          </div>
-        </div>
-      </div>
-    </div>
+          </div >
+        </div >
+      </div >
+    </div >
   );
 };
 

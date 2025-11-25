@@ -27,28 +27,40 @@ const MenuItem: React.FC<{ item: MenuItemData }> = ({ item }) => {
   const { addToCart } = useOrder();
   const { settings } = useSettings();
   return (
-    <div className="flex justify-between items-center py-4 border-b border-gray-200">
-      <div className="flex-1">
-        <h4 className="font-bold text-lg text-brand-dark-gray">{item.name}</h4>
-        {item.description && <p className="text-sm text-brand-mid-gray mt-1">{item.description}</p>}
-        <div className="mt-2 flex items-center space-x-2">
-          {item.tags?.map(tag => (
-            <span key={tag} className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
-              {tag}
-            </span>
-          ))}
+    <div className="flex justify-between items-start py-6 border-b border-gray-200">
+      {item.image_url && (
+        <div className="flex-shrink-0 mr-4">
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="w-24 h-24 object-cover rounded-lg shadow-sm"
+          />
         </div>
-      </div>
-
-      <div className="text-right ml-4 flex-shrink-0">
-        <p className="font-bold text-brand-dark-gray">{settings?.currency}{(item.price ?? 0).toFixed(2)}</p>
-        <button
-          onClick={() => addToCart(item)}
-          className="mt-2 text-sm text-brand-gold font-semibold hover:underline"
-          disabled={(item as any).is_available === false}
-        >
-          {(item as any).is_available === false ? 'Unavailable' : 'Add to cart'}
-        </button>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start">
+          <div>
+            <h4 className="font-bold text-lg text-brand-dark-gray">{item.name}</h4>
+            {item.description && <p className="text-sm text-brand-mid-gray mt-1 line-clamp-2">{item.description}</p>}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {item.tags?.map(tag => (
+                <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="text-right ml-4 flex-shrink-0">
+            <p className="font-bold text-brand-dark-gray text-lg">{settings?.currency}{(item.price ?? 0).toFixed(2)}</p>
+            <button
+              onClick={() => addToCart(item)}
+              className="mt-3 px-4 py-2 bg-brand-gold text-white text-sm font-semibold rounded-md hover:bg-brand-dark-gray transition-colors w-full"
+              disabled={(item as any).is_available === false}
+            >
+              {(item as any).is_available === false ? 'Unavailable' : 'Add'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -211,24 +223,39 @@ const MenuPage: React.FC = () => {
                 {/* Featured Item */}
                 {featuredItem && (
                   <div className="mb-12 border-b border-gray-200 pb-8">
-                    <p className="text-brand-gold font-semibold text-sm">Chef's Special</p>
-                    <h2 className="text-4xl font-serif text-brand-dark font-bold mt-2">{featuredItem.name}</h2>
-                    <p className="text-brand-mid-gray mt-3 max-w-xl">{featuredItem.description}</p>
-                    <div className="flex items-center space-x-4 mt-4">
-                      <p className="text-2xl font-bold text-brand-dark">{settings?.currency}{(featuredItem.price ?? 0).toFixed(2)}</p>
-                      {featuredItem.tags?.map(tag => (
-                        <span key={tag} className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
-                          {tag}
-                        </span>
-                      ))}
+                    <p className="text-brand-gold font-semibold text-sm uppercase tracking-widest mb-4">Chef's Special</p>
+                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                      {featuredItem.image_url && (
+                        <div className="w-full md:w-1/2">
+                          <img
+                            src={featuredItem.image_url}
+                            alt={featuredItem.name}
+                            className="w-full h-64 md:h-80 object-cover rounded-xl shadow-lg"
+                          />
+                        </div>
+                      )}
+                      <div className={`flex-1 ${!featuredItem.image_url ? 'w-full' : ''}`}>
+                        <h2 className="text-4xl font-serif text-brand-dark font-bold">{featuredItem.name}</h2>
+                        <p className="text-brand-mid-gray mt-4 text-lg leading-relaxed">{featuredItem.description}</p>
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {featuredItem.tags?.map(tag => (
+                            <span key={tag} className="text-sm bg-yellow-50 text-yellow-800 px-3 py-1 rounded-full border border-yellow-100">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-6 mt-8">
+                          <p className="text-3xl font-bold text-brand-dark">{settings?.currency}{(featuredItem.price ?? 0).toFixed(2)}</p>
+                          <button
+                            onClick={() => addToCart(featuredItem)}
+                            className="bg-brand-gold text-white px-8 py-3 rounded-lg font-semibold tracking-wide hover:bg-brand-dark-gray transition-colors shadow-md"
+                            disabled={(featuredItem as any).is_available === false}
+                          >
+                            {(featuredItem as any).is_available === false ? 'Unavailable' : 'Add to Order'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => addToCart(featuredItem)}
-                      className="mt-6 bg-brand-gold text-white px-8 py-3 font-semibold tracking-wider hover:opacity-90 transition-opacity"
-                      disabled={(featuredItem as any).is_available === false}
-                    >
-                      {(featuredItem as any).is_available === false ? 'Unavailable' : 'Add to cart'}
-                    </button>
                   </div>
                 )}
 

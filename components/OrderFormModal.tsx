@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { validateUKPhone } from '../utils/validation';
+import { useOrder } from '../context/OrderContext';
 
 interface OrderFormModalProps {
     isOpen: boolean;
@@ -25,6 +26,21 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
         notes: ''
     });
     const [error, setError] = useState<string | null>(null);
+    const { postcode, getAddressList } = useOrder();
+    const [addresses, setAddresses] = useState<string[]>([]);
+    const [loadingAddresses, setLoadingAddresses] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && orderType === 'delivery' && postcode) {
+            const fetchAddresses = async () => {
+                setLoadingAddresses(true);
+                const list = await getAddressList(postcode);
+                setAddresses(list);
+                setLoadingAddresses(false);
+            };
+            fetchAddresses();
+        }
+    }, [isOpen, orderType, postcode, getAddressList]);
 
     if (!isOpen) return null;
 
@@ -100,6 +116,23 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                     {orderType === 'delivery' && (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Address</label>
+
+                            {/* Address Lookup Dropdown */}
+                            {loadingAddresses ? (
+                                <div className="text-sm text-gray-500 mb-2">Loading addresses...</div>
+                            ) : addresses.length > 0 ? (
+                                <select
+                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                    className="w-full px-4 py-2 mb-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent bg-white"
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>Select your address</option>
+                                    {addresses.map((addr, index) => (
+                                        <option key={index} value={addr}>{addr}</option>
+                                    ))}
+                                </select>
+                            ) : null}
+
                             <textarea
                                 name="address"
                                 required

@@ -38,6 +38,7 @@ interface OrderState {
 interface OrderContextType extends OrderState {
   setOrderType: (type: OrderType) => void;
   checkPostcode: (postcode: string) => Promise<void>;
+  getAddressList: (postcode: string) => Promise<string[]>;
   setCollectionSlot: (date: string, time: string) => void;
   addToCart: (item: MenuItemData) => void;
   updateQuantity: (itemId: number, quantity: number) => void;
@@ -207,6 +208,44 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const getAddressList = async (postcode: string): Promise<string[]> => {
+    const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
+    if (!apiKey || !postcode) return [];
+
+    try {
+      const url = `${GETADDRESS_API_BASE}/find/${encodeURIComponent(postcode)}?api-key=${apiKey}&expand=true`;
+      const response = await fetch(url);
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      // data.addresses is an array of objects if expand=true, or strings if not.
+      // With expand=true, it returns { formatted_address: [], thoroughfare: "", ... }
+      // Actually, getaddress.io find endpoint with expand=true returns:
+      // { addresses: [ { formatted_address: ["Line 1", "Line 2", ...], ... } ] }
+      // But let's check the documentation or assume standard behavior. 
+      // If we use expand=true, we get more details. If we don't, we get strings.
+      // The user request linked to autocomplete, but find is easier for a dropdown.
+      // Let's use expand=true to get a nice formatted string or just join the lines.
+
+      if (data.addresses && Array.isArray(data.addresses)) {
+        return data.addresses.map((addr: any) => {
+          // If it's a string (expand=false)
+          if (typeof addr === 'string') return addr;
+          // If it's an object (expand=true), usually formatted_address is an array of lines
+          if (Array.isArray(addr.formatted_address)) {
+            return addr.formatted_address.filter((line: string) => line).join(', ');
+          }
+          return '';
+        }).filter((a: string) => a !== '');
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+      return [];
+    }
+  };
+
   const setCollectionSlot = (date: string, time: string) => {
     setState(s => ({ ...s, collectionDate: date, collectionTime: time }));
   };
@@ -316,6 +355,7 @@ Notes: ${orderDetails.notes}
         ...state,
         setOrderType,
         checkPostcode,
+        getAddressList,
         setCollectionSlot,
         addToCart,
         updateQuantity,

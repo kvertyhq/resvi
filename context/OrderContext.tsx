@@ -3,17 +3,27 @@ import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, GETADDRESS_API_BASE } fr
 import { supabase } from '../supabaseClient';
 
 // Types
+export interface Addon {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface MenuItemData {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
   category: string;
   tags?: string[];
+  image_url?: string;
+  is_available?: boolean;
 }
 
 export interface CartItem extends MenuItemData {
+  cartId: string; // Unique ID for this specific cart entry (item + addons)
   quantity: number;
+  selectedAddons: Addon[];
 }
 
 type OrderType = 'delivery' | 'collection';
@@ -40,9 +50,9 @@ interface OrderContextType extends OrderState {
   checkPostcode: (postcode: string) => Promise<void>;
   getAddressList: (postcode: string) => Promise<string[]>;
   setCollectionSlot: (date: string, time: string) => void;
-  addToCart: (item: MenuItemData) => void;
-  updateQuantity: (itemId: number, quantity: number) => void;
-  removeFromCart: (itemId: number) => void;
+  addToCart: (item: MenuItemData, addons?: Addon[]) => void;
+  updateQuantity: (cartId: string, quantity: number) => void;
+  removeFromCart: (cartId: string) => void;
   clearCart: () => void;
   submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any }>;
   cartCount: number;
@@ -99,7 +109,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const { delivery_fee, delivery_fee_mode, delivery_minimum } = state.deliverySettings;
-    const cartValue = state.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+
+    // Calculate cart value including addons
+    const cartValue = state.cart.reduce((total, item) => {
+      const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+      return total + (item.price + addonsPrice) * item.quantity;
+    }, 0);
 
     // Check for free delivery threshold
     if (delivery_minimum > 0 && cartValue >= delivery_minimum) {
@@ -219,20 +234,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!response.ok) return [];
 
       const data = await response.json();
-      // data.addresses is an array of objects if expand=true, or strings if not.
-      // With expand=true, it returns { formatted_address: [], thoroughfare: "", ... }
-      // Actually, getaddress.io find endpoint with expand=true returns:
-      // { addresses: [ { formatted_address: ["Line 1", "Line 2", ...], ... } ] }
-      // But let's check the documentation or assume standard behavior. 
-      // If we use expand=true, we get more details. If we don't, we get strings.
-      // The user request linked to autocomplete, but find is easier for a dropdown.
-      // Let's use expand=true to get a nice formatted string or just join the lines.
-
       if (data.addresses && Array.isArray(data.addresses)) {
         return data.addresses.map((addr: any) => {
-          // If it's a string (expand=false)
           if (typeof addr === 'string') return addr;
-          // If it's an object (expand=true), usually formatted_address is an array of lines
           if (Array.isArray(addr.formatted_address)) {
             return addr.formatted_address.filter((line: string) => line).join(', ');
           }
@@ -250,38 +254,52 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(s => ({ ...s, collectionDate: date, collectionTime: time }));
   };
 
-  const addToCart = (itemToAdd: MenuItemData) => {
+  const addToCart = (itemToAdd: MenuItemData, addons: Addon[] = []) => {
     setState(s => {
-      const existingItem = s.cart.find(item => item.id === itemToAdd.id);
-      if (existingItem) {
-        return {
-          ...s,
-          cart: s.cart.map(item =>
-            item.id === itemToAdd.id ? { ...item, quantity: item.quantity + 1 } : item
-          ),
-        };
+      // Create a unique key based on item ID and sorted addon IDs
+      const addonIds = addons.map(a => a.id).sort().join(',');
+
+      // Check if exact same item configuration exists
+      const existingItemIndex = s.cart.findIndex(
+        item => item.id === itemToAdd.id &&
+          item.selectedAddons.map(a => a.id).sort().join(',') === addonIds
+      );
+
+      if (existingItemIndex > -1) {
+        const newCart = [...s.cart];
+        newCart[existingItemIndex].quantity += 1;
+        return { ...s, cart: newCart };
       }
-      return { ...s, cart: [...s.cart, { ...itemToAdd, quantity: 1 }] };
+
+      // Add new item
+      const newItem: CartItem = {
+        ...itemToAdd,
+        cartId: `${itemToAdd.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        quantity: 1,
+        selectedAddons: addons
+      };
+
+      return { ...s, cart: [...s.cart, newItem] };
     });
   };
 
-  const updateQuantity = (itemId: number, quantity: number) => {
+  const updateQuantity = (cartId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(itemId);
+      removeFromCart(cartId);
     } else {
       setState(s => ({
         ...s,
         cart: s.cart.map(item =>
-          item.id === itemId ? { ...item, quantity } : item
+          item.cartId === cartId ? { ...item, quantity } : item
         ),
       }));
     }
   };
 
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (cartId: string) => {
     setState(s => ({
       ...s,
-      cart: s.cart.filter(item => item.id !== itemId),
+      cart: s.cart.filter(item => item.cartId !== cartId),
     }));
   };
 
@@ -292,8 +310,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const submitOrder = async (orderDetails: any) => {
     console.log('Submitting order with details:', orderDetails);
     try {
-      // Use orderType passed in details or fall back to state
-      // Default to 'collection' if both are missing to match UI behavior
       const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
 
       const { data, error } = await supabase.rpc('create_order_by_phone', {
@@ -303,7 +319,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           menu_item_id: item.id,
           quantity: item.quantity,
           price: item.price,
-          name: item.name
+          name: item.name,
+          selected_addons: item.selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price }))
         })),
         p_mark_payment_completed: false,
         p_name: orderDetails.name,
@@ -324,9 +341,6 @@ Notes: ${orderDetails.notes}
         throw error;
       }
 
-      // Check if the RPC returned success: true
-      // The RPC might return data directly or wrapped, depending on definition.
-      // Assuming the user said "response has 'success': true", we check for that property.
       if (data && data.success === true) {
         console.log('Order submitted successfully:', data);
         clearCart();
@@ -346,7 +360,10 @@ Notes: ${orderDetails.notes}
   }, [state.cart]);
 
   const cartTotal = useMemo(() => {
-    return state.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+    return state.cart.reduce((total, item) => {
+      const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+      return total + (item.price + addonsPrice) * item.quantity;
+    }, 0);
   }, [state.cart]);
 
   return (

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useOrder, MenuItemData } from '../context/OrderContext';
+import { useOrder, MenuItemData, Addon } from '../context/OrderContext';
 import OrderSummary from '../components/OrderSummary';
 import { useSettings } from "../context/SettingsContext";
+import { supabase } from '../supabaseClient';
+import { X, Plus, Minus } from 'lucide-react';
 
 /**
  * Updated to handle Supabase RPC response of the form:
@@ -23,8 +25,9 @@ const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL + '/rest/v1/rpc/get_full_menu_grouped_by_category';
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const MenuItem: React.FC<{ item: MenuItemData }> = ({ item }) => {
-  const { addToCart } = useOrder();
+interface MenuPageProps { }
+
+const MenuItem: React.FC<{ item: MenuItemData; onAdd: (item: MenuItemData) => void }> = ({ item, onAdd }) => {
   const { settings } = useSettings();
   return (
     <div className="flex justify-between items-start py-6 border-b border-gray-200">
@@ -53,7 +56,7 @@ const MenuItem: React.FC<{ item: MenuItemData }> = ({ item }) => {
           <div className="text-right ml-4 flex-shrink-0">
             <p className="font-bold text-brand-dark-gray text-lg">{settings?.currency}{(item.price ?? 0).toFixed(2)}</p>
             <button
-              onClick={() => addToCart(item)}
+              onClick={() => onAdd(item)}
               className="mt-3 px-4 py-2 bg-brand-gold text-white text-sm font-semibold rounded-md hover:bg-brand-dark-gray transition-colors w-full"
               disabled={(item as any).is_available === false}
             >
@@ -77,6 +80,63 @@ const MenuPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { settings } = useSettings();
+
+  // Add-ons State
+  const [menuItemAddons, setMenuItemAddons] = useState<Record<string, Addon[]>>({});
+  const [selectedItem, setSelectedItem] = useState<MenuItemData | null>(null);
+  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Fetch Add-ons
+  useEffect(() => {
+    const fetchAddons = async () => {
+      // Fetch all addons
+      const { data: allAddons } = await supabase.from('addons').select('*').eq('is_available', true);
+      // Fetch links
+      const { data: links } = await supabase.from('menu_item_addons').select('*');
+
+      if (allAddons && links) {
+        const mapping: Record<string, Addon[]> = {};
+        links.forEach(link => {
+          const addon = allAddons.find(a => a.id === link.addon_id);
+          if (addon) {
+            if (!mapping[link.menu_item_id]) mapping[link.menu_item_id] = [];
+            mapping[link.menu_item_id].push(addon);
+          }
+        });
+        setMenuItemAddons(mapping);
+      }
+    };
+    fetchAddons();
+  }, []);
+
+  const handleAddItem = (item: MenuItemData) => {
+    const availableAddons = menuItemAddons[item.id];
+    if (availableAddons && availableAddons.length > 0) {
+      setSelectedItem(item);
+      setSelectedAddons(new Set());
+      setIsModalOpen(true);
+    } else {
+      addToCart(item);
+    }
+  };
+
+  const confirmAddWithAddons = () => {
+    if (selectedItem) {
+      const addons = menuItemAddons[selectedItem.id].filter(a => selectedAddons.has(a.id));
+      addToCart(selectedItem, addons);
+      setIsModalOpen(false);
+      setSelectedItem(null);
+      setSelectedAddons(new Set());
+    }
+  };
+
+  const toggleAddon = (addonId: string) => {
+    const newSet = new Set(selectedAddons);
+    if (newSet.has(addonId)) newSet.delete(addonId);
+    else newSet.add(addonId);
+    setSelectedAddons(newSet);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -223,7 +283,7 @@ const MenuPage: React.FC = () => {
                   <h3 className="text-3xl font-serif font-bold text-brand-dark">{activeCategory || 'Menu'}</h3>
                   <div className="mt-4">
                     {filteredItems.length > 0 ? (
-                      filteredItems.map(item => <MenuItem key={item.id} item={item} />)
+                      filteredItems.map(item => <MenuItem key={item.id} item={item} onAdd={handleAddItem} />)
                     ) : (
                       <p className="text-brand-mid-gray py-8">No items found in this category.</p>
                     )}
@@ -239,6 +299,66 @@ const MenuPage: React.FC = () => {
           </div >
         </div >
       </div >
+
+
+      {/* Customization Modal */}
+      {
+        isModalOpen && selectedItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 className="font-bold text-lg text-gray-900">Customize Item</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                <div className="mb-6">
+                  <h4 className="text-xl font-bold text-brand-dark-gray">{selectedItem.name}</h4>
+                  <p className="text-brand-mid-gray mt-1">{selectedItem.description}</p>
+                  <p className="text-brand-gold font-bold mt-2">{settings?.currency}{selectedItem.price.toFixed(2)}</p>
+                </div>
+
+                <div>
+                  <h5 className="font-semibold text-gray-900 mb-3">Add-ons</h5>
+                  <div className="space-y-3">
+                    {menuItemAddons[selectedItem.id]?.map(addon => (
+                      <div key={addon.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-brand-gold cursor-pointer" onClick={() => toggleAddon(addon.id)}>
+                        <div className="flex items-center">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${selectedAddons.has(addon.id) ? 'bg-brand-gold border-brand-gold text-white' : 'border-gray-300'}`}>
+                            {selectedAddons.has(addon.id) && <Plus className="h-3 w-3" />}
+                          </div>
+                          <span className="text-gray-700">{addon.name}</span>
+                        </div>
+                        <span className="font-medium text-gray-900">+{settings?.currency}{addon.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={confirmAddWithAddons}
+                  className="w-full bg-brand-dark-gray text-white py-3 rounded-md font-bold hover:bg-gray-800 transition-colors flex justify-between px-6"
+                >
+                  <span>Add to Order</span>
+                  <span>
+                    {settings?.currency}
+                    {(
+                      selectedItem.price +
+                      (menuItemAddons[selectedItem.id]
+                        ?.filter(a => selectedAddons.has(a.id))
+                        .reduce((sum, a) => sum + a.price, 0) || 0)
+                    ).toFixed(2)}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
     </div >
   );
 };

@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Clock, CheckCircle, Truck, XCircle, Filter } from 'lucide-react';
+import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X } from 'lucide-react';
+
+interface OrderItem {
+    id: string;
+    menu_item_id: string;
+    name_snapshot: string;
+    price_snapshot: number;
+    quantity: number;
+    selected_addons: {
+        id: string;
+        name: string;
+        price: number;
+    }[];
+}
 
 interface Order {
     id: string;
@@ -25,12 +38,17 @@ interface Order {
         full_name: string | null;
         phone: string | null;
     };
+    order_items: OrderItem[];
 }
 
 const OrderManagementPage: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<string>('all');
+
+    // Modal State
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
         fetchOrders();
@@ -62,6 +80,14 @@ const OrderManagementPage: React.FC = () => {
                     profiles:user_id (
                         full_name,
                         phone
+                    ),
+                    order_items (
+                        id,
+                        menu_item_id,
+                        name_snapshot,
+                        price_snapshot,
+                        quantity,
+                        selected_addons
                     )
                 `)
                 .eq('restaurant_id', restaurantId)
@@ -100,6 +126,11 @@ const OrderManagementPage: React.FC = () => {
             console.error('Failed to update order:', err);
             alert('Failed to update order status');
         }
+    };
+
+    const openOrderDetails = (order: Order) => {
+        setSelectedOrder(order);
+        setIsModalOpen(true);
     };
 
     const filteredOrders = filterStatus === 'all' ? orders : orders.filter(o => o.status === filterStatus);
@@ -270,7 +301,15 @@ const OrderManagementPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="mt-4 md:mt-0 flex items-center space-x-2">
+                        <div className="mt-4 md:mt-0 flex flex-col space-y-2 md:space-y-0 md:flex-row md:items-center md:space-x-2">
+                            <button
+                                onClick={() => openOrderDetails(order)}
+                                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
+                            >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Items
+                            </button>
+
                             {order.status === 'pending' && (
                                 <button onClick={() => updateStatus(order.id, 'confirmed')} className="bg-cyan-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-cyan-700 transition-colors">
                                     Confirm Order
@@ -311,6 +350,126 @@ const OrderManagementPage: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Order Details Modal */}
+            {isModalOpen && selectedOrder && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900">Order #{selectedOrder.readable_id} Details</h3>
+                                <p className="text-sm text-gray-500">{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto">
+                            <div className="space-y-6">
+                                {/* Items List */}
+                                <div>
+                                    <h4 className="font-semibold text-gray-900 mb-3">Ordered Items</h4>
+                                    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                                                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
+                                                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {selectedOrder.order_items?.map((item, idx) => {
+                                                    const addonsTotal = item.selected_addons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
+                                                    const itemTotal = (item.price_snapshot + addonsTotal) * item.quantity;
+
+                                                    return (
+                                                        <tr key={idx}>
+                                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{item.quantity}x</td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                <div className="font-medium">{item.name_snapshot}</div>
+                                                                {item.selected_addons && item.selected_addons.length > 0 && (
+                                                                    <div className="text-xs text-gray-500 mt-1">
+                                                                        {item.selected_addons.map((addon, i) => (
+                                                                            <span key={i} className="block">
+                                                                                + {addon.name} (£{addon.price.toFixed(2)})
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                                                                £{item.price_snapshot.toFixed(2)}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">
+                                                                £{itemTotal.toFixed(2)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Financial Summary */}
+                                <div className="border-t border-gray-200 pt-4">
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-600">Subtotal</span>
+                                        <span className="font-medium">£{selectedOrder.metadata.subtotal.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-600">Tax</span>
+                                        <span className="font-medium">£{selectedOrder.metadata.tax.toFixed(2)}</span>
+                                    </div>
+                                    {selectedOrder.metadata.delivery_fee > 0 && (
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-gray-600">Delivery Fee</span>
+                                            <span className="font-medium">£{selectedOrder.metadata.delivery_fee.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-lg font-bold text-gray-900 mt-3 pt-3 border-t border-gray-200">
+                                        <span>Total</span>
+                                        <span>£{selectedOrder.total_amount.toFixed(2)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Customer & Note Details */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                    <div className="bg-gray-50 p-3 rounded-md">
+                                        <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer</h5>
+                                        <p className="text-sm font-medium">{selectedOrder.profiles?.full_name || 'Guest'}</p>
+                                        <p className="text-sm text-gray-600">{selectedOrder.profiles?.phone}</p>
+                                    </div>
+                                    <div className="bg-gray-50 p-3 rounded-md">
+                                        <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Order Info</h5>
+                                        <p className="text-sm"><span className="text-gray-500">Type:</span> {selectedOrder.order_type}</p>
+                                        <p className="text-sm"><span className="text-gray-500">Payment:</span> {selectedOrder.payment_status}</p>
+                                    </div>
+                                </div>
+
+                                {selectedOrder.notes && (
+                                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-100">
+                                        <h5 className="text-xs font-semibold text-yellow-800 uppercase mb-1">Notes</h5>
+                                        <p className="text-sm text-yellow-900">{selectedOrder.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

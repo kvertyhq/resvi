@@ -28,19 +28,37 @@ interface MenuItem {
     updated_at?: string;
 }
 
+interface Addon {
+    id: string;
+    restaurant_id: string;
+    name: string;
+    description: string;
+    price: number;
+    is_available: boolean;
+}
+
+interface MenuItemAddon {
+    menu_item_id: string;
+    addon_id: string;
+    order_index: number;
+}
+
 const MenuManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
-    const [activeTab, setActiveTab] = useState<'items' | 'categories'>('items');
+    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons'>('items');
     const [loading, setLoading] = useState(false);
 
     // Data State
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
+    const [addons, setAddons] = useState<Addon[]>([]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+    const [editingAddon, setEditingAddon] = useState<Addon | null>(null);
+    const [selectedAddonIds, setSelectedAddonIds] = useState<Set<string>>(new Set());
 
     // Form State
     const [categoryForm, setCategoryForm] = useState<Partial<MenuCategory>>({
@@ -61,6 +79,13 @@ const MenuManagementPage: React.FC = () => {
         spicy_level: 0
     });
 
+    const [addonForm, setAddonForm] = useState<Partial<Addon>>({
+        name: '',
+        description: '',
+        price: 0,
+        is_available: true
+    });
+
     // Image Upload State
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string>('');
@@ -75,7 +100,7 @@ const MenuManagementPage: React.FC = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchItems()]);
+        await Promise.all([fetchCategories(), fetchItems(), fetchAddons()]);
         setLoading(false);
     };
 
@@ -95,6 +120,15 @@ const MenuManagementPage: React.FC = () => {
             .order('name', { ascending: true });
         if (data) setItems(data);
         if (error) console.error('Error fetching items:', error);
+    };
+
+    const fetchAddons = async () => {
+        const { data, error } = await supabase
+            .from('addons')
+            .select('*')
+            .order('name', { ascending: true });
+        if (data) setAddons(data);
+        if (error) console.error('Error fetching addons:', error);
     };
 
     // --- Handlers for Categories ---
@@ -185,15 +219,26 @@ const MenuManagementPage: React.FC = () => {
         }, 1500);
     };
 
-    const openItemModal = (item?: MenuItem) => {
+    const openItemModal = async (item?: MenuItem) => {
         setImageFile(null);
         setAiCheckStatus('idle');
         setAiFeedback('');
+        setSelectedAddonIds(new Set());
 
         if (item) {
             setEditingItem(item);
             setItemForm(item);
             setImagePreview(item.image_url || '');
+
+            // Fetch linked addons
+            const { data } = await supabase
+                .from('menu_item_addons')
+                .select('addon_id')
+                .eq('menu_item_id', item.id);
+
+            if (data) {
+                setSelectedAddonIds(new Set(data.map(a => a.addon_id)));
+            }
         } else {
             setEditingItem(null);
             setItemForm({
@@ -234,11 +279,30 @@ const MenuManagementPage: React.FC = () => {
 
         const payload = { ...itemForm, image_url: imageUrl };
 
+        let itemId = editingItem?.id;
+
         if (editingItem) {
             await supabase.from('menu_items').update(payload).eq('id', editingItem.id);
         } else {
-            await supabase.from('menu_items').insert([payload]);
+            const { data, error } = await supabase.from('menu_items').insert([payload]).select().single();
+            if (data) itemId = data.id;
         }
+
+        // Update Addons
+        if (itemId) {
+            // Delete existing
+            await supabase.from('menu_item_addons').delete().eq('menu_item_id', itemId);
+
+            // Insert new
+            if (selectedAddonIds.size > 0) {
+                const addonsToInsert = Array.from(selectedAddonIds).map(addonId => ({
+                    menu_item_id: itemId,
+                    addon_id: addonId
+                }));
+                await supabase.from('menu_item_addons').insert(addonsToInsert);
+            }
+        }
+
         setIsModalOpen(false);
         fetchItems();
     };
@@ -247,6 +311,57 @@ const MenuManagementPage: React.FC = () => {
         if (confirm('Delete this item?')) {
             await supabase.from('menu_items').delete().eq('id', id);
             fetchItems();
+        }
+    };
+
+    // --- Handlers for Addons ---
+
+    const handleAddonInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        setAddonForm(prev => ({
+            ...prev,
+            [name]: type === 'number' ? parseFloat(value) : value
+        }));
+    };
+
+    const handleAddonCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, checked } = e.target;
+        setAddonForm(prev => ({ ...prev, [name]: checked }));
+    };
+
+    const openAddonModal = (addon?: Addon) => {
+        if (addon) {
+            setEditingAddon(addon);
+            setAddonForm(addon);
+        } else {
+            setEditingAddon(null);
+            setAddonForm({
+                name: '',
+                description: '',
+                price: 0,
+                is_available: true
+            });
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleAddonSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = { ...addonForm, restaurant_id: import.meta.env.VITE_RESTAURANT_ID };
+
+        if (editingAddon) {
+            await supabase.from('addons').update(payload).eq('id', editingAddon.id);
+        } else {
+            await supabase.from('addons').insert([payload]);
+        }
+        setIsModalOpen(false);
+        fetchAddons();
+    };
+
+    const handleDeleteAddon = async (id: string) => {
+        if (confirm('Delete this add-on?')) {
+            await supabase.from('addons').delete().eq('id', id);
+            fetchAddons();
         }
     };
 
@@ -261,7 +376,7 @@ const MenuManagementPage: React.FC = () => {
                     className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
                 >
                     <Plus className="h-5 w-5 mr-2" />
-                    Add {activeTab === 'categories' ? 'Category' : 'Item'}
+                    Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : 'Item'}
                 </button>
             </div>
 
@@ -278,6 +393,12 @@ const MenuManagementPage: React.FC = () => {
                     className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'categories' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     <Layers className="h-4 w-4 mr-2" /> Categories
+                </button>
+                <button
+                    onClick={() => setActiveTab('addons')}
+                    className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'addons' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Plus className="h-4 w-4 mr-2" /> Add-ons
                 </button>
             </div>
 
@@ -368,6 +489,43 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'addons' && (
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {addons.map((addon) => (
+                                            <tr key={addon.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{addon.name}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{addon.description}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">£{addon.price.toFixed(2)}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${addon.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {addon.is_available ? 'Available' : 'Unavailable'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button onClick={() => openAddonModal(addon)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
+                                                    <button onClick={() => handleDeleteAddon(addon.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {addons.length === 0 && <tr><td colSpan={5} className="px-6 py-4 text-center text-gray-500">No add-ons found.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modal */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -376,7 +534,9 @@ const MenuManagementPage: React.FC = () => {
                                     <h3 className="text-xl font-bold text-gray-900">
                                         {activeTab === 'categories'
                                             ? (editingCategory ? 'Edit Category' : 'Add Category')
-                                            : (editingItem ? 'Edit Item' : 'Add Item')}
+                                            : activeTab === 'addons'
+                                                ? (editingAddon ? 'Edit Add-on' : 'Add Add-on')
+                                                : (editingItem ? 'Edit Item' : 'Add Item')}
                                     </h3>
                                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500">
                                         <XCircle className="h-6 w-6" />
@@ -401,6 +561,29 @@ const MenuManagementPage: React.FC = () => {
                                             <div className="flex justify-end space-x-3 pt-4">
                                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                                                 <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Category</button>
+                                            </div>
+                                        </form>
+                                    ) : activeTab === 'addons' ? (
+                                        <form onSubmit={handleAddonSubmit} className="space-y-6">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                                <input type="text" name="name" value={addonForm.name} onChange={handleAddonInputChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                                <textarea name="description" rows={3} value={addonForm.description} onChange={handleAddonInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"></textarea>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Price (£)</label>
+                                                <input type="number" name="price" step="0.01" value={addonForm.price} onChange={handleAddonInputChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                                            </div>
+                                            <div className="flex items-center">
+                                                <input type="checkbox" id="addon_is_available" name="is_available" checked={addonForm.is_available} onChange={handleAddonCheckboxChange} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
+                                                <label htmlFor="addon_is_available" className="ml-2 block text-sm text-gray-900">Available</label>
+                                            </div>
+                                            <div className="flex justify-end space-x-3 pt-4">
+                                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                                <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Add-on</button>
                                             </div>
                                         </form>
                                     ) : (
@@ -445,6 +628,33 @@ const MenuManagementPage: React.FC = () => {
                                                 <div className="flex items-center">
                                                     <input type="checkbox" id="vegetarian" name="vegetarian" checked={itemForm.vegetarian} onChange={handleCheckboxChange} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
                                                     <label htmlFor="vegetarian" className="ml-2 block text-sm text-gray-900">Vegetarian</label>
+                                                </div>
+                                            </div>
+
+                                            {/* Add-ons Selection */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Available Add-ons</label>
+                                                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+                                                    {addons.map(addon => (
+                                                        <div key={addon.id} className="flex items-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                id={`addon-${addon.id}`}
+                                                                checked={selectedAddonIds.has(addon.id)}
+                                                                onChange={(e) => {
+                                                                    const newSet = new Set(selectedAddonIds);
+                                                                    if (e.target.checked) newSet.add(addon.id);
+                                                                    else newSet.delete(addon.id);
+                                                                    setSelectedAddonIds(newSet);
+                                                                }}
+                                                                className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
+                                                            />
+                                                            <label htmlFor={`addon-${addon.id}`} className="ml-2 text-sm text-gray-700">
+                                                                {addon.name} (+£{addon.price.toFixed(2)})
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                    {addons.length === 0 && <p className="text-sm text-gray-500 col-span-2">No add-ons created yet.</p>}
                                                 </div>
                                             </div>
 

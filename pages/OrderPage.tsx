@@ -23,14 +23,18 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
-    const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot, deliveryFee } = useOrder();
+    const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot, setDeliverySlot, deliveryFee } = useOrder();
 
     const [localPostcode, setLocalPostcode] = useState(postcode);
     const [isCheckingPostcode, setIsCheckingPostcode] = useState(false);
     const [localDate, setLocalDate] = useState('');
     const [localTime, setLocalTime] = useState('');
 
-    const isDeliveryReady = orderType === 'delivery' && deliveryAvailable === true;
+    // Delivery slot state
+    const [deliveryDate, setDeliveryDate] = useState('');
+    const [deliveryTime, setDeliveryTime] = useState('');
+
+    const isDeliveryReady = orderType === 'delivery' && deliveryAvailable === true && deliveryDate && deliveryTime;
     const isCollectionReady = orderType === 'collection' && localDate && localTime;
     const canContinue = isDeliveryReady || isCollectionReady;
 
@@ -39,12 +43,15 @@ const OrderPage: React.FC = () => {
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        setLocalDate(`${yyyy}-${mm}-${dd}`);
+        const formattedToday = `${yyyy}-${mm}-${dd}`;
+
+        setLocalDate(formattedToday);
+        setDeliveryDate(formattedToday);
     }, []);
 
     const handleContinue = () => {
         if (isDeliveryReady) {
-            // Postcode is already in context from checkPostcode
+            setDeliverySlot(deliveryDate, deliveryTime);
         } else if (isCollectionReady) {
             setCollectionSlot(localDate, localTime);
         }
@@ -60,8 +67,6 @@ const OrderPage: React.FC = () => {
     const baseButtonClasses = "w-full text-center p-6 border rounded-lg cursor-pointer transition-all duration-300";
     const inactiveButtonClasses = "border-gray-200 bg-white hover:bg-gray-50 hover:border-brand-gold/50";
     const activeButtonClasses = "border-brand-gold bg-brand-gold/5 shadow-md";
-
-    const timeSlots = ["17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30"];
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-160px)] font-sans">
@@ -122,12 +127,45 @@ const OrderPage: React.FC = () => {
                                     </button>
                                 </div>
                                 {deliveryAvailable === true && deliveryDistance && (
-                                    <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
-                                        Great! We deliver to your area ({(deliveryDistance * 0.621371).toFixed(1)} miles away).
-                                        <span className="block mt-1 font-medium">
-                                            Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
-                                        </span>
-                                    </p>
+                                    <>
+                                        <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
+                                            Great! We deliver to your area ({(deliveryDistance * 0.621371).toFixed(1)} miles away).
+                                            <span className="block mt-1 font-medium">
+                                                Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
+                                            </span>
+                                        </p>
+
+                                        {/* Delivery Slot Selection */}
+                                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                                <div className="relative">
+                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
+                                                    <input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
+                                                <div className="relative">
+                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
+                                                    <select value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
+                                                        <option value="" disabled>Select a time</option>
+                                                        {(() => {
+                                                            if (!deliveryDate || !settings?.collection_time_slots) return null;
+
+                                                            const date = new Date(deliveryDate);
+                                                            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+                                                            const slots = settings.collection_time_slots[dayName] || [];
+
+                                                            return slots.map((slot) => (
+                                                                <option key={slot} value={slot}>{slot}</option>
+                                                            ));
+                                                        })()}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
                                 {deliveryAvailable === false && deliveryError && (
                                     <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">

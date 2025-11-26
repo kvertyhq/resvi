@@ -34,6 +34,8 @@ interface OrderState {
   deliveryAvailable: boolean | null;
   deliveryDistance: number | null; // Distance in km
   deliveryError: string | null;
+  deliveryDate: string;
+  deliveryTime: string;
   collectionDate: string;
   collectionTime: string;
   cart: CartItem[];
@@ -50,6 +52,7 @@ interface OrderContextType extends OrderState {
   checkPostcode: (postcode: string) => Promise<void>;
   getAddressList: (postcode: string) => Promise<string[]>;
   setCollectionSlot: (date: string, time: string) => void;
+  setDeliverySlot: (date: string, time: string) => void;
   addToCart: (item: MenuItemData, addons?: Addon[]) => void;
   updateQuantity: (cartId: string, quantity: number) => void;
   removeFromCart: (cartId: string) => void;
@@ -68,6 +71,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deliveryAvailable: null,
     deliveryDistance: null,
     deliveryError: null,
+    deliveryDate: '',
+    deliveryTime: '',
     collectionDate: '',
     collectionTime: '',
     cart: [],
@@ -146,6 +151,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       deliveryAvailable: type === 'collection' ? null : s.deliveryAvailable,
       deliveryDistance: type === 'collection' ? null : s.deliveryDistance,
       deliveryError: type === 'collection' ? null : s.deliveryError,
+      deliveryDate: type === 'collection' ? '' : s.deliveryDate,
+      deliveryTime: type === 'collection' ? '' : s.deliveryTime,
       collectionDate: type === 'delivery' ? '' : s.collectionDate,
       collectionTime: type === 'delivery' ? '' : s.collectionTime,
     }));
@@ -254,6 +261,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(s => ({ ...s, collectionDate: date, collectionTime: time }));
   };
 
+  const setDeliverySlot = (date: string, time: string) => {
+    setState(s => ({ ...s, deliveryDate: date, deliveryTime: time }));
+  };
+
   const addToCart = (itemToAdd: MenuItemData, addons: Addon[] = []) => {
     setState(s => {
       // Create a unique key based on item ID and sorted addon IDs
@@ -312,6 +323,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
 
+      let scheduledTime = null;
+      if (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) {
+        scheduledTime = `${state.collectionDate} ${state.collectionTime}`;
+      } else if (finalOrderType === 'delivery' && state.deliveryDate && state.deliveryTime) {
+        scheduledTime = `${state.deliveryDate} ${state.deliveryTime}`;
+      }
+
       const { data, error } = await supabase.rpc('create_order_by_phone', {
         p_delivery_address_id: null,
         p_delivery_fee: state.deliveryFee,
@@ -332,7 +350,7 @@ Notes: ${orderDetails.notes}
         p_payment_method: 'card',
         p_phone: orderDetails.phone,
         p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
-        p_scheduled_time: (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) ? `${state.collectionDate} ${state.collectionTime}` : null,
+        p_scheduled_time: scheduledTime,
         p_transaction_id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
 
@@ -374,6 +392,7 @@ Notes: ${orderDetails.notes}
         checkPostcode,
         getAddressList,
         setCollectionSlot,
+        setDeliverySlot,
         addToCart,
         updateQuantity,
         removeFromCart,

@@ -132,8 +132,8 @@ const BookingManagementPage: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('today')}
                         className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'today'
-                                ? 'border-brand-gold text-brand-gold'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-brand-gold text-brand-gold'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         Today
@@ -141,8 +141,8 @@ const BookingManagementPage: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('upcoming')}
                         className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'upcoming'
-                                ? 'border-brand-gold text-brand-gold'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-brand-gold text-brand-gold'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         Upcoming
@@ -150,8 +150,8 @@ const BookingManagementPage: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('past')}
                         className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'past'
-                                ? 'border-brand-gold text-brand-gold'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-brand-gold text-brand-gold'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         Past
@@ -178,7 +178,7 @@ const BookingManagementPage: React.FC = () => {
                                         <div className="flex items-center">
                                             <Calendar className="h-5 w-5 text-gray-400 mr-3" />
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">{booking.booking_date} at {booking.booking_time}</div>
+                                                <div className="text-sm font-medium text-gray-900">{booking.booking_date.split('-').reverse().join('-')} at {booking.booking_time}</div>
                                                 <div className="text-sm text-gray-500 flex items-center mt-1">
                                                     <Users className="h-3 w-3 mr-1" /> {booking.guest_count} guests
                                                 </div>

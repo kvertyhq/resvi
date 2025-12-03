@@ -44,6 +44,7 @@ const ReservationPage: React.FC = () => {
       p_auto_confirm: false,
       p_table_count: Math.ceil(person / 4),
       p_user_id: null, // Set to null as per task
+      p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
     };
 
     try {

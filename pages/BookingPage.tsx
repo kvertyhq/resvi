@@ -185,7 +185,9 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
                 </div>
                 <div className="flex items-center">
                     <input type="checkbox" id="terms" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
-                    <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">Please accept our Terms and conditions</label>
+                    <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
+                        Please accept our <a href="/#/terms" target="_blank" rel="noopener noreferrer" className="text-brand-gold hover:underline">Terms and conditions</a>
+                    </label>
                 </div>
 
                 <div className="flex justify-between pt-2">
@@ -264,7 +266,8 @@ const BookingPage: React.FC = () => {
                     p_notes: bookingData.notes,
                     p_phone: validatedPhone,
                     p_table_count: calculateTables(bookingData.guests),
-                    p_user_id: null // Assuming guest booking for now, or could be session.user.id if auth implemented
+                    p_user_id: null, // Assuming guest booking for now, or could be session.user.id if auth implemented
+                    p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID
                 });
 
             if (error) {

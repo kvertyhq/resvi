@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X } from 'lucide-react';
+import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X, RefreshCcw } from 'lucide-react';
 
 interface OrderItem {
     id: string;
@@ -45,20 +45,29 @@ const OrderManagementPage: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     // Modal State
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
+        // Initialize audio
+        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
         fetchOrders();
 
         // Realtime Subscription
         const channel = supabase
             .channel('public:orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-                console.log('Realtime update:', payload);
-                fetchOrders(); // Refresh list on any change
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+                console.log('New order received:', payload);
+                playNotificationSound();
+                fetchOrders();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+                console.log('Order updated:', payload);
+                fetchOrders();
             })
             .subscribe();
 
@@ -66,6 +75,18 @@ const OrderManagementPage: React.FC = () => {
             supabase.removeChannel(channel);
         };
     }, []);
+
+    const playNotificationSound = () => {
+        if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+                console.log("Audio play failed (user interaction required):", error);
+            });
+        }
+    };
+
+    const handleRefresh = () => {
+        fetchOrders();
+    };
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -188,7 +209,16 @@ const OrderManagementPage: React.FC = () => {
     return (
         <div>
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-serif font-bold text-gray-800">Order Management</h2>
+                <div className="flex items-center space-x-4">
+                    <h2 className="text-3xl font-serif font-bold text-gray-800">Order Management</h2>
+                    <button
+                        onClick={handleRefresh}
+                        className="p-2 bg-white border border-gray-300 rounded-full hover:bg-gray-50 text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
+                        title="Refresh Orders"
+                    >
+                        <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
                 <div className="flex items-center space-x-2">
                     <Filter className="h-5 w-5 text-gray-500" />
                     <select

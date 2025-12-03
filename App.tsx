@@ -12,6 +12,7 @@ import OrderPage from './pages/OrderPage';
 import BookingPage from './pages/BookingPage';
 import MenuPage from './pages/MenuPage';
 import AboutPage from './pages/AboutPage';
+import TermsPage from './pages/TermsPage';
 
 // Admin Pages
 import LoginPage from './pages/admin/LoginPage';
@@ -93,6 +94,15 @@ const App: React.FC = () => {
                   <Header />
                   <main className="flex-grow">
                     <MenuPage />
+                  </main>
+                  <Footer />
+                </div>
+              } />
+              <Route path="/terms" element={
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-grow">
+                    <TermsPage />
                   </main>
                   <Footer />
                 </div>

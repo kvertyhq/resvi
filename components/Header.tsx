@@ -2,11 +2,7 @@ import { useSettings } from '@/context/SettingsContext';
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
-const CartIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-);
+
 
 const MenuIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -33,9 +29,6 @@ const Header: React.FC = () => {
             <NavLink to="/contact" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Contact Us</NavLink>
             <NavLink to="/order" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Order Online</NavLink>
             <NavLink to="/booking" onClick={onLinkClick} className="px-5 py-2 border border-white text-white hover:bg-white hover:text-brand-dark transition duration-300 uppercase tracking-wider text-sm">Book a Table</NavLink>
-            <button className="text-white" aria-label="View cart">
-                <CartIcon />
-            </button>
         </>
     );
     const { settings } = useSettings();

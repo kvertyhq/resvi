@@ -20,6 +20,8 @@ const AdminLayout: React.FC = () => {
     const { session, loading, logout, selectedRestaurantId, setSelectedRestaurantId, restaurants } = useAdmin();
     const navigate = useNavigate();
 
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
     if (loading) {
         return <div className="flex items-center justify-center h-screen bg-gray-100">Loading...</div>;
     }
@@ -27,8 +29,6 @@ const AdminLayout: React.FC = () => {
     if (!session) {
         return <Navigate to="/admin/login" replace />;
     }
-
-    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
     const handleLogout = async () => {
         await logout();

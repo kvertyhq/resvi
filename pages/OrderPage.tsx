@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
 import { useSettings } from '../context/SettingsContext';
+import { supabase } from '../supabaseClient';
 
 const DeliveryIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -49,13 +50,51 @@ const OrderPage: React.FC = () => {
         setDeliveryDate(formattedToday);
     }, []);
 
-    const handleContinue = () => {
-        if (isDeliveryReady) {
-            setDeliverySlot(deliveryDate, deliveryTime);
-        } else if (isCollectionReady) {
-            setCollectionSlot(localDate, localTime);
+    const [isCheckingCapacity, setIsCheckingCapacity] = useState(false);
+    const [capacityError, setCapacityError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setCapacityError(null);
+    }, [orderType]);
+
+    const handleContinue = async () => {
+        setIsCheckingCapacity(true);
+        setCapacityError(null); // Reset error
+        const date = orderType === 'delivery' ? deliveryDate : localDate;
+        const time = orderType === 'delivery' ? deliveryTime : localTime;
+
+        if (!date || !time) {
+            setCapacityError("Please select both date and time.");
+            setIsCheckingCapacity(false);
+            return;
         }
-        navigate('/menu');
+
+        try {
+            const { data, error } = await supabase.rpc('check_timeslot_capacity', {
+                p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                p_date: date,
+                p_time: time,
+                p_order_type: orderType
+            });
+
+            if (error) throw error;
+
+            if (data && (data.message === 'slot available' || data.unlimited === true)) {
+                if (isDeliveryReady) {
+                    setDeliverySlot(deliveryDate, deliveryTime);
+                } else if (isCollectionReady) {
+                    setCollectionSlot(localDate, localTime);
+                }
+                navigate('/menu');
+            } else {
+                setCapacityError("Selected time slot is not available. Please choose another time.");
+            }
+        } catch (error) {
+            console.error("Error checking capacity:", error);
+            setCapacityError("An error occurred. Please try again.");
+        } finally {
+            setIsCheckingCapacity(false);
+        }
     };
 
     const handlePostcodeCheck = async () => {
@@ -106,7 +145,7 @@ const OrderPage: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="min-h-[160px] space-y-4">
+                    <div className="space-y-4">
                         {orderType === 'delivery' && (
                             <div className="animate-fade-in space-y-4">
                                 <p className="text-sm text-gray-600">Enter postcode to check availability</p>
@@ -134,14 +173,30 @@ const OrderPage: React.FC = () => {
                                                 Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
                                             </span>
                                         </p>
-
+                                        {capacityError && (
+                                            <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
+                                        )}
                                         {/* Delivery Slot Selection */}
                                         <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                                 <div className="relative">
                                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
-                                                    <input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold" />
+                                                    <input
+                                                        type="date"
+                                                        value={deliveryDate}
+                                                        onChange={e => {
+                                                            const selectedDate = e.target.value;
+                                                            if (settings?.closure_dates?.includes(selectedDate)) {
+                                                                alert("We are closed on this date. Please select another date.");
+                                                                setDeliveryDate('');
+                                                            } else {
+                                                                setDeliveryDate(selectedDate);
+                                                            }
+                                                        }}
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
+                                                    />
                                                 </div>
                                             </div>
                                             <div>
@@ -179,13 +234,29 @@ const OrderPage: React.FC = () => {
                         )}
                         {orderType === 'collection' && (
                             <div className="animate-fade-in space-y-4">
-                                <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">Collection available today</p>
+                                {capacityError && (
+                                    <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                                         <div className="relative">
                                             <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
-                                            <input type="date" value={localDate} onChange={e => setLocalDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold" />
+                                            <input
+                                                type="date"
+                                                value={localDate}
+                                                onChange={e => {
+                                                    const selectedDate = e.target.value;
+                                                    if (settings?.closure_dates?.includes(selectedDate)) {
+                                                        alert("We are closed on this date. Please select another date.");
+                                                        setLocalDate('');
+                                                    } else {
+                                                        setLocalDate(selectedDate);
+                                                    }
+                                                }}
+                                                min={new Date().toISOString().split('T')[0]}
+                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
+                                            />
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1">Choose a collection date</p>
                                     </div>
@@ -226,10 +297,10 @@ const OrderPage: React.FC = () => {
 
                     <button
                         onClick={handleContinue}
-                        disabled={!canContinue}
+                        disabled={!canContinue || isCheckingCapacity}
                         className="w-full mt-6 bg-brand-gold text-white py-4 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                     >
-                        Continue
+                        {isCheckingCapacity ? 'Checking Availability...' : 'Continue'}
                     </button>
                 </div>
             </div>

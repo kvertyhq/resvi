@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
 import { Save } from 'lucide-react';
+import SettingsBasicInfo from '../../components/admin/settings/SettingsBasicInfo';
+import SettingsLocation from '../../components/admin/settings/SettingsLocation';
+import SettingsOperations from '../../components/admin/settings/SettingsOperations';
+import SettingsMedia from '../../components/admin/settings/SettingsMedia';
+import SettingsOpeningHours from '../../components/admin/settings/SettingsOpeningHours';
+import SettingsClosureDates from '../../components/admin/settings/SettingsClosureDates';
+import SettingsTimeslots from '../../components/admin/settings/SettingsTimeslots';
 
 const SettingsPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
@@ -34,98 +41,32 @@ const SettingsPage: React.FC = () => {
         theme_color: '#000000',
         tax_rate: 0,
         max_booking_size: 10,
-        opening_hours: {} as Record<string, string[]>, // JSONB
-        collection_time_slots: {} as Record<string, string[]>, // JSONB
+        opening_hours: {} as Record<string, string[]>,
         delivery_fee: 0,
         delivery_fee_mode: 'flat',
         delivery_minimum: 0
     });
 
-    const [collectionRanges, setCollectionRanges] = useState<Record<string, { start: string, end: string }[]>>({});
+    // New states for advanced settings
+    const [collectionTimeSlots, setCollectionTimeSlots] = useState<Record<string, string[]>>({});
+    const [closureDates, setClosureDates] = useState<string[]>([]);
+    const [timeslotCapacities, setTimeslotCapacities] = useState<Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number }>>({});
 
     useEffect(() => {
-        // Use env var for now as requested
         const envRestaurantId = import.meta.env.VITE_RESTAURANT_ID;
         if (envRestaurantId) {
             fetchSettings(envRestaurantId);
         }
     }, []);
 
-    const parseSlotsToRanges = (slots: Record<string, string[]>) => {
-        const ranges: Record<string, { start: string, end: string }[]> = {};
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-        days.forEach(day => {
-            const daySlots = slots[day]?.sort() || [];
-            if (daySlots.length === 0) return;
-
-            const dayRanges: { start: string, end: string }[] = [];
-            let start = daySlots[0];
-            let prev = daySlots[0];
-
-            for (let i = 1; i < daySlots.length; i++) {
-                const current = daySlots[i];
-                const prevDate = new Date(`2000-01-01T${prev}`);
-                const currentDate = new Date(`2000-01-01T${current}`);
-                const diff = (currentDate.getTime() - prevDate.getTime()) / (1000 * 60);
-
-                if (diff > 30) {
-                    // End of a contiguous block
-                    // For the range end, we add 30 mins to the last slot to represent the closing time
-                    const endDate = new Date(prevDate.getTime() + 30 * 60000);
-                    const endString = endDate.toTimeString().slice(0, 5);
-                    dayRanges.push({ start, end: endString });
-                    start = current;
-                }
-                prev = current;
-            }
-            // Push the last range
-            const lastDate = new Date(`2000-01-01T${prev}`);
-            const lastEndDate = new Date(lastDate.getTime() + 30 * 60000);
-            const lastEndString = lastEndDate.toTimeString().slice(0, 5);
-            dayRanges.push({ start, end: lastEndString });
-
-            ranges[day] = dayRanges;
-        });
-        return ranges;
-    };
-
-    const generateSlots = (ranges: Record<string, { start: string, end: string }[]>) => {
-        const slots: Record<string, string[]> = {};
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-        days.forEach(day => {
-            const dayRanges = ranges[day];
-            if (!dayRanges || dayRanges.length === 0) return;
-
-            const daySlots: string[] = [];
-            dayRanges.forEach(range => {
-                if (!range.start || !range.end) return;
-
-                let current = new Date(`2000-01-01T${range.start}`);
-                const end = new Date(`2000-01-01T${range.end}`);
-
-                while (current < end) {
-                    daySlots.push(current.toTimeString().slice(0, 5));
-                    current = new Date(current.getTime() + 30 * 60000);
-                }
-            });
-            slots[day] = [...new Set(daySlots)].sort();
-        });
-        return slots;
-    };
-
     const fetchSettings = async (id: string) => {
         setLoading(true);
         try {
-            // Use env var for p_id
             const { data, error } = await supabase.rpc('get_restaurant_settings', { p_id: import.meta.env.VITE_RESTAURANT_ID });
 
             if (error) throw error;
 
             if (data) {
-                // The API returns { data: { ... }, success: true }
-                // So we need to access data.data if it exists, or fallback to data if it's direct
                 const responseData = data.data || data;
                 const settings = Array.isArray(responseData) ? responseData[0] : responseData;
 
@@ -157,15 +98,14 @@ const SettingsPage: React.FC = () => {
                         tax_rate: settings.tax_rate || 0,
                         max_booking_size: settings.max_booking_size || 10,
                         opening_hours: settings.opening_hours || {},
-                        collection_time_slots: settings.collection_time_slots || {},
                         delivery_fee: settings.delivery_fee || 0,
                         delivery_fee_mode: settings.delivery_fee_mode || 'flat',
                         delivery_minimum: settings.delivery_minimum || 0
                     });
 
-                    if (settings.collection_time_slots) {
-                        setCollectionRanges(parseSlotsToRanges(settings.collection_time_slots));
-                    }
+                    setCollectionTimeSlots(settings.collection_time_slots || {});
+                    setClosureDates(settings.closure_dates || []);
+                    setTimeslotCapacities(settings.timeslot_capacities || {});
                 }
             }
         } catch (err: any) {
@@ -184,54 +124,20 @@ const SettingsPage: React.FC = () => {
         }));
     };
 
-    const handleRangeChange = (day: string, index: number, field: 'start' | 'end', value: string) => {
-        setCollectionRanges(prev => {
-            const newRanges = { ...prev };
-            // Create a shallow copy of the array for the specific day to avoid mutation
-            const dayRanges = [...(newRanges[day] || [])];
-
-            // Ensure object exists at index
-            if (!dayRanges[index]) dayRanges[index] = { start: '', end: '' };
-
-            dayRanges[index] = { ...dayRanges[index], [field]: value };
-            newRanges[day] = dayRanges;
-            return newRanges;
-        });
-    };
-
-    const addRange = (day: string) => {
-        setCollectionRanges(prev => {
-            const newRanges = { ...prev };
-            // Create a shallow copy of the array for the specific day to avoid mutation
-            const dayRanges = [...(newRanges[day] || [])];
-            dayRanges.push({ start: '', end: '' });
-            newRanges[day] = dayRanges;
-            return newRanges;
-        });
-    };
-
-    const removeRange = (day: string, index: number) => {
-        setCollectionRanges(prev => {
-            const newRanges = { ...prev };
-            if (newRanges[day]) {
-                newRanges[day] = newRanges[day].filter((_, i) => i !== index);
-            }
-            return newRanges;
-        });
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Use env var for update
         const targetId = import.meta.env.VITE_RESTAURANT_ID;
         if (!targetId) return;
 
         setLoading(true);
         setMessage(null);
 
-        // Generate slots from ranges
-        const generatedSlots = generateSlots(collectionRanges);
-        const dataToSave = { ...formData, collection_time_slots: generatedSlots };
+        const dataToSave = {
+            ...formData,
+            collection_time_slots: collectionTimeSlots,
+            closure_dates: closureDates,
+            timeslot_capacities: timeslotCapacities
+        };
 
         try {
             const { error } = await supabase
@@ -250,8 +156,6 @@ const SettingsPage: React.FC = () => {
         }
     };
 
-    // if (!selectedRestaurantId) return <div className="text-center py-10 text-gray-500">Select a restaurant context</div>;
-
     return (
         <div className="max-w-5xl mx-auto pb-10">
             <h2 className="text-3xl font-serif font-bold text-gray-800 mb-8">Restaurant Settings</h2>
@@ -264,262 +168,18 @@ const SettingsPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg overflow-hidden">
                 <div className="p-6 space-y-8">
-
-                    {/* Basic Info */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Basic Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant Name</label>
-                                <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <textarea name="description" rows={3} value={formData.description} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"></textarea>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
-                                <input type="url" name="website_url" value={formData.website_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Location */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Location</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1</label>
-                                <input type="text" name="address_line1" value={formData.address_line1} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
-                                <input type="text" name="address_line2" value={formData.address_line2} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                                <input type="text" name="city" value={formData.city} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
-                                <input type="text" name="postcode" value={formData.postcode} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Google Map URL</label>
-                                <input type="url" name="google_map_url" value={formData.google_map_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Operations */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Operations & Settings</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Currency Symbol</label>
-                                <select name="currency" value={formData.currency} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold">
-                                    <option value="£">£ (GBP)</option>
-                                    <option value="$">$ (USD)</option>
-                                    <option value="€">€ (EUR)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
-                                <input type="number" name="tax_rate" value={formData.tax_rate} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Max Booking Size</label>
-                                <input type="number" name="max_booking_size" value={formData.max_booking_size} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Theme Color</label>
-                                <div className="flex items-center space-x-2">
-                                    <input type="color" name="theme_color" value={formData.theme_color} onChange={handleChange} className="h-10 w-10 border border-gray-300 rounded p-1" />
-                                    <input type="text" name="theme_color" value={formData.theme_color} onChange={handleChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-4">
-                                <div className="flex items-center">
-                                    <input type="checkbox" id="delivery_available" name="delivery_available" checked={formData.delivery_available} onChange={handleChange} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
-                                    <label htmlFor="delivery_available" className="ml-2 block text-sm text-gray-900">Delivery Available</label>
-                                </div>
-                                <div className="flex items-center">
-                                    <input type="checkbox" id="collection_available" name="collection_available" checked={formData.collection_available} onChange={handleChange} className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" />
-                                    <label htmlFor="collection_available" className="ml-2 block text-sm text-gray-900">Collection Available</label>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 col-span-2">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time (min)</label>
-                                    <input type="number" name="delivery_time_estimate" value={formData.delivery_time_estimate} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Collection Time (min)</label>
-                                    <input type="number" name="collection_time_estimate" value={formData.collection_time_estimate} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                                </div>
-                            </div>
-
-                            {/* Delivery Settings */}
-                            {formData.delivery_available && (
-                                <div className="col-span-2 bg-gray-50 p-4 rounded-md border border-gray-200 mt-2">
-                                    <h4 className="text-sm font-medium text-gray-900 mb-3">Delivery Configuration</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Fee Mode</label>
-                                            <select name="delivery_fee_mode" value={formData.delivery_fee_mode} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold">
-                                                <option value="flat">Flat Fee</option>
-                                                <option value="per_km">Per KM</option>
-                                                <option value="zone">Zone Based</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                {formData.delivery_fee_mode === 'flat' ? 'Delivery Fee' :
-                                                    formData.delivery_fee_mode === 'per_km' ? 'Fee per KM' : 'Base Fee'}
-                                            </label>
-                                            <div className="relative rounded-md shadow-sm">
-                                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                                    <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
-                                                </div>
-                                                <input type="number" name="delivery_fee" value={formData.delivery_fee} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Order</label>
-                                            <div className="relative rounded-md shadow-sm">
-                                                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                                    <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
-                                                </div>
-                                                <input type="number" name="delivery_minimum" value={formData.delivery_minimum} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Collection Time Slots */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Collection Time Slots</h3>
-                        <p className="text-sm text-gray-500 mb-4">Define the available time ranges for collection. These will be converted into 30-minute slots.</p>
-                        <div className="space-y-4">
-                            {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => (
-                                <div key={day} className="border-b border-gray-100 pb-4 last:border-0">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="w-24 text-sm font-bold text-gray-700 capitalize">{day}</label>
-                                        <button type="button" onClick={() => addRange(day)} className="text-xs text-brand-gold hover:text-brand-dark-gray font-medium">
-                                            + Add Range
-                                        </button>
-                                    </div>
-                                    {collectionRanges[day]?.map((range, index) => (
-                                        <div key={index} className="flex items-center space-x-2 mb-2">
-                                            <input
-                                                type="time"
-                                                value={range.start}
-                                                onChange={(e) => handleRangeChange(day, index, 'start', e.target.value)}
-                                                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
-                                            />
-                                            <span className="text-gray-400">-</span>
-                                            <input
-                                                type="time"
-                                                value={range.end}
-                                                onChange={(e) => handleRangeChange(day, index, 'end', e.target.value)}
-                                                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
-                                            />
-                                            <button type="button" onClick={() => removeRange(day, index)} className="text-red-500 hover:text-red-700">
-                                                <span className="sr-only">Remove</span>
-                                                &times;
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {(!collectionRanges[day] || collectionRanges[day].length === 0) && (
-                                        <p className="text-xs text-gray-400 italic">No slots defined</p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Social Media */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Social Media</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Facebook URL</label>
-                                <input type="url" name="facebook_url" value={formData.facebook_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Instagram URL</label>
-                                <input type="url" name="instagram_url" value={formData.instagram_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Twitter URL</label>
-                                <input type="url" name="twitter_url" value={formData.twitter_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">TikTok URL</label>
-                                <input type="url" name="tiktok_url" value={formData.tiktok_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
-                                <input type="url" name="youtube_url" value={formData.youtube_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Media */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Media</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                                <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                                {/* Opening Hours */}
-                                <div>
-                                    <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Opening Hours</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => (
-                                            <div key={day} className="flex items-center">
-                                                <label className="w-24 text-sm font-medium text-gray-700 capitalize">{day}</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. 09:00-22:00"
-                                                    value={formData.opening_hours?.[day]?.[0] || ''}
-                                                    onChange={(e) => {
-                                                        const newHours = { ...formData.opening_hours };
-                                                        if (e.target.value) {
-                                                            newHours[day] = [e.target.value];
-                                                        } else {
-                                                            delete newHours[day];
-                                                        }
-                                                        setFormData(prev => ({ ...prev, opening_hours: newHours }));
-                                                    }}
-                                                    className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold text-sm"
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
-                                <input type="text" name="cover_image_url" value={formData.cover_image_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                            </div>
-                        </div>
-                    </div>
-
+                    <SettingsBasicInfo formData={formData} handleChange={handleChange} />
+                    <SettingsLocation formData={formData} handleChange={handleChange} />
+                    <SettingsOperations formData={formData} handleChange={handleChange} />
+                    <SettingsTimeslots
+                        timeSlots={collectionTimeSlots}
+                        setTimeSlots={setCollectionTimeSlots}
+                        capacities={timeslotCapacities}
+                        setCapacities={setTimeslotCapacities}
+                    />
+                    <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
+                    <SettingsOpeningHours formData={formData} setFormData={setFormData} />
+                    <SettingsMedia formData={formData} handleChange={handleChange} />
                 </div>
                 <div className="bg-gray-50 px-6 py-4 flex justify-end">
                     <button type="submit" disabled={loading} className="bg-brand-dark-gray text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50">

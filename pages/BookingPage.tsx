@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { validateUKPhone } from '../utils/validation';
+import { useSettings } from '../context/SettingsContext';
 
 // Icons for calendar navigation
 const ChevronLeftIcon = () => (
@@ -25,7 +26,7 @@ const DecorativeElement = () => (
 );
 
 // Step 1: Date Selection
-const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
+const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates }) => {
     const [displayDate, setDisplayDate] = useState(selectedDate || new Date());
 
     const today = new Date();
@@ -46,25 +47,35 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
         for (let i = 1; i <= daysInMonth; i++) {
             const dayDate = new Date(year, month, i);
             dayDate.setHours(0, 0, 0, 0);
+
+            // Adjust for timezone offset to match the format in closureDates (YYYY-MM-DD)
+            const offset = dayDate.getTimezoneOffset();
+            const adjustedDate = new Date(dayDate.getTime() - (offset * 60 * 1000));
+            const dateString = adjustedDate.toISOString().split('T')[0];
+
+            const isClosed = closureDates.includes(dateString);
             const isSelected = selectedDate && dayDate.getTime() === selectedDate.getTime();
             const isPast = dayDate < today;
+            const isDisabled = isPast || isClosed;
 
             days.push(
                 <button
                     key={i}
-                    disabled={isPast}
+                    disabled={isDisabled}
                     onClick={() => onDateSelect(dayDate)}
-                    className={`p-3 text-center text-sm border
-                        ${isPast ? 'text-gray-300 cursor-not-allowed border-gray-100' : 'border-gray-200 hover:bg-gray-200'}
+                    className={`p-3 text-center text-sm border relative
+                        ${isDisabled ? 'text-gray-300 cursor-not-allowed border-gray-100 bg-gray-50' : 'border-gray-200 hover:bg-gray-200'}
                         ${isSelected ? 'bg-brand-mid-gray text-white border-brand-mid-gray' : ''}
                     `}
+                    title={isClosed ? "Closed" : ""}
                 >
                     {i}
+                    {isClosed && <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-400"></span>}
                 </button>
             );
         }
         return days;
-    }, [year, month, selectedDate, onDateSelect, today]);
+    }, [year, month, selectedDate, onDateSelect, today, closureDates]);
 
     const handlePrevMonth = () => {
         setDisplayDate(new Date(year, month - 1, 1));
@@ -105,9 +116,8 @@ const DateStep = ({ onDateSelect, selectedDate, onNext }) => {
 
 
 // Step 2: Time and Guest Selection
-const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext }) => {
-    const times = ["12.00", "12.30", "1.00", "1.30", "8.00", "8.30", "9.00", "9.30"];
-    const guests = [1, 2, 3, 4];
+const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading }) => {
+    const guests = [1, 2, 3, 4, 5, 6, 7, 8]; // Expanded guest options
 
     const baseButtonClasses = "p-3 border text-center font-semibold text-sm transition-colors";
     const inactiveClasses = "border-gray-300 bg-white hover:bg-gray-100";
@@ -119,13 +129,17 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
             <div className="bg-white p-4 shadow-inner space-y-6">
                 <div>
                     <p className="font-bold text-xs uppercase tracking-wider mb-2 text-brand-dark-gray">Time</p>
-                    <div className="grid grid-cols-4 gap-2">
-                        {times.map(time => (
-                            <button key={time} onClick={() => onTimeSelect(time)} className={`${baseButtonClasses} ${selectedTime === time ? activeClasses : inactiveClasses}`}>
-                                {time}
-                            </button>
-                        ))}
-                    </div>
+                    {availableTimes.length === 0 ? (
+                        <p className="text-sm text-red-500 italic">No available times for this date.</p>
+                    ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                            {availableTimes.map(time => (
+                                <button key={time} onClick={() => onTimeSelect(time)} className={`${baseButtonClasses} ${selectedTime === time ? activeClasses : inactiveClasses}`}>
+                                    {time}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div>
@@ -145,10 +159,10 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
                 </button>
                 <button
                     onClick={onNext}
-                    disabled={!selectedTime || !selectedGuests}
+                    disabled={!selectedTime || !selectedGuests || isLoading}
                     className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
-                    Next
+                    {isLoading ? 'Checking...' : 'Next'}
                 </button>
             </div>
         </div>
@@ -209,6 +223,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
 
 
 const BookingPage: React.FC = () => {
+    const { settings } = useSettings();
     const [step, setStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
     const [bookingData, setBookingData] = useState({
@@ -223,13 +238,16 @@ const BookingPage: React.FC = () => {
     const nextStep = () => setStep(s => s + 1);
     const prevStep = () => setStep(s => s - 1);
 
-    const handleDateSelect = (date: Date) => setBookingData(d => ({ ...d, date }));
+    const handleDateSelect = (date: Date) => setBookingData(d => ({ ...d, date, time: '' })); // Reset time on date change
     const handleTimeSelect = (time: string) => setBookingData(d => ({ ...d, time }));
     const handleGuestsSelect = (guests: number) => setBookingData(d => ({ ...d, guests }));
 
     const formatDate = (date: Date | null): string => {
         if (!date) return '';
-        return date.toISOString().split('T')[0]; // YYYY-MM-DD
+        // Adjust for timezone to ensure we send the correct date string
+        const offset = date.getTimezoneOffset();
+        const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+        return adjustedDate.toISOString().split('T')[0];
     };
 
     const formatTime = (time: string): string => {
@@ -240,6 +258,21 @@ const BookingPage: React.FC = () => {
     const calculateTables = (guests: number): number => {
         if (!guests || guests <= 0) return 0;
         return Math.ceil(guests / 4); // Assuming 4 guests per table
+    };
+
+    // Get available times for the selected date
+    const getAvailableTimes = () => {
+        if (!bookingData.date || !settings?.collection_time_slots) return [];
+
+        const dayOfWeek = bookingData.date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+        // Use the new day-specific keys if available, otherwise fallback to simple day key if that was the old structure
+        // The settings object structure for collection_time_slots is Record<string, string[]> where key is day (mon, tue...)
+        // My previous fix in SettingsTimeslots.tsx updated how we SAVE to this structure.
+        // Wait, SettingsTimeslots.tsx updates `timeSlots` state which is `Record<string, string[]>`.
+        // The keys are 'mon', 'tue', etc. The VALUES are arrays of time strings.
+        // So `settings.collection_time_slots[dayOfWeek]` should give the array of times.
+
+        return settings.collection_time_slots[dayOfWeek] || [];
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -295,6 +328,33 @@ const BookingPage: React.FC = () => {
         }
     };
 
+    const handleTimeGuestNext = async () => {
+        if (!bookingData.date || !bookingData.time) return;
+
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase.rpc('check_timeslot_capacity', {
+                p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                p_date: formatDate(bookingData.date),
+                p_time: formatTime(bookingData.time),
+                p_order_type: 'booking'
+            });
+
+            if (error) throw error;
+
+            if (data && (data.message === 'slot available' || data.unlimited === true)) {
+                nextStep();
+            } else {
+                alert("Sorry, this timeslot is fully booked. Please select another time.");
+            }
+        } catch (error) {
+            console.error("Error checking capacity:", error);
+            alert("An error occurred while checking availability. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="bg-white text-brand-dark-gray font-sans">
             {/* Banner Section */}
@@ -332,6 +392,7 @@ const BookingPage: React.FC = () => {
                                         selectedDate={bookingData.date}
                                         onDateSelect={handleDateSelect}
                                         onNext={nextStep}
+                                        closureDates={settings?.closure_dates || []}
                                     />
                                 )}
                                 {step === 2 && (
@@ -341,7 +402,9 @@ const BookingPage: React.FC = () => {
                                         selectedGuests={bookingData.guests}
                                         onGuestsSelect={handleGuestsSelect}
                                         onPrev={prevStep}
-                                        onNext={nextStep}
+                                        onNext={handleTimeGuestNext}
+                                        availableTimes={getAvailableTimes()}
+                                        isLoading={isLoading}
                                     />
                                 )}
                                 {step === 3 && (

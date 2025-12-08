@@ -324,10 +324,38 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
 
       let scheduledTime = null;
+      let dateForCheck = null;
+      let timeForCheck = null;
+
       if (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) {
         scheduledTime = `${state.collectionDate} ${state.collectionTime}`;
+        dateForCheck = state.collectionDate;
+        timeForCheck = state.collectionTime;
       } else if (finalOrderType === 'delivery' && state.deliveryDate && state.deliveryTime) {
         scheduledTime = `${state.deliveryDate} ${state.deliveryTime}`;
+        dateForCheck = state.deliveryDate;
+        timeForCheck = state.deliveryTime;
+      }
+
+      // Final Capacity Check
+      if (dateForCheck && timeForCheck) {
+        const { data: capacityData, error: capacityError } = await supabase.rpc('check_timeslot_capacity', {
+          p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+          p_date: dateForCheck,
+          p_time: timeForCheck,
+          p_order_type: finalOrderType
+        });
+
+        if (capacityError) {
+          console.error('Final capacity check error:', capacityError);
+          // Fallback: Proceed if check fails? Or block? usually block to be safe.
+          // For now, let's block to prevent overbooking if DB is reachable but errors.
+          return { success: false, error: "Unable to verify timeslot availability. Please try again." };
+        }
+
+        if (capacityData && !(capacityData.message === 'slot available' || capacityData.unlimited === true)) {
+          return { success: false, error: "Sorry, this timeslot became fully booked while you were ordering. Please select another time." };
+        }
       }
 
       const { data, error } = await supabase.rpc('create_order_by_phone', {

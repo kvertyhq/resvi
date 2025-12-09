@@ -11,6 +11,7 @@ import SettingsClosureDates from '../../components/admin/settings/SettingsClosur
 import SettingsTimeslots from '../../components/admin/settings/SettingsTimeslots';
 import SettingsBookingPreorder from '../../components/admin/settings/SettingsBookingPreorder';
 import SettingsDeliveryZones from '../../components/admin/settings/SettingsDeliveryZones';
+import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 
 // Simple Toast Component
 const Toast = ({ message, onClose }: { message: { type: 'success' | 'error', text: string }, onClose: () => void }) => {
@@ -198,6 +199,7 @@ const SettingsPage: React.FC = () => {
                     <SettingsBasicInfo formData={formData} handleChange={handleChange} />
                     <SettingsLocation formData={formData} handleChange={handleChange} />
                     <SettingsOperations formData={formData} handleChange={handleChange} />
+                    <SettingsPayment />
                     <SettingsDeliveryZones />
                     <SettingsTimeslots
                         timeSlots={collectionTimeSlots}

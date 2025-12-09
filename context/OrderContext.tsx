@@ -438,6 +438,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
+      // OrderFormModal passes 'paymentType' (from OrderDetails interface), not 'paymentMethod'
+      const paymentMethod = orderDetails.paymentType || 'cash';
+      const isCardPayment = paymentMethod === 'card';
+
       const { data, error } = await supabase.rpc('create_order_by_phone', {
         p_delivery_address_id: null,
         p_delivery_fee: state.deliveryFee,
@@ -448,18 +452,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           name: item.name,
           selected_addons: item.selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price }))
         })),
-        p_mark_payment_completed: false,
+        p_mark_payment_completed: isCardPayment, // Mark paid if card (since creating order after successful stripe flow)
         p_name: orderDetails.name,
         p_notes: `
 Address: ${orderDetails.address}
 Notes: ${orderDetails.notes}
         `.trim(),
         p_order_type: finalOrderType,
-        p_payment_method: 'card',
+        p_payment_method: paymentMethod,
         p_phone: orderDetails.phone,
         p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
         p_scheduled_time: scheduledTime,
-        p_transaction_id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        p_transaction_id: orderDetails.paymentIntentId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
 
       if (error) {

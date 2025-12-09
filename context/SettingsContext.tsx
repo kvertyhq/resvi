@@ -27,6 +27,14 @@ type Settings = {
   max_delivery_order_value?: number;
   delivery_available?: boolean;
   collection_available?: boolean;
+  payment_settings?: {
+    enable_cash: boolean;
+    enable_card: boolean;
+    stripe_config?: {
+      publishable_key: string;
+      secret_key: string;
+    };
+  };
 };
 
 interface SettingsContextType {

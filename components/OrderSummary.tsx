@@ -69,18 +69,23 @@ const OrderSummary: React.FC = () => {
                 ) : (
                     <div className="space-y-4">
                         {cart.map(item => (
-                            <div key={item.id} className="flex items-start justify-between">
+                            <div key={item.cartId} className="flex items-start justify-between">
                                 <div>
                                     <p className="font-semibold text-brand-dark-gray">{item.name}</p>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="h-5 w-5 border rounded-full text-gray-500">-</button>
+                                        <button onClick={() => updateQuantity(item.cartId, item.quantity - 1)} className="h-5 w-5 border rounded-full text-gray-500">-</button>
                                         <span className="text-sm font-bold">{item.quantity}</span>
-                                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="h-5 w-5 border rounded-full text-gray-500">+</button>
+                                        <button onClick={() => updateQuantity(item.cartId, item.quantity + 1)} className="h-5 w-5 border rounded-full text-gray-500">+</button>
                                     </div>
+                                    {item.selectedAddons && item.selectedAddons.length > 0 && (
+                                        <div className="text-xs text-brand-mid-gray mt-1">
+                                            {item.selectedAddons.map(addon => addon.name).join(', ')}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-semibold text-brand-dark-gray">{settings?.currency}{(item.price * item.quantity).toFixed(2)}</p>
-                                    <button onClick={() => removeFromCart(item.id)} className="text-red-500 hover:text-red-700 mt-1"><TrashIcon /></button>
+                                    <p className="font-semibold text-brand-dark-gray">{settings?.currency}{((item.price + item.selectedAddons.reduce((sum, a) => sum + a.price, 0)) * item.quantity).toFixed(2)}</p>
+                                    <button onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-700 mt-1"><TrashIcon /></button>
                                 </div>
                             </div>
                         ))}

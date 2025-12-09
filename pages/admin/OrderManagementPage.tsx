@@ -28,6 +28,7 @@ interface Order {
     restaurant_id: string;
     delivery_address_id: string | null;
     scheduled_time: string | null;
+    payment_method: string | null; // Added
     notes: string | null;
     metadata: {
         subtotal: number;
@@ -149,6 +150,29 @@ const OrderManagementPage: React.FC = () => {
         }
     };
 
+    const markAsPaid = async (id: string) => {
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ payment_status: 'paid' })
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error updating payment status:', error);
+                alert('Failed to mark as paid');
+            } else {
+                // Optimistic update
+                setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: 'paid' } : o));
+                if (selectedOrder && selectedOrder.id === id) {
+                    setSelectedOrder({ ...selectedOrder, payment_status: 'paid' });
+                }
+            }
+        } catch (err) {
+            console.error('Failed to update payment status:', err);
+            alert('Failed to mark as paid');
+        }
+    };
+
     const openOrderDetails = (order: Order) => {
         setSelectedOrder(order);
         setIsModalOpen(true);
@@ -265,6 +289,11 @@ const OrderManagementPage: React.FC = () => {
                                 <div>
                                     <span className="font-semibold">Total: £{order.total_amount.toFixed(2)}</span>
                                     <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 uppercase">{order.order_type}</span>
+                                    {order.payment_method && (
+                                        <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded uppercase border border-blue-100">
+                                            {order.payment_method}
+                                        </span>
+                                    )}
                                     {order.scheduled_time && (
                                         <span className="ml-2 text-xs text-gray-500">
                                             Scheduled: {new Date(order.scheduled_time).toLocaleString()}
@@ -332,6 +361,16 @@ const OrderManagementPage: React.FC = () => {
                         </div>
 
                         <div className="mt-4 md:mt-0 flex flex-col space-y-2 md:space-y-0 md:flex-row md:items-center md:space-x-2">
+                            {/* Mark as Paid Button */}
+                            {order.payment_method === 'cash' && order.payment_status !== 'paid' && order.status !== 'cancelled' && (
+                                <button
+                                    onClick={() => markAsPaid(order.id)}
+                                    className="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-md text-sm font-medium transition-colors border border-green-200"
+                                >
+                                    Mark as Paid
+                                </button>
+                            )}
+
                             <button
                                 onClick={() => openOrderDetails(order)}
                                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
@@ -477,6 +516,9 @@ const OrderManagementPage: React.FC = () => {
                                         <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Order Info</h5>
                                         <p className="text-sm"><span className="text-gray-500">Type:</span> {selectedOrder.order_type}</p>
                                         <p className="text-sm"><span className="text-gray-500">Payment:</span> {selectedOrder.payment_status}</p>
+                                        {selectedOrder.payment_method && (
+                                            <p className="text-sm"><span className="text-gray-500">Method:</span> <span className="uppercase">{selectedOrder.payment_method}</span></p>
+                                        )}
                                     </div>
                                 </div>
 

@@ -128,20 +128,32 @@ const OrderPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <button
-                            onClick={() => setOrderType('delivery')}
-                            className={`${baseButtonClasses} ${orderType === 'delivery' ? activeButtonClasses : inactiveButtonClasses}`}
+                            onClick={() => settings?.delivery_available !== false && setOrderType('delivery')}
+                            disabled={settings?.delivery_available === false}
+                            className={`${baseButtonClasses} ${settings?.delivery_available === false
+                                    ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                    : orderType === 'delivery' ? activeButtonClasses : inactiveButtonClasses
+                                }`}
                             aria-pressed={orderType === 'delivery'}
                         >
                             <DeliveryIcon />
-                            <span className="font-semibold text-brand-dark-gray">Delivery</span>
+                            <span className="font-semibold text-brand-dark-gray">
+                                {settings?.delivery_available === false ? 'Delivery Unavailable' : 'Delivery'}
+                            </span>
                         </button>
                         <button
-                            onClick={() => setOrderType('collection')}
-                            className={`${baseButtonClasses} ${orderType === 'collection' ? activeButtonClasses : inactiveButtonClasses}`}
+                            onClick={() => settings?.collection_available !== false && setOrderType('collection')}
+                            disabled={settings?.collection_available === false}
+                            className={`${baseButtonClasses} ${settings?.collection_available === false
+                                    ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                    : orderType === 'collection' ? activeButtonClasses : inactiveButtonClasses
+                                }`}
                             aria-pressed={orderType === 'collection'}
                         >
                             <CollectionIcon />
-                            <span className="font-semibold text-brand-dark-gray">Collection</span>
+                            <span className="font-semibold text-brand-dark-gray">
+                                {settings?.collection_available === false ? 'Collection Unavailable' : 'Collection'}
+                            </span>
                         </button>
                     </div>
 

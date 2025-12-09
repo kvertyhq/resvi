@@ -25,6 +25,8 @@ type Settings = {
   preorder_required_days?: string[]; // Array of day names (e.g. 'Mon', 'Tue')
   max_delivery_radius_miles?: number;
   max_delivery_order_value?: number;
+  delivery_available?: boolean;
+  collection_available?: boolean;
 };
 
 interface SettingsContextType {

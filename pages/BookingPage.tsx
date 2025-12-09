@@ -2,6 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { validateUKPhone } from '../utils/validation';
 import { useSettings } from '../context/SettingsContext';
+import BookingMenuStep from './BookingMenuStep';
+import { MenuItemData } from '../context/OrderContext';
+
+// Helper to format items as markdown
+const formatItemsToMarkdown = (items: { item: MenuItemData; quantity: number }[], currency: string = '£') => {
+    if (!items || items.length === 0) return '';
+
+    let markdown = "### Pre-ordered Items\n\n";
+    let total = 0;
+
+    items.forEach(({ item, quantity }) => {
+        const itemTotal = item.price * quantity;
+        total += itemTotal;
+        markdown += `- **${quantity}x ${item.name}** (${currency}${item.price.toFixed(2)}) = ${currency}${itemTotal.toFixed(2)}\n`;
+    });
+
+    markdown += `\n**Total Value: ${currency}${total.toFixed(2)}**`;
+    return markdown;
+};
 
 // Icons for calendar navigation
 const ChevronLeftIcon = () => (
@@ -26,7 +45,7 @@ const DecorativeElement = () => (
 );
 
 // Step 1: Date Selection
-const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates }) => {
+const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber, totalSteps }) => {
     const [displayDate, setDisplayDate] = useState(selectedDate || new Date());
 
     const today = new Date();
@@ -87,7 +106,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates }) => {
 
     return (
         <div>
-            <p className="font-bold text-sm text-brand-mid-gray mb-4">1/3 Please Select a date</p>
+            <p className="font-bold text-sm text-brand-mid-gray mb-4">{stepNumber}/{totalSteps} Please Select a date</p>
             <div className="bg-white p-4 shadow-inner">
                 <div className="flex justify-between items-center mb-4">
                     <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-gray-100"><ChevronLeftIcon /></button>
@@ -116,7 +135,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates }) => {
 
 
 // Step 2: Time and Guest Selection
-const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading }) => {
+const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading, stepNumber, totalSteps }) => {
     const guests = [1, 2, 3, 4, 5, 6, 7, 8]; // Expanded guest options
 
     const baseButtonClasses = "p-3 border text-center font-semibold text-sm transition-colors";
@@ -125,7 +144,7 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
 
     return (
         <div>
-            <p className="font-bold text-sm text-brand-mid-gray mb-4">2/3 Select time and guests</p>
+            <p className="font-bold text-sm text-brand-mid-gray mb-4">{stepNumber}/{totalSteps} Select time and guests</p>
             <div className="bg-white p-4 shadow-inner space-y-6">
                 <div>
                     <p className="font-bold text-xs uppercase tracking-wider mb-2 text-brand-dark-gray">Time</p>
@@ -170,7 +189,7 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
 };
 
 // Step 3: Details
-const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => {
+const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading, stepNumber, totalSteps }) => {
     const [termsAccepted, setTermsAccepted] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -181,7 +200,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading }) => 
 
     return (
         <div>
-            <p className="font-bold text-sm text-brand-mid-gray mb-4">3/3 Please fill with your details</p>
+            <p className="font-bold text-sm text-brand-mid-gray mb-4">{stepNumber}/{totalSteps} Please fill with your details</p>
             <form className="bg-white p-4 shadow-inner space-y-4" onSubmit={onSubmit}>
                 <div>
                     <input type="text" name="name" placeholder="First and Last Name" value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-gold" required />
@@ -234,11 +253,28 @@ const BookingPage: React.FC = () => {
         phone: '',
         notes: '',
     });
+    const [selectedItems, setSelectedItems] = useState<{ item: MenuItemData; quantity: number }[]>([]);
+    // Skip logic state
+    const [skipMenuStep, setSkipMenuStep] = useState(true);
+
+    const totalSteps = skipMenuStep ? 3 : 4;
 
     const nextStep = () => setStep(s => s + 1);
     const prevStep = () => setStep(s => s - 1);
 
-    const handleDateSelect = (date: Date) => setBookingData(d => ({ ...d, date, time: '' })); // Reset time on date change
+    const handleDateSelect = (date: Date) => {
+        setBookingData(d => ({ ...d, date, time: '' }));
+
+        // Check if date requires pre-order
+        if (settings?.preorder_required_days && settings.preorder_required_days.length > 0) {
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }); // "Mon", "Tue"
+            const isRequired = settings.preorder_required_days.includes(dayName);
+            console.log(`Date selected: ${dayName}, Pre-order required: ${isRequired}`);
+            setSkipMenuStep(!isRequired);
+        } else {
+            setSkipMenuStep(true);
+        }
+    };
     const handleTimeSelect = (time: string) => setBookingData(d => ({ ...d, time }));
     const handleGuestsSelect = (guests: number) => setBookingData(d => ({ ...d, guests }));
 
@@ -300,7 +336,8 @@ const BookingPage: React.FC = () => {
                     p_phone: validatedPhone,
                     p_table_count: calculateTables(bookingData.guests),
                     p_user_id: null, // Assuming guest booking for now, or could be session.user.id if auth implemented
-                    p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID
+                    p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                    p_preorder_summary: formatItemsToMarkdown(selectedItems, settings?.currency)
                 });
 
             if (error) {
@@ -311,6 +348,8 @@ const BookingPage: React.FC = () => {
 
             // Reset form state on successful submission
             setStep(1);
+            setSelectedItems([]);
+            setSkipMenuStep(true);
             setBookingData({
                 date: null,
                 time: '',
@@ -331,27 +370,12 @@ const BookingPage: React.FC = () => {
     const handleTimeGuestNext = async () => {
         if (!bookingData.date || !bookingData.time) return;
 
-        setIsLoading(true);
-        try {
-            const { data, error } = await supabase.rpc('check_timeslot_capacity', {
-                p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
-                p_date: formatDate(bookingData.date),
-                p_time: formatTime(bookingData.time),
-                p_order_type: 'booking'
-            });
+        // Removed check_timeslot_capacity for bookings as requested
 
-            if (error) throw error;
-
-            if (data && (data.message === 'slot available' || data.unlimited === true)) {
-                nextStep();
-            } else {
-                alert("Sorry, this timeslot is fully booked. Please select another time.");
-            }
-        } catch (error) {
-            console.error("Error checking capacity:", error);
-            alert("An error occurred while checking availability. Please try again.");
-        } finally {
-            setIsLoading(false);
+        if (skipMenuStep) {
+            setStep(4);
+        } else {
+            nextStep();
         }
     };
 
@@ -393,6 +417,8 @@ const BookingPage: React.FC = () => {
                                         onDateSelect={handleDateSelect}
                                         onNext={nextStep}
                                         closureDates={settings?.closure_dates || []}
+                                        stepNumber={1}
+                                        totalSteps={totalSteps}
                                     />
                                 )}
                                 {step === 2 && (
@@ -405,17 +431,35 @@ const BookingPage: React.FC = () => {
                                         onNext={handleTimeGuestNext}
                                         availableTimes={getAvailableTimes()}
                                         isLoading={isLoading}
+                                        stepNumber={2}
+                                        totalSteps={totalSteps}
                                     />
                                 )}
-                                {step === 3 && (
+                                {step === 3 && !skipMenuStep && (
+                                    <BookingMenuStep
+                                        onNext={nextStep}
+                                        onPrev={prevStep}
+                                        selectedItems={selectedItems}
+                                        onItemsChange={setSelectedItems}
+                                        isLoading={isLoading}
+                                    // BookingMenuStep needs internal update for step display if it uses it.
+                                    // Assuming I should pass it or it renders its own title. 
+                                    // Let's modify BookingMenuStep if needed, but for now just passing props here won't break it if it doesn't use them.
+                                    // Actually better to pass "stepIndicator={<p>...p>}" or similar if I can modify it. 
+                                    // For now, I'll assume I need to update BookingMenuStep.tsx too or let it handle its own "2.5/3" -> "3/4" logic.
+                                    />
+                                )}
+                                {(step === 3 && skipMenuStep) || (step === 4) ? (
                                     <DetailsStep
                                         formData={bookingData}
                                         setFormData={setBookingData}
                                         onPrev={prevStep}
                                         onSubmit={handleSubmit}
                                         isLoading={isLoading}
+                                        stepNumber={totalSteps} // Always last step
+                                        totalSteps={totalSteps}
                                     />
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>

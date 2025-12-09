@@ -165,10 +165,14 @@ const OrderPage: React.FC = () => {
                                         {isCheckingPostcode ? '...' : 'Check'}
                                     </button>
                                 </div>
-                                {deliveryAvailable === true && deliveryDistance && (
+                                {deliveryAvailable === true && (
                                     <>
                                         <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
-                                            Great! We deliver to your area ({(deliveryDistance * 0.621371).toFixed(1)} miles away).
+                                            {deliveryDistance ? (
+                                                `Great! We deliver to your area (${(deliveryDistance * 0.621371).toFixed(1)} miles away).`
+                                            ) : (
+                                                "Great! We deliver to your area."
+                                            )}
                                             <span className="block mt-1 font-medium">
                                                 Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
                                             </span>
@@ -225,7 +229,10 @@ const OrderPage: React.FC = () => {
                                 {deliveryAvailable === false && deliveryError && (
                                     <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
                                         {deliveryError}
-                                        {deliveryDistance && deliveryDistance > 8.04672 && (
+                                        {deliveryDistance && settings?.max_delivery_radius_miles && deliveryDistance > (settings.max_delivery_radius_miles * 1.60934) && (
+                                            <span className="block mt-1">Your location is {(deliveryDistance * 0.621371).toFixed(1)} miles away. We only deliver within {settings.max_delivery_radius_miles} miles.</span>
+                                        )}
+                                        {(!settings?.max_delivery_radius_miles && deliveryDistance && deliveryDistance > 8.04672) && (
                                             <span className="block mt-1">Your location is {(deliveryDistance * 0.621371).toFixed(1)} miles away. We only deliver within 5 miles.</span>
                                         )}
                                     </p>

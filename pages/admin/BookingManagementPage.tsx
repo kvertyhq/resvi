@@ -4,8 +4,67 @@ import { supabase } from '../../supabaseClient';
 import { Calendar, Users, Check, X, UserCheck, List, Grid } from 'lucide-react';
 import CalendarView, { Booking } from '../../components/admin/CalendarView';
 
+// Removed unavailable react-markdown import. Displaying as pre-formatted text.
+
+
 type TabType = 'today' | 'upcoming' | 'past';
 type ViewType = 'list' | 'calendar';
+
+// Simple Modal for Pre-orders
+const PreOrderModal = ({ content, onClose }: { content: string; onClose: () => void }) => {
+    if (!content) return null;
+
+    // Parser for the specific markdown format
+    const lines = content.split('\n');
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+                <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                    <h3 className="font-serif font-bold text-lg text-gray-800">Pre-ordered Items</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="p-6">
+                    {lines.map((line, index) => {
+                        // Headers
+                        if (line.startsWith('###')) {
+                            return null; // Skip title as we have modal title
+                        }
+                        // List items: "- **Qty Name** (Price) = Total"
+                        if (line.trim().startsWith('-')) {
+                            // Simple regex to clean up markdown bold
+                            const cleanLine = line.replace(/^\-\s*/, '').replace(/\*\*/g, '');
+                            return (
+                                <div key={index} className="flex justify-between py-2 border-b border-gray-100 text-sm">
+                                    <span>{cleanLine.split('=')[0]}</span>
+                                    <span className="font-semibold text-gray-900">{cleanLine.split('=')[1]}</span>
+                                </div>
+                            );
+                        }
+                        // Total
+                        if (line.includes('Total Value')) {
+                            const cleanLine = line.replace(/\*\*/g, '');
+                            return (
+                                <div key={index} className="mt-4 pt-4 border-t border-gray-200 flex justify-between font-bold text-brand-gold text-lg">
+                                    <span>Total Value</span>
+                                    <span>{cleanLine.split(':')[1]}</span>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+                <div className="p-4 border-t bg-gray-50 text-right">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm font-medium">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const BookingManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
@@ -13,6 +72,7 @@ const BookingManagementPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('today');
     const [viewType, setViewType] = useState<ViewType>('list');
+    const [selectedPreorder, setSelectedPreorder] = useState<string | null>(null);
 
     useEffect(() => {
         if (selectedRestaurantId) {
@@ -191,6 +251,15 @@ const BookingManagementPage: React.FC = () => {
                                                         {booking.special_request && (
                                                             <div className="text-xs text-gray-500 mt-1 italic">"{booking.special_request}"</div>
                                                         )}
+                                                        {booking.preorder_summary && (
+                                                            <button
+                                                                onClick={() => setSelectedPreorder(booking.preorder_summary || '')}
+                                                                className="mt-2 text-xs flex items-center bg-brand-gold text-white px-3 py-1.5 rounded-md hover:bg-brand-dark transition-colors font-medium shadow-sm"
+                                                            >
+                                                                <List className="h-3 w-3 mr-1.5" />
+                                                                View Pre-order
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -251,6 +320,13 @@ const BookingManagementPage: React.FC = () => {
                     bookings={bookings}
                     onStatusUpdate={updateStatus}
                     onAssignTable={assignTable}
+                    onViewPreorder={(summary) => setSelectedPreorder(summary)}
+                />
+            )}
+            {selectedPreorder && (
+                <PreOrderModal
+                    content={selectedPreorder}
+                    onClose={() => setSelectedPreorder(null)}
                 />
             )}
         </div>

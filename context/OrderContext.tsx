@@ -44,6 +44,8 @@ interface OrderState {
     delivery_fee: number;
     delivery_fee_mode: 'flat' | 'per_km' | 'zone';
     delivery_minimum: number;
+    max_delivery_radius_miles: number;
+    max_delivery_order_value: number;
   } | null;
 }
 
@@ -80,73 +82,82 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deliverySettings: null,
   });
 
-  // Fetch delivery settings on mount
+  // State for Delivery Zones
+  const [globalDeliverySettings, setGlobalDeliverySettings] = useState<OrderState['deliverySettings']>(null);
+
+  // Fetch delivery settings on mount (Zones are now checked dynamically via RPC)
   React.useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchData = async () => {
       const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
       if (!restaurantId) return;
 
-      const { data, error } = await supabase
+      // Fetch Settings
+      const { data: settingsData } = await supabase
         .from('restaurant_settings')
-        .select('delivery_fee, delivery_fee_mode, delivery_minimum')
+        .select('delivery_fee, delivery_fee_mode, delivery_minimum, max_delivery_radius_miles, max_delivery_order_value')
         .eq('id', restaurantId)
         .single();
 
-      if (data) {
-        setState(s => ({
-          ...s,
-          deliverySettings: {
-            delivery_fee: data.delivery_fee || 0,
-            delivery_fee_mode: data.delivery_fee_mode || 'flat',
-            delivery_minimum: data.delivery_minimum || 0
-          }
-        }));
+      let initialSettings = null;
+      if (settingsData) {
+        initialSettings = {
+          delivery_fee: settingsData.delivery_fee || 0,
+          delivery_fee_mode: settingsData.delivery_fee_mode || 'flat',
+          delivery_minimum: settingsData.delivery_minimum || 0,
+          max_delivery_radius_miles: settingsData.max_delivery_radius_miles || 5,
+          max_delivery_order_value: settingsData.max_delivery_order_value || 1000
+        };
+        setGlobalDeliverySettings(initialSettings);
+        setState(s => ({ ...s, deliverySettings: initialSettings }));
       }
     };
-    fetchSettings();
+    fetchData();
   }, []);
 
   // Calculate delivery fee whenever relevant state changes
   React.useEffect(() => {
+    // If a zone is active (implied by modified deliverySettings matching a zone), fee is already set by checkPostcode.
+    // However, if we are in "Radius Mode" (fallback), we might need to recalculate per_km fee.
+    // We can check if the current settings match the global settings to determine "mode".
+
     if (!state.deliverySettings || state.orderType !== 'delivery') {
       if (state.deliveryFee !== 0) setState(s => ({ ...s, deliveryFee: 0 }));
       return;
     }
 
-    const { delivery_fee, delivery_fee_mode, delivery_minimum } = state.deliverySettings;
+    // Check if we are using a specific Zone (simple check: if min/max/fee differ from global, likely a zone)
+    // Or simpler: checkPostcode sets the fee for Zones. Radius logic sets fee.
+    // Here we mainly handle the "per_km" updates for Radius mode.
 
-    // Calculate cart value including addons
-    const cartValue = state.cart.reduce((total, item) => {
-      const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
-      return total + (item.price + addonsPrice) * item.quantity;
-    }, 0);
+    const isZoneActive = state.deliverySettings !== globalDeliverySettings;
+    // Note: object identity comparison works if we be careful not to create new objects unnecessarily for global.
+    // But checkPostcode creates new object for Zone. So if they differ, it's a zone (or modified).
 
-    // Check for free delivery threshold
-    if (delivery_minimum > 0 && cartValue >= delivery_minimum) {
-      if (state.deliveryFee !== 0) setState(s => ({ ...s, deliveryFee: 0 }));
+    if (isZoneActive) {
+      // Zone rules apply: Fee is fixed to the zone's fee (set during checkPostcode).
+      // Nothing to do here unless we want to enforce it again.
       return;
     }
+
+    const { delivery_fee, delivery_fee_mode } = state.deliverySettings;
 
     let fee = 0;
     if (delivery_fee_mode === 'flat') {
       fee = delivery_fee;
     } else if (delivery_fee_mode === 'per_km' && state.deliveryDistance) {
       fee = delivery_fee * state.deliveryDistance;
-      // Optional: Round up to nearest 0.50 or similar? For now, keep exact or 2 decimals.
       fee = Math.round(fee * 100) / 100;
     }
 
-    // Ensure fee doesn't change if it's already correct to avoid loops
     if (state.deliveryFee !== fee) {
       setState(s => ({ ...s, deliveryFee: fee }));
     }
-  }, [state.deliverySettings, state.orderType, state.deliveryDistance, state.cart]);
+  }, [state.deliverySettings, state.orderType, state.deliveryDistance, state.cart, globalDeliverySettings]);
 
   const setOrderType = (type: OrderType) => {
     setState(s => ({
       ...s,
       orderType: type,
-      // Reset other type's data
       postcode: type === 'collection' ? '' : s.postcode,
       deliveryAvailable: type === 'collection' ? null : s.deliveryAvailable,
       deliveryDistance: type === 'collection' ? null : s.deliveryDistance,
@@ -160,6 +171,51 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const checkPostcode = async (postcode: string) => {
     const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
+    const cleanPostcode = postcode.trim().replace(/\s+/g, '').toUpperCase();
+
+    // 1. Check for Configured Delivery Zones First via RPC
+    const { data: zoneMatches, error: zoneError } = await supabase.rpc('get_matching_delivery_zone', {
+      p_postcode: cleanPostcode
+    });
+
+    if (zoneMatches && zoneMatches.length > 0) {
+      const matchedZone = zoneMatches[0];
+      // Zone Match Found! Override settings.
+      const defaults = {
+        delivery_fee: 0,
+        delivery_fee_mode: 'flat' as const,
+        delivery_minimum: 0,
+        max_delivery_radius_miles: 5,
+        max_delivery_order_value: 1000
+      };
+
+      const baseSettings = globalDeliverySettings || defaults;
+
+      const zoneSettings = {
+        ...baseSettings,
+        delivery_fee: matchedZone.delivery_fee, // Use Zone Fee
+        delivery_minimum: matchedZone.min_order_amount, // Use Zone Min
+        max_delivery_order_value: matchedZone.max_order_amount, // Use Zone Max
+        delivery_fee_mode: 'flat' as const // Zones are always flat fee currently
+      };
+
+      setState(s => ({
+        ...s,
+        postcode: cleanPostcode,
+        deliveryAvailable: true,
+        deliveryDistance: null, // Distance irrelevant for fixed zones
+        deliveryError: null,
+        deliverySettings: zoneSettings,
+        deliveryFee: matchedZone.delivery_fee
+      }));
+      return;
+    }
+
+    // 2. Fallback to Radius Check
+    // Reset to Global Settings first
+    if (globalDeliverySettings) {
+      setState(s => ({ ...s, deliverySettings: globalDeliverySettings }));
+    }
 
     if (!apiKey) {
       setState(s => ({
@@ -167,15 +223,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         postcode,
         deliveryAvailable: false,
         deliveryDistance: null,
-        deliveryError: 'Configuration error. Please contact the restaurant.'
+        deliveryError: 'Configuration error. Please contact the restaurant.',
+        deliverySettings: globalDeliverySettings
       }));
       return;
     }
 
-    const cleanPostcode = postcode.trim().toUpperCase();
-
     try {
-      // Call getaddress.io Distance API
       const url = `${GETADDRESS_API_BASE}/distance/${encodeURIComponent(RESTAURANT_POSTCODE)}/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}`;
       const response = await fetch(url);
 
@@ -186,7 +240,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             postcode: cleanPostcode,
             deliveryAvailable: false,
             deliveryDistance: null,
-            deliveryError: 'Invalid postcode. Please check and try again.'
+            deliveryError: 'Invalid postcode. Please check and try again.',
+            deliverySettings: globalDeliverySettings
           }));
           return;
         }
@@ -197,7 +252,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             postcode: cleanPostcode,
             deliveryAvailable: false,
             deliveryDistance: null,
-            deliveryError: 'Configuration error. Please contact the restaurant.'
+            deliveryError: 'Configuration error. Please contact the restaurant.',
+            deliverySettings: globalDeliverySettings
           }));
           return;
         }
@@ -208,14 +264,21 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const data = await response.json();
       const distanceMetres = data.metres;
       const distanceKm = distanceMetres / 1000;
-      const isWithinRange = distanceKm <= MAX_DELIVERY_DISTANCE_KM;
+
+      // Use dynamic radius directly (converted to km) or fallback to 5 miles
+      // 1 mile = 1.60934 km
+      const radiusMiles = globalDeliverySettings?.max_delivery_radius_miles || 5;
+      const maxDistanceKm = radiusMiles * 1.60934;
+
+      const isWithinRange = distanceKm <= maxDistanceKm;
 
       setState(s => ({
         ...s,
         postcode: cleanPostcode,
         deliveryAvailable: isWithinRange,
         deliveryDistance: distanceKm,
-        deliveryError: null
+        deliveryError: null,
+        deliverySettings: globalDeliverySettings
       }));
 
     } catch (error) {
@@ -225,7 +288,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         postcode: cleanPostcode,
         deliveryAvailable: false,
         deliveryDistance: null,
-        deliveryError: 'Unable to verify postcode. Please try again or contact us.'
+        deliveryError: 'Unable to verify postcode. Please try again or contact us.',
+        deliverySettings: globalDeliverySettings
       }));
     }
   };
@@ -335,6 +399,22 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         scheduledTime = `${state.deliveryDate} ${state.deliveryTime}`;
         dateForCheck = state.deliveryDate;
         timeForCheck = state.deliveryTime;
+
+        // DELIVERY MIN/MAX CHECK
+        if (state.deliverySettings) {
+          const cartValue = state.cart.reduce((total, item) => {
+            const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+            return total + (item.price + addonsPrice) * item.quantity;
+          }, 0);
+
+          if (state.deliverySettings.delivery_minimum > 0 && cartValue < state.deliverySettings.delivery_minimum) {
+            return { success: false, error: `Minimum delivery order value is £${state.deliverySettings.delivery_minimum.toFixed(2)}` };
+          }
+
+          if (state.deliverySettings.max_delivery_order_value > 0 && cartValue > state.deliverySettings.max_delivery_order_value) {
+            return { success: false, error: `Maximum delivery order value is £${state.deliverySettings.max_delivery_order_value.toFixed(2)}` };
+          }
+        }
       }
 
       // Final Capacity Check

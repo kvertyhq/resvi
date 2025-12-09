@@ -22,6 +22,9 @@ type Settings = {
   collection_time_slots?: Record<string, string[]>;
   closure_dates?: string[]; // Array of ISO date strings (YYYY-MM-DD)
   timeslot_capacities?: Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number }>;
+  preorder_required_days?: string[]; // Array of day names (e.g. 'Mon', 'Tue')
+  max_delivery_radius_miles?: number;
+  max_delivery_order_value?: number;
 };
 
 interface SettingsContextType {

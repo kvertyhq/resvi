@@ -11,7 +11,7 @@ const TrashIcon = () => (
 );
 
 const OrderSummary: React.FC = () => {
-    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder, deliveryFee } = useOrder();
+    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder, deliveryFee, deliverySettings } = useOrder();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -21,6 +21,10 @@ const OrderSummary: React.FC = () => {
     const subtotal = cartTotal;
     const deliveryFeeDisplay = orderType === 'delivery' ? deliveryFee : 0;
     const total = subtotal + deliveryFeeDisplay;
+
+    // Check Max Order Value
+    const maxOrderValue = deliverySettings?.max_delivery_order_value || 0;
+    const isOverMaxOrderValue = orderType === 'delivery' && maxOrderValue > 0 && subtotal > maxOrderValue;
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -112,6 +116,7 @@ const OrderSummary: React.FC = () => {
                             )}
                         </>
                     )}
+
                     {orderType === 'collection' && (
                         <>
                             <div className="flex justify-between items-center"><span className="font-semibold">Method</span> <span className="bg-gray-200 px-2 py-0.5 rounded">Collection</span></div>
@@ -119,10 +124,16 @@ const OrderSummary: React.FC = () => {
                             <div className="flex justify-between items-center"><span className="font-semibold">Time</span> <span>{collectionTime}</span></div>
                         </>
                     )}
+
+                    {isOverMaxOrderValue && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm font-medium mt-4">
+                            Order exceeds maximum delivery value of {settings?.currency}{maxOrderValue.toFixed(2)}. Please reduce your order or choose collection.
+                        </div>
+                    )}
                 </div>
 
                 <button
-                    disabled={cart.length === 0}
+                    disabled={cart.length === 0 || isOverMaxOrderValue}
                     onClick={handleOrderClick}
                     className="w-full mt-6 bg-brand-dark-gray text-white py-3 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-mid-gray"
                 >

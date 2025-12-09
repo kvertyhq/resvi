@@ -67,16 +67,16 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
-                <div className="flex justify-between items-center p-4 border-b border-gray-100">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 bg-black bg-opacity-50 backdrop-blur-sm shadow-2xl overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[85vh] animate-fade-in my-auto">
+                <div className="flex justify-between items-center p-4 border-b border-gray-100 shrink-0 bg-white rounded-t-lg">
                     <h3 className="text-xl font-serif font-bold text-gray-800">Complete Your Order</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
                     {error && (
                         <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
                             {error}

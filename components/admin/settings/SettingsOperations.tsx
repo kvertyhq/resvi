@@ -62,18 +62,7 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                         <h4 className="text-sm font-medium text-gray-900 mb-3">Delivery Configuration</h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Fee Mode</label>
-                                <select name="delivery_fee_mode" value={formData.delivery_fee_mode} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold">
-                                    <option value="flat">Flat Fee</option>
-                                    <option value="per_km">Per KM</option>
-                                    <option value="zone">Zone Based</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {formData.delivery_fee_mode === 'flat' ? 'Delivery Fee' :
-                                        formData.delivery_fee_mode === 'per_km' ? 'Fee per KM' : 'Base Fee'}
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Fee ({formData.currency})</label>
                                 <div className="relative rounded-md shadow-sm">
                                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                         <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
@@ -89,6 +78,18 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                                     </div>
                                     <input type="number" name="delivery_minimum" value={formData.delivery_minimum} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
                                 </div>
+                            </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Max Delivery Radius (Miles)</label>
+                                <input type="number" name="max_delivery_radius_miles" value={formData.max_delivery_radius_miles} onChange={handleChange} step="0.1" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                                <p className="text-xs text-gray-500 mt-1">Delivery will be unavailable outside this radius.</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Max Delivery Order Value ({formData.currency})</label>
+                                <input type="number" name="max_delivery_order_value" value={formData.max_delivery_order_value} onChange={handleChange} step="0.01" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                                <p className="text-xs text-gray-500 mt-1">Maximum allowed value for delivery orders.</p>
                             </div>
                         </div>
                     </div>

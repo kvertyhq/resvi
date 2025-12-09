@@ -14,6 +14,7 @@ export interface Booking {
     status: 'pending' | 'confirmed' | 'cancelled';
     table_assigned?: string;
     special_request?: string;
+    preorder_summary?: string; // Markdown string
     created_at?: string;
     user_id?: string;
     profiles?: {
@@ -26,9 +27,10 @@ interface CalendarViewProps {
     bookings: Booking[];
     onStatusUpdate: (id: string, status: 'confirmed' | 'cancelled') => void;
     onAssignTable: (id: string) => void;
+    onViewPreorder: (summary: string) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, onAssignTable }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, onAssignTable, onViewPreorder }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [filterStatus, setFilterStatus] = useState<'all' | 'confirmed' | 'pending' | 'cancelled'>('all');
@@ -203,8 +205,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, o
                                             {booking.booking_time.slice(0, 5)}
                                         </div>
                                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                                                booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                                    'bg-yellow-100 text-yellow-800'
+                                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                'bg-yellow-100 text-yellow-800'
                                             }`}>
                                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                         </span>
@@ -231,6 +233,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, o
                                         <div className="text-xs text-gray-500 italic bg-gray-50 p-2 rounded mb-3">
                                             "{booking.special_request}"
                                         </div>
+                                    )}
+
+                                    {booking.preorder_summary && (
+                                        <button
+                                            onClick={() => onViewPreorder(booking.preorder_summary!)}
+                                            className="text-xs w-full mt-2 bg-brand-gold text-white px-2 py-1.5 rounded hover:bg-brand-dark transition-colors font-medium text-center"
+                                        >
+                                            View Pre-order
+                                        </button>
                                     )}
 
                                     <div className="flex justify-end space-x-2 mt-2 pt-2 border-t border-gray-100">

@@ -1,7 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import { FileText } from 'lucide-react';
 
 const HomePage: React.FC = () => {
+    const [menuPdfUrl, setMenuPdfUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const { data } = await supabase
+                .from('restaurant_settings')
+                .select('menu_pdf_url, is_menu_pdf_visible')
+                .eq('id', import.meta.env.VITE_RESTAURANT_ID)
+                .single();
+
+            if (data && data.menu_pdf_url && data.is_menu_pdf_visible !== false) {
+                setMenuPdfUrl(data.menu_pdf_url);
+            }
+        };
+        fetchSettings();
+    }, []);
+
     return (
         <div className="bg-white">
             {/* Hero Section */}
@@ -13,12 +32,25 @@ const HomePage: React.FC = () => {
                 <div className="relative z-10 text-center">
                     <h1 className="text-5xl md:text-7xl font-serif tracking-wider">Fuel Your Mood. Feed Your Cravings.</h1>
                     <p className="mt-4 text-lg md:text-xl text-gray-300">Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.</p>
-                    <NavLink
-                        to="order"
-                        className="mt-8 inline-block bg-brand-gold text-white px-8 py-3 font-semibold tracking-wider hover:bg-yellow-700 transition duration-300"
-                    >
-                        Order Now
-                    </NavLink>
+                    <div className="mt-8 flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                        <NavLink
+                            to="order"
+                            className="bg-brand-gold text-white px-8 py-3 font-semibold tracking-wider hover:bg-yellow-700 transition duration-300"
+                        >
+                            Order Now
+                        </NavLink>
+                        {menuPdfUrl && (
+                            <a
+                                href={menuPdfUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3 font-semibold tracking-wider hover:bg-white/20 transition duration-300"
+                            >
+                                <FileText className="mr-2 h-5 w-5" />
+                                Download Menu
+                            </a>
+                        )}
+                    </div>
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
                     <span className="text-9xl md:text-[20rem] font-bold text-white tracking-widest">Daniel Sushi</span>

@@ -67,7 +67,9 @@ const SettingsPage: React.FC = () => {
         delivery_fee_mode: 'flat',
         delivery_minimum: 0,
         max_delivery_radius_miles: 5,
-        max_delivery_order_value: 1000
+        max_delivery_order_value: 1000,
+        menu_pdf_url: '',
+        is_menu_pdf_visible: true
     });
 
     // New states for advanced settings
@@ -126,7 +128,9 @@ const SettingsPage: React.FC = () => {
                         delivery_fee_mode: settings.delivery_fee_mode || 'flat',
                         delivery_minimum: settings.delivery_minimum || 0,
                         max_delivery_radius_miles: settings.max_delivery_radius_miles || 5,
-                        max_delivery_order_value: settings.max_delivery_order_value || 1000
+                        max_delivery_order_value: settings.max_delivery_order_value || 1000,
+                        menu_pdf_url: settings.menu_pdf_url || '',
+                        is_menu_pdf_visible: settings.is_menu_pdf_visible ?? true
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});
@@ -210,7 +214,7 @@ const SettingsPage: React.FC = () => {
                     <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
                     <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
                     <SettingsOpeningHours formData={formData} setFormData={setFormData} />
-                    <SettingsMedia formData={formData} handleChange={handleChange} />
+                    <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
                 </div>
                 <div className="bg-gray-50 px-6 py-4 flex justify-end">
                     <button type="submit" disabled={loading} className="bg-brand-dark-gray text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50">

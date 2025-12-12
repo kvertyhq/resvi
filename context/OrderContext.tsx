@@ -290,7 +290,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         postcode: cleanPostcode,
         deliveryAvailable: isWithinRange,
         deliveryDistance: distanceKm,
-        deliveryError: isWithinRange ? null : `Sorry, we only deliver within ${radiusMiles} miles.`,
+        deliveryError: isWithinRange ? null : `Our delivery operates within ${radiusMiles} miles. Please don't hesitate to get in touch with us.`,
         deliverySettings: currentGlobalSettings
       }));
 

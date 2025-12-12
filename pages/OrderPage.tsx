@@ -131,8 +131,8 @@ const OrderPage: React.FC = () => {
                             onClick={() => settings?.delivery_available !== false && setOrderType('delivery')}
                             disabled={settings?.delivery_available === false}
                             className={`${baseButtonClasses} ${settings?.delivery_available === false
-                                    ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
-                                    : orderType === 'delivery' ? activeButtonClasses : inactiveButtonClasses
+                                ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                : orderType === 'delivery' ? activeButtonClasses : inactiveButtonClasses
                                 }`}
                             aria-pressed={orderType === 'delivery'}
                         >
@@ -145,8 +145,8 @@ const OrderPage: React.FC = () => {
                             onClick={() => settings?.collection_available !== false && setOrderType('collection')}
                             disabled={settings?.collection_available === false}
                             className={`${baseButtonClasses} ${settings?.collection_available === false
-                                    ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
-                                    : orderType === 'collection' ? activeButtonClasses : inactiveButtonClasses
+                                ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                : orderType === 'collection' ? activeButtonClasses : inactiveButtonClasses
                                 }`}
                             aria-pressed={orderType === 'collection'}
                         >
@@ -241,12 +241,6 @@ const OrderPage: React.FC = () => {
                                 {deliveryAvailable === false && deliveryError && (
                                     <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
                                         {deliveryError}
-                                        {deliveryDistance && settings?.max_delivery_radius_miles && deliveryDistance > (settings.max_delivery_radius_miles * 1.60934) && (
-                                            <span className="block mt-1">Your location is {(deliveryDistance * 0.621371).toFixed(1)} miles away. We only deliver within {settings.max_delivery_radius_miles} miles.</span>
-                                        )}
-                                        {(!settings?.max_delivery_radius_miles && deliveryDistance && deliveryDistance > 8.04672) && (
-                                            <span className="block mt-1">Your location is {(deliveryDistance * 0.621371).toFixed(1)} miles away. We only deliver within 5 miles.</span>
-                                        )}
                                     </p>
                                 )}
                             </div>

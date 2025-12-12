@@ -172,13 +172,17 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const checkPostcode = async (postcode: string) => {
     const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
     const cleanPostcode = postcode.trim().replace(/\s+/g, '').toUpperCase();
+    console.log("Checking postcode:", cleanPostcode);
 
     // 1. Check for Configured Delivery Zones First via RPC
     const { data: zoneMatches, error: zoneError } = await supabase.rpc('get_matching_delivery_zone', {
       p_postcode: cleanPostcode
     });
 
+    if (zoneError) console.error("Error checking zones:", zoneError);
+
     if (zoneMatches && zoneMatches.length > 0) {
+      console.log("Zone match found:", zoneMatches[0]);
       const matchedZone = zoneMatches[0];
       // Zone Match Found! Override settings.
       const defaults = {
@@ -212,19 +216,26 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // 2. Fallback to Radius Check
-    // Reset to Global Settings first
-    if (globalDeliverySettings) {
-      setState(s => ({ ...s, deliverySettings: globalDeliverySettings }));
-    }
+    console.log("No zone match, falling back to radius check...");
+
+    // Ensure we are using the base global settings (resetting any previous zone overrides)
+    const currentGlobalSettings = globalDeliverySettings || {
+      delivery_fee: 0,
+      delivery_fee_mode: 'flat' as const,
+      delivery_minimum: 0,
+      max_delivery_radius_miles: 5,
+      max_delivery_order_value: 1000
+    };
 
     if (!apiKey) {
+      console.error("No API Key found for address lookup.");
       setState(s => ({
         ...s,
         postcode,
         deliveryAvailable: false,
         deliveryDistance: null,
         deliveryError: 'Configuration error. Please contact the restaurant.',
-        deliverySettings: globalDeliverySettings
+        deliverySettings: currentGlobalSettings
       }));
       return;
     }
@@ -241,7 +252,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             deliveryAvailable: false,
             deliveryDistance: null,
             deliveryError: 'Invalid postcode. Please check and try again.',
-            deliverySettings: globalDeliverySettings
+            deliverySettings: currentGlobalSettings
           }));
           return;
         }
@@ -253,7 +264,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             deliveryAvailable: false,
             deliveryDistance: null,
             deliveryError: 'Configuration error. Please contact the restaurant.',
-            deliverySettings: globalDeliverySettings
+            deliverySettings: currentGlobalSettings
           }));
           return;
         }
@@ -267,8 +278,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Use dynamic radius directly (converted to km) or fallback to 5 miles
       // 1 mile = 1.60934 km
-      const radiusMiles = globalDeliverySettings?.max_delivery_radius_miles || 5;
+      const radiusMiles = currentGlobalSettings.max_delivery_radius_miles || 5;
       const maxDistanceKm = radiusMiles * 1.60934;
+
+      console.log(`Distance: ${distanceKm}km, Max Radius: ${radiusMiles} miles (${maxDistanceKm}km)`);
 
       const isWithinRange = distanceKm <= maxDistanceKm;
 
@@ -277,19 +290,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         postcode: cleanPostcode,
         deliveryAvailable: isWithinRange,
         deliveryDistance: distanceKm,
-        deliveryError: null,
-        deliverySettings: globalDeliverySettings
+        deliveryError: isWithinRange ? null : `Sorry, we only deliver within ${radiusMiles} miles.`,
+        deliverySettings: currentGlobalSettings
       }));
 
     } catch (error) {
-      console.error('Error checking postcode:', error);
+      console.error('Error checking postcode distance:', error);
       setState(s => ({
         ...s,
         postcode: cleanPostcode,
         deliveryAvailable: false,
         deliveryDistance: null,
         deliveryError: 'Unable to verify postcode. Please try again or contact us.',
-        deliverySettings: globalDeliverySettings
+        deliverySettings: currentGlobalSettings
       }));
     }
   };

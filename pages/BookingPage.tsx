@@ -325,7 +325,7 @@ const BookingPage: React.FC = () => {
         }
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .rpc('create_booking', {
                     p_auto_confirm: false,
                     p_booking_date: formatDate(bookingData.date),
@@ -344,7 +344,12 @@ const BookingPage: React.FC = () => {
                 throw error;
             }
 
-            alert('Thank you for your reservation request! We will contact you shortly to confirm.');
+            if (data && !data.success) {
+                alert(data.error_message || 'Booking failed. Please try again.');
+                return;
+            }
+
+            alert(data?.message || 'Thank you for your reservation request! We will contact you shortly to confirm.');
 
             // Reset form state on successful submission
             setStep(1);

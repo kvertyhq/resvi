@@ -48,10 +48,15 @@ const ReservationPage: React.FC = () => {
     };
 
     try {
-      const { error } = await supabase.rpc('create_booking', bookingData);
+      const { data, error } = await supabase.rpc('create_booking', bookingData);
 
       if (error) {
         throw error;
+      }
+
+      if (data && !data.success) {
+        setError(data.error_message || 'Booking failed. Please try again.');
+        return;
       }
 
       setIsSubmitted(true);

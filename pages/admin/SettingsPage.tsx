@@ -12,6 +12,7 @@ import SettingsTimeslots from '../../components/admin/settings/SettingsTimeslots
 import SettingsBookingPreorder from '../../components/admin/settings/SettingsBookingPreorder';
 import SettingsDeliveryZones from '../../components/admin/settings/SettingsDeliveryZones';
 import SettingsPayment from '../../components/admin/settings/SettingsPayment';
+import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
 
 // Simple Toast Component
 const Toast = ({ message, onClose }: { message: { type: 'success' | 'error', text: string }, onClose: () => void }) => {
@@ -190,37 +191,103 @@ const SettingsPage: React.FC = () => {
         }
     };
 
-    return (
-        <div className="max-w-5xl mx-auto pb-10">
-            <h2 className="text-3xl font-serif font-bold text-gray-800 mb-8">Restaurant Settings</h2>
+    const [activeTab, setActiveTab] = useState('general');
 
+    const tabs = [
+        { id: 'general', label: 'General' },
+        { id: 'media', label: 'Media & Socials' },
+        { id: 'operations', label: 'Operations' },
+        { id: 'orders', label: 'Orders' },
+        { id: 'payments', label: 'Payments' },
+        { id: 'bookings', label: 'Bookings' }
+    ];
+
+    return (
+        <div className="max-w-6xl mx-auto pb-10">
             {message && (
                 <Toast message={message} onClose={() => setMessage(null)} />
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg overflow-hidden">
-                <div className="p-6 space-y-8">
-                    <SettingsBasicInfo formData={formData} handleChange={handleChange} />
-                    <SettingsLocation formData={formData} handleChange={handleChange} />
-                    <SettingsOperations formData={formData} handleChange={handleChange} />
-                    <SettingsPayment />
-                    <SettingsDeliveryZones />
-                    <SettingsTimeslots
-                        timeSlots={collectionTimeSlots}
-                        setTimeSlots={setCollectionTimeSlots}
-                        capacities={timeslotCapacities}
-                        setCapacities={setTimeslotCapacities}
-                    />
-                    <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
-                    <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
-                    <SettingsOpeningHours formData={formData} setFormData={setFormData} />
-                    <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
-                </div>
-                <div className="bg-gray-50 px-6 py-4 flex justify-end">
-                    <button type="submit" disabled={loading} className="bg-brand-dark-gray text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50">
+            <form onSubmit={handleSubmit}>
+                {/* Header with Save Button */}
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-serif font-bold text-gray-800">Restaurant Settings</h2>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-brand-dark-gray text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50 shadow-sm"
+                    >
                         <Save className="h-5 w-5 mr-2" />
                         {loading ? 'Saving...' : 'Save Settings'}
                     </button>
+                </div>
+
+                {/* Tabs Navigation */}
+                <div className="bg-white rounded-lg shadow-sm mb-6 border border-gray-200">
+                    <div className="flex flex-wrap border-b border-gray-200">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-6 py-4 text-sm font-medium focus:outline-none transition-colors ${activeTab === tab.id
+                                    ? 'text-brand-gold border-b-2 border-brand-gold bg-gray-50'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Tab Content */}
+                <div className="bg-white shadow rounded-lg overflow-hidden p-6 space-y-8 min-h-[500px]">
+                    {activeTab === 'general' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsBasicInfo formData={formData} handleChange={handleChange} />
+                            <SettingsLocation formData={formData} handleChange={handleChange} />
+                        </div>
+                    )}
+
+                    {activeTab === 'media' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
+                        </div>
+                    )}
+
+                    {activeTab === 'operations' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsOperations formData={formData} handleChange={handleChange} />
+                            <SettingsOpeningHours formData={formData} setFormData={setFormData} />
+                            <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
+                        </div>
+                    )}
+
+                    {activeTab === 'orders' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsDeliveryZones />
+                            <SettingsTimeslots
+                                timeSlots={collectionTimeSlots}
+                                setTimeSlots={setCollectionTimeSlots}
+                                capacities={timeslotCapacities}
+                                setCapacities={setTimeslotCapacities}
+                            />
+                        </div>
+                    )}
+
+                    {activeTab === 'payments' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsPayment />
+                        </div>
+                    )}
+
+                    {activeTab === 'bookings' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsTableManagement />
+                            <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
+                        </div>
+                    )}
                 </div>
             </form>
         </div>

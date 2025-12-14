@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { validateUKPhone } from '../utils/validation';
 import { useSettings } from '../context/SettingsContext';
@@ -135,8 +135,14 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber
 
 
 // Step 2: Time and Guest Selection
-const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading, stepNumber, totalSteps }) => {
-    const guests = [1, 2, 3, 4, 5, 6, 7, 8]; // Expanded guest options
+const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading, stepNumber, totalSteps, maxGuests }) => {
+    const guests = useMemo(() => {
+        const options = [];
+        for (let i = 1; i <= maxGuests; i++) {
+            options.push(i);
+        }
+        return options;
+    }, [maxGuests]);
 
     const baseButtonClasses = "p-3 border text-center font-semibold text-sm transition-colors";
     const inactiveClasses = "border-gray-300 bg-white hover:bg-gray-100";
@@ -256,6 +262,23 @@ const BookingPage: React.FC = () => {
     const [selectedItems, setSelectedItems] = useState<{ item: MenuItemData; quantity: number }[]>([]);
     // Skip logic state
     const [skipMenuStep, setSkipMenuStep] = useState(true);
+    const [maxGuests, setMaxGuests] = useState(8);
+
+    useEffect(() => {
+        const fetchTableInfo = async () => {
+            const { data, error } = await supabase
+                .from('table_info')
+                .select('count')
+                .eq('restaurant_id', import.meta.env.VITE_RESTAURANT_ID)
+                .order('count', { ascending: false })
+                .limit(1);
+
+            if (data && data.length > 0) {
+                setMaxGuests(data[0].count);
+            }
+        };
+        fetchTableInfo();
+    }, []);
 
     const totalSteps = skipMenuStep ? 3 : 4;
 
@@ -438,6 +461,7 @@ const BookingPage: React.FC = () => {
                                         isLoading={isLoading}
                                         stepNumber={2}
                                         totalSteps={totalSteps}
+                                        maxGuests={maxGuests}
                                     />
                                 )}
                                 {step === 3 && !skipMenuStep && (

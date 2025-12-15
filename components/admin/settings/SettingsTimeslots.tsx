@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 interface SettingsTimeslotsProps {
     timeSlots: Record<string, string[]>;
     setTimeSlots: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
-    capacities: Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number }>;
-    setCapacities: React.Dispatch<React.SetStateAction<Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number }>>>;
+    capacities: Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number; max_bookings?: number }>;
+    setCapacities: React.Dispatch<React.SetStateAction<Record<string, { max_orders?: number; max_delivery?: number; max_collection?: number; max_bookings?: number }>>>;
 }
 
 const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTimeSlots, capacities, setCapacities }) => {
@@ -33,7 +33,7 @@ const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTim
         });
     };
 
-    const handleCapacityChange = (day: string, time: string, type: 'max_orders' | 'max_delivery' | 'max_collection', value: number) => {
+    const handleCapacityChange = (day: string, time: string, type: 'max_orders' | 'max_delivery' | 'max_collection' | 'max_bookings', value: number) => {
         const key = `${day}_${time}`;
         setCapacities(prev => ({
             ...prev,
@@ -116,16 +116,27 @@ const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTim
                                             Remove
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Max Orders</label>
+                                            <label className="block text-xs text-brand-dark-gray font-bold mb-1">Max Table Bookings</label>
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={capacities[capacityKey]?.max_orders || ''}
+                                                value={capacities[capacityKey]?.max_bookings ?? ''}
+                                                onChange={(e) => handleCapacityChange(selectedDay, slot, 'max_bookings', parseInt(e.target.value))}
+                                                placeholder="Unlimited"
+                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Max Orders (Online)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={capacities[capacityKey]?.max_orders ?? ''}
                                                 onChange={(e) => handleCapacityChange(selectedDay, slot, 'max_orders', parseInt(e.target.value))}
                                                 placeholder="Unlimited"
-                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
                                             />
                                         </div>
                                         <div>
@@ -133,10 +144,10 @@ const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTim
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={capacities[capacityKey]?.max_delivery || ''}
+                                                value={capacities[capacityKey]?.max_delivery ?? ''}
                                                 onChange={(e) => handleCapacityChange(selectedDay, slot, 'max_delivery', parseInt(e.target.value))}
                                                 placeholder="Unlimited"
-                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
                                             />
                                         </div>
                                         <div>
@@ -144,10 +155,10 @@ const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTim
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={capacities[capacityKey]?.max_collection || ''}
+                                                value={capacities[capacityKey]?.max_collection ?? ''}
                                                 onChange={(e) => handleCapacityChange(selectedDay, slot, 'max_collection', parseInt(e.target.value))}
                                                 placeholder="Unlimited"
-                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-brand-gold focus:border-brand-gold"
                                             />
                                         </div>
                                     </div>
@@ -157,7 +168,7 @@ const SettingsTimeslots: React.FC<SettingsTimeslotsProps> = ({ timeSlots, setTim
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

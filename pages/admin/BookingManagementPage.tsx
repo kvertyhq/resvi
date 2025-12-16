@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
-import { Calendar, Users, Check, X, UserCheck, List, Grid } from 'lucide-react';
+import { Calendar, Users, Check, X, UserCheck, List, Grid, RefreshCcw } from 'lucide-react';
 import CalendarView, { Booking } from '../../components/admin/CalendarView';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 
 // Removed unavailable react-markdown import. Displaying as pre-formatted text.
 
@@ -73,14 +74,26 @@ const BookingManagementPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('today');
     const [viewType, setViewType] = useState<ViewType>('list');
     const [selectedPreorder, setSelectedPreorder] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Auto Refresh
+    const { timeLeft } = useAutoRefresh(() => fetchBookings(false), 15000);
 
     useEffect(() => {
+        // Initialize audio
+        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
         if (selectedRestaurantId) {
             fetchBookings();
 
             const channel = supabase
                 .channel('public:bookings')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, (payload) => {
+                    console.log('New booking received:', payload);
+                    playNotificationSound();
+                    fetchBookings();
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, (payload) => {
                     fetchBookings();
                 })
                 .subscribe();
@@ -91,8 +104,21 @@ const BookingManagementPage: React.FC = () => {
         }
     }, [selectedRestaurantId]);
 
-    const fetchBookings = async () => {
-        setLoading(true);
+    const playNotificationSound = () => {
+        if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+                console.log("Audio play failed (user interaction required):", error);
+            });
+        }
+    };
+
+    const handleRefresh = () => {
+        fetchBookings(true);
+    };
+
+    const fetchBookings = async (showLoading = true) => {
+        if (showLoading && bookings.length === 0) setLoading(true); // Only show loading if empty or forced
+
         const { data, error } = await supabase
             .from('bookings')
             .select(`
@@ -108,6 +134,15 @@ const BookingManagementPage: React.FC = () => {
         if (error) {
             console.error('Error fetching bookings:', error);
         } else {
+            if (data && data.length > 0 && bookings.length > 0) {
+                const currentIds = new Set(bookings.map(b => b.id));
+                const newBookings = data.filter(b => !currentIds.has(b.id));
+
+                if (newBookings.length > 0) {
+                    console.log('New bookings detected:', newBookings.length);
+                    playNotificationSound();
+                }
+            }
             setBookings(data || []);
         }
         setLoading(false);
@@ -169,7 +204,19 @@ const BookingManagementPage: React.FC = () => {
     return (
         <div>
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-serif font-bold text-gray-800">Booking Management</h2>
+                <div className="flex items-center space-x-4">
+                    <h2 className="text-3xl font-serif font-bold text-gray-800">Booking Management</h2>
+                    <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-400">Refreshing in {timeLeft}s</span>
+                        <button
+                            onClick={handleRefresh}
+                            className="p-2 bg-white border border-gray-300 rounded-full hover:bg-gray-50 text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
+                            title="Refresh Bookings"
+                        >
+                            <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
+                </div>
 
                 {/* View Toggle */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex">

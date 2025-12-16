@@ -42,6 +42,8 @@ interface Order {
     order_items: OrderItem[];
 }
 
+import useAutoRefresh from '../../hooks/useAutoRefresh';
+
 const OrderManagementPage: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,6 +53,66 @@ const OrderManagementPage: React.FC = () => {
     // Modal State
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const fetchOrders = async () => {
+        // Don't set loading to true on background refreshes if we have data, to avoid flicker
+        // But for initial load or manual refresh we might want it.
+        // For now let's keep it simple, but maybe avoid full loader if orders.length > 0
+        if (orders.length === 0) setLoading(true);
+
+        try {
+            const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+            console.log('Fetching orders for restaurant ID:', restaurantId, '(from env variable)');
+
+            const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    profiles:user_id (
+                        full_name,
+                        phone
+                    ),
+                    order_items (
+                        id,
+                        menu_item_id,
+                        name_snapshot,
+                        price_snapshot,
+                        quantity,
+                        selected_addons
+                    )
+                `)
+                .eq('restaurant_id', restaurantId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching orders:', error);
+                // setOrders([]); // Don't clear orders on error, keep stale data
+            } else {
+                console.log('Fetched', data?.length || 0, 'orders for restaurant', restaurantId);
+
+                // Play sound if new orders are found (and it's not the initial empty state)
+                if (data && data.length > 0 && orders.length > 0) {
+                    const currentIds = new Set(orders.map(o => o.id));
+                    const newOrders = data.filter(o => !currentIds.has(o.id));
+
+                    if (newOrders.length > 0) {
+                        console.log('New orders detected:', newOrders.length);
+                        playNotificationSound();
+                    }
+                }
+
+                setOrders(data || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch orders:', err);
+            // setOrders([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Auto Refresh
+    const { timeLeft } = useAutoRefresh(fetchOrders, 15000);
 
     useEffect(() => {
         // Initialize audio
@@ -89,46 +151,7 @@ const OrderManagementPage: React.FC = () => {
         fetchOrders();
     };
 
-    const fetchOrders = async () => {
-        setLoading(true);
-        try {
-            const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
-            console.log('Fetching orders for restaurant ID:', restaurantId, '(from env variable)');
 
-            const { data, error } = await supabase
-                .from('orders')
-                .select(`
-                    *,
-                    profiles:user_id (
-                        full_name,
-                        phone
-                    ),
-                    order_items (
-                        id,
-                        menu_item_id,
-                        name_snapshot,
-                        price_snapshot,
-                        quantity,
-                        selected_addons
-                    )
-                `)
-                .eq('restaurant_id', restaurantId)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching orders:', error);
-                setOrders([]);
-            } else {
-                console.log('Fetched', data?.length || 0, 'orders for restaurant', restaurantId);
-                setOrders(data || []);
-            }
-        } catch (err) {
-            console.error('Failed to fetch orders:', err);
-            setOrders([]);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const updateStatus = async (id: string, newStatus: string) => {
         try {
@@ -235,13 +258,16 @@ const OrderManagementPage: React.FC = () => {
             <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center space-x-4">
                     <h2 className="text-3xl font-serif font-bold text-gray-800">Order Management</h2>
-                    <button
-                        onClick={handleRefresh}
-                        className="p-2 bg-white border border-gray-300 rounded-full hover:bg-gray-50 text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
-                        title="Refresh Orders"
-                    >
-                        <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-400">Refreshing in {timeLeft}s</span>
+                        <button
+                            onClick={handleRefresh}
+                            className="p-2 bg-white border border-gray-300 rounded-full hover:bg-gray-50 text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
+                            title="Refresh Orders"
+                        >
+                            <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Filter className="h-5 w-5 text-gray-500" />

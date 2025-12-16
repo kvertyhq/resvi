@@ -74,9 +74,81 @@ begin
       p_guest_count, v_max_booking_size;
   end if;
 
+    -- ---------------------------------------------------------
+    -- PHYSICAL INVENTORY CHECKS (Advanced Capacity Lookahead)
+    -- ---------------------------------------------------------
+    DECLARE
+        v_table_capacities INTEGER[];
+        v_booking_counts INTEGER[];
+        i INTEGER;
+    BEGIN
+        -- 1. Get all table capacities sorted DESC
+        SELECT ARRAY_AGG(count ORDER BY count DESC) INTO v_table_capacities
+        FROM table_info
+        WHERE restaurant_id = p_restaurant_id;
+
+        -- 2. Get all active booking guest counts + current request sorted DESC
+        -- Use a subquery to combine existing and new
+        SELECT ARRAY_AGG(guest_count ORDER BY guest_count DESC) INTO v_booking_counts
+        FROM (
+            SELECT guest_count
+            FROM bookings
+            WHERE restaurant_id = p_restaurant_id
+              AND booking_date = p_booking_date
+              AND booking_time = p_booking_time
+              AND status IN ('confirmed', 'pending')
+            UNION ALL
+            SELECT p_guest_count
+        ) AS combined_bookings;
+
+        -- 3. VALIDATION
+        -- A. Check if total bookings exceed total tables
+        IF array_length(v_booking_counts, 1) > COALESCE(array_length(v_table_capacities, 1), 0) THEN
+             return jsonb_build_object(
+                'success', false,
+                'error_message', 'No tables available for this time (All tables booked).'
+            );
+        END IF;
+
+        -- B. Check if tables can accommodate the groups (Greedy heuristic: Largest group -> Largest Table)
+        -- Since both are sorted DESC, valid assignment exists IFF Booking[i] <= Table[i] for all i
+        FOR i IN 1..array_length(v_booking_counts, 1) LOOP
+            IF v_booking_counts[i] > v_table_capacities[i] THEN
+                return jsonb_build_object(
+                    'success', false,
+                    'error_message', format('No table available for a group of %s (Capacity limit reached for this size).', v_booking_counts[i])
+                );
+            END IF;
+        END LOOP;
+    END;
+
   -- ---------------------------------------------------------
   -- MAX TABLE BOOKINGS LIMIT CHECK (Merged Feature)
   -- ---------------------------------------------------------
+    DECLARE
+        v_total_tables INTEGER;
+    BEGIN
+        -- Count total tables available for this restaurant
+        SELECT count(*) INTO v_total_tables FROM table_info WHERE restaurant_id = p_restaurant_id;
+
+        IF v_total_tables > 0 THEN
+             -- Count active bookings for this slot
+            SELECT count(*) INTO v_current_count
+            FROM bookings
+            WHERE restaurant_id = p_restaurant_id
+              AND booking_date = p_booking_date
+              AND booking_time = p_booking_time
+              AND status IN ('confirmed', 'pending');
+
+            IF v_current_count >= v_total_tables THEN
+                 return jsonb_build_object(
+                    'success', false,
+                    'error_message', 'No tables available for this time (Capacity Reached).'
+                );
+            END IF;
+        END IF;
+    END;
+
     -- Get the day name (e.g., 'mon', 'tue')
     SELECT lower(trim(to_char(p_booking_date, 'Day'))) INTO v_day_name;
     v_day_name := substring(v_day_name, 1, 3); -- Ensure 3 chars

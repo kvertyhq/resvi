@@ -97,12 +97,12 @@ const ContactPage: React.FC = () => {
             <InfoCard
               icon={<ReservationIcon />}
               title="Reservations"
-              lines={[`${settings?.phone || ''} - ${settings?.email || ''}`, "- Or use the online form -"]}
+              lines={[`${settings?.phone || ''} - ${settings?.email || ''}`, ""]}
             />
             <InfoCard
               icon={<LocationIcon />}
               title="Address"
-              lines={[`${settings?.address_line1 || ''}, ${settings?.address_line2 || ''}`, "- Get Directions -"]}
+              lines={[`${settings?.address_line1 || ''}, ${settings?.address_line2 || ''}`, ""]}
             />
             <InfoCard
               icon={<ClockIcon />}

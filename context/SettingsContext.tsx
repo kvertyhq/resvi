@@ -78,6 +78,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
 
         setSettings(data?.data);
         document.title = data?.data?.name;
+
+        // Update favicon
+        if (data?.data?.logo_url) {
+          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = data.data.logo_url;
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {

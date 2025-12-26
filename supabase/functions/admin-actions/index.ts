@@ -34,12 +34,24 @@ serve(async (req) => {
 
         const { data: profile } = await supabaseClient
             .from('profiles')
-            .select('role')
+            .select('role, restaurant_id')
             .eq('id', user.id)
             .single();
 
-        if (profile?.role !== 'super_admin') {
-            throw new Error('Forbidden: Super Admin only');
+        if (profile?.role !== 'super_admin' && profile?.role !== 'restaurant_admin' && profile?.role !== 'admin') {
+            throw new Error('Forbidden: Admin access required');
+        }
+
+        const { action, email, password, restaurantId } = await req.json();
+
+        // Enforce restaurant scope for non-super admins
+        if (profile.role !== 'super_admin') {
+            if (!profile.restaurant_id || profile.restaurant_id !== restaurantId) {
+                throw new Error(`Forbidden: You can only manage your own restaurant. Profile: ${profile.restaurant_id}, Request: ${restaurantId}`);
+            }
+            if (action === 'invite-admin') {
+                throw new Error('Forbidden: Only Super Admins can invite new admins');
+            }
         }
 
         const supabaseAdmin = createClient(
@@ -47,13 +59,13 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        const { action, email, password, restaurantId } = await req.json();
-
         if (action === 'get-users') {
             const { data: profiles, error: profilesError } = await supabaseAdmin
                 .from('profiles')
                 .select('*')
-                .eq('restaurant_id', restaurantId);
+                .eq('restaurant_id', restaurantId)
+                .neq('role', 'customer')
+                .neq('role', 'super_admin');
 
             if (profilesError) throw profilesError;
 

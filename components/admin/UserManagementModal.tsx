@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAdmin } from '../../context/AdminContext';
 import { X, UserPlus, Mail, Lock, RotateCcw, Shield, User } from 'lucide-react';
 
 interface UserManagementModalProps {
@@ -31,6 +32,7 @@ interface Profile {
 }
 
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClose, restaurantId, restaurantName }) => {
+    const { role } = useAdmin();
     const [activeTab, setActiveTab] = useState<'list' | 'invite' | 'create'>('list');
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -132,12 +134,14 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
                     >
                         Users List
                     </button>
-                    <button
-                        onClick={() => setActiveTab('invite')}
-                        className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'invite' ? 'border-brand-gold text-brand-gold' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Invite Admin
-                    </button>
+                    {role === 'super_admin' && (
+                        <button
+                            onClick={() => setActiveTab('invite')}
+                            className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'invite' ? 'border-brand-gold text-brand-gold' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Invite Admin
+                        </button>
+                    )}
                     <button
                         onClick={() => setActiveTab('create')}
                         className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'create' ? 'border-brand-gold text-brand-gold' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -200,7 +204,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
                         </div>
                     )}
 
-                    {activeTab === 'invite' && (
+                    {activeTab === 'invite' && role === 'super_admin' && (
                         <div className="max-w-md mx-auto py-4">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">Invite New Admin</h3>
                             <p className="text-sm text-gray-500 mb-6">

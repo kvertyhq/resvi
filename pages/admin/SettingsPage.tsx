@@ -73,7 +73,8 @@ const SettingsPage: React.FC = () => {
         max_delivery_radius_miles: 5,
         max_delivery_order_value: 1000,
         menu_pdf_url: '',
-        is_menu_pdf_visible: true
+        is_menu_pdf_visible: true,
+        timezone: 'UTC'
     });
 
     // New states for advanced settings
@@ -133,7 +134,8 @@ const SettingsPage: React.FC = () => {
                         max_delivery_radius_miles: settings.max_delivery_radius_miles || 5,
                         max_delivery_order_value: settings.max_delivery_order_value || 1000,
                         menu_pdf_url: settings.menu_pdf_url || '',
-                        is_menu_pdf_visible: settings.is_menu_pdf_visible ?? true
+                        is_menu_pdf_visible: settings.is_menu_pdf_visible ?? true,
+                        timezone: settings.timezone || 'UTC'
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});

@@ -30,6 +30,22 @@ const SettingsLocation: React.FC<SettingsLocationProps> = ({ formData, handleCha
                     <label className="block text-sm font-medium text-gray-700 mb-1">Google Map URL</label>
                     <input type="url" name="google_map_url" value={formData.google_map_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
+                <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                    <select
+                        name="timezone"
+                        value={formData.timezone}
+                        onChange={handleChange}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                    >
+                        {Intl.supportedValuesOf('timeZone').map((tz) => (
+                            <option key={tz} value={tz}>
+                                {tz}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Used for booking availability checks.</p>
+                </div>
             </div>
         </div>
     );

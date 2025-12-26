@@ -45,11 +45,31 @@ const DecorativeElement = () => (
 );
 
 // Step 1: Date Selection
-const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber, totalSteps }) => {
+const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber, totalSteps, timezone = 'UTC' }) => {
     const [displayDate, setDisplayDate] = useState(selectedDate || new Date());
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Helper to get "today" in the restaurant's timezone
+    const getRestaurantToday = () => {
+        try {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-CA', { // YYYY-MM-DD
+                timeZone: timezone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            });
+            const dateString = formatter.format(now);
+            const [year, month, day] = dateString.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        } catch (e) {
+            console.error("Invalid timezone, defaulting to local today", e);
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+    };
+
+    const restaurantToday = getRestaurantToday();
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -74,7 +94,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber
 
             const isClosed = closureDates.includes(dateString);
             const isSelected = selectedDate && dayDate.getTime() === selectedDate.getTime();
-            const isPast = dayDate < today;
+            const isPast = dayDate < restaurantToday;
             const isDisabled = isPast || isClosed;
 
             days.push(
@@ -94,7 +114,8 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber
             );
         }
         return days;
-    }, [year, month, selectedDate, onDateSelect, today, closureDates]);
+        return days;
+    }, [year, month, selectedDate, onDateSelect, restaurantToday, closureDates, timezone]);
 
     const handlePrevMonth = () => {
         setDisplayDate(new Date(year, month - 1, 1));
@@ -135,7 +156,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber
 
 
 // Step 2: Time and Guest Selection
-const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading, stepNumber, totalSteps, maxGuests }) => {
+const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSelect, onPrev, onNext, availableTimes, isLoading, stepNumber, totalSteps, maxGuests, restaurantTimezone }) => {
     const guests = useMemo(() => {
         const options = [];
         for (let i = 1; i <= maxGuests; i++) {
@@ -158,11 +179,20 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
                         <p className="text-sm text-red-500 italic">No available times for this date.</p>
                     ) : (
                         <div className="grid grid-cols-4 gap-2">
-                            {availableTimes.map(time => (
-                                <button key={time} onClick={() => onTimeSelect(time)} className={`${baseButtonClasses} ${selectedTime === time ? activeClasses : inactiveClasses}`}>
-                                    {time}
-                                </button>
-                            ))}
+                            {availableTimes.sort().map(time => {
+                                // Filter times that have passed if the selected date is "today"
+                                // The validTimes array passed in 'availableTimes' is already handled by getAvailableTimes in the parent if simple filtering was needed.
+                                // However, checking time vs NOW requires current restaurant time.
+                                // Let's trust getAvailableTimes from parent to have filtered "past" times if it's today.
+                                // But `getAvailableTimes` in parent (BookingPage) currently just returns the full array from settings.
+                                // We should move the filtering logic to getAvailableTimes or handle it here. 
+                                // Moving to getAvailableTimes is cleaner.
+                                return (
+                                    <button key={time} onClick={() => onTimeSelect(time)} className={`${baseButtonClasses} ${selectedTime === time ? activeClasses : inactiveClasses}`}>
+                                        {time}
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -331,7 +361,53 @@ const BookingPage: React.FC = () => {
         // The keys are 'mon', 'tue', etc. The VALUES are arrays of time strings.
         // So `settings.collection_time_slots[dayOfWeek]` should give the array of times.
 
-        return settings.collection_time_slots[dayOfWeek] || [];
+        const rawTimes = settings.collection_time_slots[dayOfWeek] || [];
+
+        // Filter past times if date is today
+        try {
+            // Restaurant date "YYYY-MM-DD"
+            const now = new Date();
+            const tz = settings.timezone || 'UTC';
+            const formatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: tz,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            // "2023-10-27, 14:30" - format depends on locale, let's parse carefully
+            // Actually simpler: Get restaurant "today" date object (00:00)
+            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const restaurantToday = new Date(y, m - 1, d);
+
+            if (bookingData.date && bookingData.date.getTime() === restaurantToday.getTime()) {
+                // It is today. Filter based on time.
+                const timeStr = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+                // timeStr is "14:30"
+                // Convert to comparable value
+                const [h, min] = timeStr.split(':').map(Number);
+                const currentMinutes = h * 60 + min;
+
+                return rawTimes.filter(t => {
+                    const [th, tmin] = t.split('.').map(Number); // Assuming format "12.00" or "12:00". settings usually "12.00"? code uses replace('.', ':') later so probably "12.00".
+                    // Check format
+                    let slotH = th;
+                    let slotM = tmin;
+                    if (t.includes(':')) {
+                        const parts = t.split(':');
+                        slotH = Number(parts[0]);
+                        slotM = Number(parts[1]);
+                    }
+                    const slotMinutes = slotH * 60 + slotM;
+                    // Allow booking at least 30 mins in advance? Or just "future"?
+                    // Let's say strictly future for now.
+                    return slotMinutes > currentMinutes;
+                });
+            }
+        } catch (e) {
+            console.error("Error filtering times", e);
+        }
+
+        return rawTimes;
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -447,6 +523,7 @@ const BookingPage: React.FC = () => {
                                         closureDates={settings?.closure_dates || []}
                                         stepNumber={1}
                                         totalSteps={totalSteps}
+                                        timezone={settings?.timezone}
                                     />
                                 )}
                                 {step === 2 && (
@@ -462,6 +539,7 @@ const BookingPage: React.FC = () => {
                                         stepNumber={2}
                                         totalSteps={totalSteps}
                                         maxGuests={maxGuests}
+                                        restaurantTimezone={settings?.timezone}
                                     />
                                 )}
                                 {step === 3 && !skipMenuStep && (

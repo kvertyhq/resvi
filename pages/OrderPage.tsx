@@ -158,154 +158,197 @@ const OrderPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {orderType === 'delivery' && (
-                            <div className="animate-fade-in space-y-4">
-                                <p className="text-sm text-gray-600">Enter postcode to check availability</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={localPostcode}
-                                        onChange={(e) => setLocalPostcode(e.target.value.toUpperCase())}
-                                        placeholder="e.g. NW10 1AA"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
-                                    />
-                                    <button
-                                        onClick={handlePostcodeCheck}
-                                        disabled={isCheckingPostcode || !localPostcode}
-                                        className="px-6 py-3 bg-brand-dark-gray text-white rounded-md font-semibold disabled:bg-gray-400 hover:bg-brand-mid-gray transition-colors"
-                                    >
-                                        {isCheckingPostcode ? '...' : 'Check'}
-                                    </button>
-                                </div>
-                                {deliveryAvailable === true && (
-                                    <>
-                                        <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
-                                            {deliveryDistance ? (
-                                                `Great! We deliver to your area (${(deliveryDistance * 0.621371).toFixed(1)} miles away).`
-                                            ) : (
-                                                "Great! We deliver to your area."
+                        {(() => {
+                            // Helper to filter slots based on timezone
+                            const getFilteredSlots = (dateString: string) => {
+                                if (!dateString || !settings?.collection_time_slots) return [];
+
+                                const date = new Date(dateString);
+                                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+                                const rawSlots = settings.collection_time_slots[dayName] || [];
+
+                                try {
+                                    // 1. Get restaurant timezone
+                                    const tz = settings.timezone || 'UTC';
+
+                                    // 2. Get "Restaurant Today" (YYYY-MM-DD)
+                                    const now = new Date();
+                                    const restaurantDateStr = new Intl.DateTimeFormat('en-CA', {
+                                        timeZone: tz,
+                                        year: 'numeric', month: '2-digit', day: '2-digit'
+                                    }).format(now);
+
+                                    // 3. Compare selected date with "Restaurant Today"
+                                    if (dateString === restaurantDateStr) {
+                                        // It is today. We need to filter past times.
+
+                                        // 4. Get "Restaurant Now" Time (HH:MM)
+                                        const timeStr = new Intl.DateTimeFormat('en-GB', {
+                                            timeZone: tz,
+                                            hour: '2-digit', minute: '2-digit', hour12: false
+                                        }).format(now);
+
+                                        const [h, m] = timeStr.split(':').map(Number);
+                                        const currentMinutes = h * 60 + m;
+
+                                        return rawSlots.filter(t => {
+                                            // Handle various time formats if necessary (e.g. "12.00", "12:00")
+                                            // Assuming format similar to booking "12.00" or "12:00"
+                                            let slotH, slotM;
+                                            if (t.includes(':')) {
+                                                [slotH, slotM] = t.split(':').map(Number);
+                                            } else {
+                                                [slotH, slotM] = t.split('.').map(Number);
+                                            }
+
+                                            const slotMinutes = slotH * 60 + slotM;
+                                            return slotMinutes > currentMinutes;
+                                        });
+                                    }
+                                } catch (e) {
+                                    console.error("Error filtering order slots:", e);
+                                    return rawSlots;
+                                }
+
+                                return rawSlots;
+                            };
+
+                            const availableSlots = orderType === 'delivery'
+                                ? getFilteredSlots(deliveryDate)
+                                : getFilteredSlots(localDate);
+
+                            return (
+                                <>
+                                    {orderType === 'delivery' && (
+                                        <div className="animate-fade-in space-y-4">
+                                            <p className="text-sm text-gray-600">Enter postcode to check availability</p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={localPostcode}
+                                                    onChange={(e) => setLocalPostcode(e.target.value.toUpperCase())}
+                                                    placeholder="e.g. NW10 1AA"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
+                                                />
+                                                <button
+                                                    onClick={handlePostcodeCheck}
+                                                    disabled={isCheckingPostcode || !localPostcode}
+                                                    className="px-6 py-3 bg-brand-dark-gray text-white rounded-md font-semibold disabled:bg-gray-400 hover:bg-brand-mid-gray transition-colors"
+                                                >
+                                                    {isCheckingPostcode ? '...' : 'Check'}
+                                                </button>
+                                            </div>
+                                            {deliveryAvailable === true && (
+                                                <>
+                                                    <p className="text-green-600 bg-green-50 p-3 rounded-md text-sm">
+                                                        {deliveryDistance ? (
+                                                            `Great! We deliver to your area (${(deliveryDistance * 0.621371).toFixed(1)} miles away).`
+                                                        ) : (
+                                                            "Great! We deliver to your area."
+                                                        )}
+                                                        <span className="block mt-1 font-medium">
+                                                            Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
+                                                        </span>
+                                                    </p>
+                                                    {capacityError && (
+                                                        <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
+                                                    )}
+                                                    {/* Delivery Slot Selection */}
+                                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                                            <div className="relative">
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
+                                                                <input
+                                                                    type="date"
+                                                                    value={deliveryDate}
+                                                                    onChange={e => {
+                                                                        const selectedDate = e.target.value;
+                                                                        if (settings?.closure_dates?.includes(selectedDate)) {
+                                                                            alert("We are closed on this date. Please select another date.");
+                                                                            setDeliveryDate('');
+                                                                        } else {
+                                                                            setDeliveryDate(selectedDate);
+                                                                        }
+                                                                    }}
+                                                                    min={new Date().toISOString().split('T')[0]}
+                                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
+                                                            <div className="relative">
+                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
+                                                                <select value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
+                                                                    <option value="" disabled>Select a time</option>
+                                                                    {availableSlots.map((slot) => (
+                                                                        <option key={slot} value={slot}>{slot}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
                                             )}
-                                            <span className="block mt-1 font-medium">
-                                                Delivery Fee: {deliveryFee === 0 ? 'Free' : `£${deliveryFee.toFixed(2)}`}
-                                            </span>
-                                        </p>
-                                        {capacityError && (
-                                            <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
-                                        )}
-                                        {/* Delivery Slot Selection */}
-                                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                                <div className="relative">
-                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
-                                                    <input
-                                                        type="date"
-                                                        value={deliveryDate}
-                                                        onChange={e => {
-                                                            const selectedDate = e.target.value;
-                                                            if (settings?.closure_dates?.includes(selectedDate)) {
-                                                                alert("We are closed on this date. Please select another date.");
-                                                                setDeliveryDate('');
-                                                            } else {
-                                                                setDeliveryDate(selectedDate);
-                                                            }
-                                                        }}
-                                                        min={new Date().toISOString().split('T')[0]}
-                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
-                                                    />
+                                            {deliveryAvailable === false && deliveryError && (
+                                                <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
+                                                    {deliveryError}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {orderType === 'collection' && (
+                                        <div className="animate-fade-in space-y-4">
+                                            {capacityError && (
+                                                <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                                    <div className="relative">
+                                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
+                                                        <input
+                                                            type="date"
+                                                            value={localDate}
+                                                            onChange={e => {
+                                                                const selectedDate = e.target.value;
+                                                                if (settings?.closure_dates?.includes(selectedDate)) {
+                                                                    alert("We are closed on this date. Please select another date.");
+                                                                    setLocalDate('');
+                                                                } else {
+                                                                    setLocalDate(selectedDate);
+                                                                }
+                                                            }}
+                                                            min={new Date().toISOString().split('T')[0]}
+                                                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
+                                                        />
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-1">Choose a collection date</p>
                                                 </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
-                                                <div className="relative">
-                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
-                                                    <select value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
-                                                        <option value="" disabled>Select a time</option>
-                                                        {(() => {
-                                                            if (!deliveryDate || !settings?.collection_time_slots) return null;
-
-                                                            const date = new Date(deliveryDate);
-                                                            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-                                                            const slots = settings.collection_time_slots[dayName] || [];
-
-                                                            return slots.map((slot) => (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
+                                                    <div className="relative">
+                                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
+                                                        <select value={localTime} onChange={e => setLocalTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
+                                                            <option value="" disabled>Select a time</option>
+                                                            {availableSlots.map((slot) => (
                                                                 <option key={slot} value={slot}>{slot}</option>
-                                                            ));
-                                                        })()}
-                                                    </select>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    {localDate && (
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {availableSlots.length === 0 ? "No slots available for this day" : ""}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
-                                    </>
-                                )}
-                                {deliveryAvailable === false && deliveryError && (
-                                    <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
-                                        {deliveryError}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                        {orderType === 'collection' && (
-                            <div className="animate-fade-in space-y-4">
-                                {capacityError && (
-                                    <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">{capacityError}</p>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3"><CalendarIcon /></span>
-                                            <input
-                                                type="date"
-                                                value={localDate}
-                                                onChange={e => {
-                                                    const selectedDate = e.target.value;
-                                                    if (settings?.closure_dates?.includes(selectedDate)) {
-                                                        alert("We are closed on this date. Please select another date.");
-                                                        setLocalDate('');
-                                                    } else {
-                                                        setLocalDate(selectedDate);
-                                                    }
-                                                }}
-                                                min={new Date().toISOString().split('T')[0]}
-                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">Choose a collection date</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3"><ClockIcon /></span>
-                                            <select value={localTime} onChange={e => setLocalTime(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-gold appearance-none bg-white">
-                                                <option value="" disabled>Select a time</option>
-                                                {(() => {
-                                                    if (!localDate || !settings?.collection_time_slots) return null;
-
-                                                    const date = new Date(localDate);
-                                                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-                                                    const slots = settings.collection_time_slots[dayName] || [];
-
-                                                    return slots.map((slot) => (
-                                                        <option key={slot} value={slot}>{slot}</option>
-                                                    ));
-                                                })()}
-                                            </select>
-                                        </div>
-                                        {localDate && settings?.collection_time_slots && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                {(() => {
-                                                    const date = new Date(localDate);
-                                                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-                                                    const slots = settings.collection_time_slots[dayName];
-                                                    return !slots || slots.length === 0 ? "No slots available for this day" : "";
-                                                })()}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
 
                     <button

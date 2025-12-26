@@ -80,16 +80,15 @@ const SettingsPage: React.FC = () => {
     const [preorderRequiredDays, setPreorderRequiredDays] = useState<string[]>([]);
 
     useEffect(() => {
-        const envRestaurantId = import.meta.env.VITE_RESTAURANT_ID;
-        if (envRestaurantId) {
-            fetchSettings(envRestaurantId);
+        if (selectedRestaurantId) {
+            fetchSettings(selectedRestaurantId);
         }
-    }, []);
+    }, [selectedRestaurantId]);
 
     const fetchSettings = async (id: string) => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.rpc('get_restaurant_settings', { p_id: import.meta.env.VITE_RESTAURANT_ID });
+            const { data, error } = await supabase.rpc('get_restaurant_settings', { p_id: id });
 
             if (error) throw error;
 
@@ -160,8 +159,7 @@ const SettingsPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const targetId = import.meta.env.VITE_RESTAURANT_ID;
-        if (!targetId) return;
+        if (!selectedRestaurantId) return;
 
         setLoading(true);
         setMessage(null);
@@ -178,7 +176,7 @@ const SettingsPage: React.FC = () => {
             const { error } = await supabase
                 .from('restaurant_settings')
                 .update(dataToSave)
-                .eq('id', targetId);
+                .eq('id', selectedRestaurantId);
 
             if (error) throw error;
 
@@ -201,6 +199,15 @@ const SettingsPage: React.FC = () => {
         { id: 'payments', label: 'Payments' },
         { id: 'bookings', label: 'Bookings' }
     ];
+
+    if (!selectedRestaurantId) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[50vh] text-gray-500">
+                <p className="text-xl font-medium mb-2">No Restaurant Selected</p>
+                <p>Please select a restaurant from the sidebar to manage settings.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-6xl mx-auto pb-10">

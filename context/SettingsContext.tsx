@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Settings = {
+  id?: string;
   restaurant_name?: string;
   logo_url?: string;
   theme_color?: string;

@@ -468,7 +468,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         p_mark_payment_completed: isCardPayment, // Mark paid if card (since creating order after successful stripe flow)
         p_name: orderDetails.name,
         p_notes: `
-Address: ${orderDetails.address}
+Address: ${orderDetails.address}${finalOrderType === 'delivery' && state.postcode ? `, ${state.postcode}` : ''}
 Notes: ${orderDetails.notes}
         `.trim(),
         p_order_type: finalOrderType,

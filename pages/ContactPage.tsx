@@ -56,7 +56,8 @@ const ContactPage: React.FC = () => {
             message: formData.message,
             user_agent: navigator.userAgent,
             referrer: document.referrer,
-            processed: false
+            processed: false,
+            restaurant_id: settings?.id || import.meta.env.VITE_RESTAURANT_ID
           }
         ]);
 

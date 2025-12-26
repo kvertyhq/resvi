@@ -12,20 +12,28 @@ interface Profile {
     updated_at: string;
 }
 
+import { useAdmin } from '../../context/AdminContext';
+
 const CustomerManagementPage: React.FC = () => {
+    const { selectedRestaurantId } = useAdmin();
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        fetchProfiles();
-    }, []);
+        if (selectedRestaurantId) {
+            fetchProfiles();
+        }
+    }, [selectedRestaurantId]);
 
     const fetchProfiles = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
+            .eq('restaurant_id', selectedRestaurantId)
+            .eq('role', 'customer')
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -40,6 +48,15 @@ const CustomerManagementPage: React.FC = () => {
         (profile.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (profile.phone?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
+
+    if (!selectedRestaurantId) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-gray-500 bg-white rounded-lg border border-gray-200 mt-8 max-w-6xl mx-auto">
+                <p className="text-xl font-medium mb-2">No Restaurant Selected</p>
+                <p>Please select a restaurant context to view customers.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6">

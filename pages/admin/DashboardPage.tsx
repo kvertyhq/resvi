@@ -21,6 +21,7 @@ const DashboardPage: React.FC = () => {
     }, [selectedRestaurantId]);
 
     const fetchDashboardStats = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
@@ -31,6 +32,7 @@ const DashboardPage: React.FC = () => {
             const { data: revenueData, error: revenueError } = await supabase
                 .from('orders')
                 .select('total_amount')
+                .eq('restaurant_id', selectedRestaurantId)
                 .eq('status', 'completed')
                 .gte('created_at', firstDayOfMonth);
 
@@ -43,6 +45,7 @@ const DashboardPage: React.FC = () => {
             const { count: activeOrdersCount, error: activeOrdersError } = await supabase
                 .from('orders')
                 .select('*', { count: 'exact', head: true })
+                .eq('restaurant_id', selectedRestaurantId)
                 .neq('status', 'completed')
                 .neq('status', 'cancelled')
                 .gte('created_at', todayStr + 'T00:00:00'); // From start of today
@@ -53,13 +56,14 @@ const DashboardPage: React.FC = () => {
             const { count: bookingsCount, error: bookingsError } = await supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })
+                .eq('restaurant_id', selectedRestaurantId)
                 .eq('booking_date', todayStr);
 
             if (bookingsError) throw bookingsError;
 
             // 4. Average Order Value (via RPC)
             const { data: aovData, error: aovError } = await supabase
-                .rpc('get_aov', { p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID });
+                .rpc('get_aov', { p_restaurant_id: selectedRestaurantId });
 
             if (aovError) throw aovError;
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
 
@@ -9,7 +9,19 @@ const LoginPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
+    const location = useLocation(); // Add this import if missing, wait, I need to check imports.
     const { login } = useAdmin();
+
+    useEffect(() => {
+        // Check for error from redirection
+        const state = location.state as { error?: string };
+        if (state?.error) {
+            setError(state.error);
+            // Clean up state so refresh doesn't show error again? 
+            // Replace history to remove state
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,7 +50,7 @@ const LoginPage: React.FC = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
             <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-serif font-bold text-brand-dark-gray">Daniel Sushi Admin</h1>
+                    <h1 className="text-3xl font-serif font-bold text-brand-dark-gray">Admin Panel</h1>
                     <p className="text-gray-500 mt-2">Sign in to manage your restaurant</p>
                 </div>
 

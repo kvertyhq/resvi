@@ -13,11 +13,12 @@ import {
     Users,
     MessageSquare,
     Menu,
-    X
+    X,
+    Shield
 } from 'lucide-react';
 
 const AdminLayout: React.FC = () => {
-    const { session, loading, logout, selectedRestaurantId, setSelectedRestaurantId, restaurants } = useAdmin();
+    const { session, loading, logout, selectedRestaurantId, setSelectedRestaurantId, restaurants, role } = useAdmin();
     const navigate = useNavigate();
 
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
@@ -39,7 +40,7 @@ const AdminLayout: React.FC = () => {
         <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
             {/* Mobile Header */}
             <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-brand-dark-gray text-white flex items-center justify-between px-4 z-40 shadow-md">
-                <h1 className="text-lg font-serif font-bold tracking-wider">Daniel Sushi Admin</h1>
+                <h1 className="text-lg font-serif font-bold tracking-wider">Admin Panel</h1>
                 <button
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     className="p-2 rounded-md hover:bg-gray-700 focus:outline-none"
@@ -62,7 +63,7 @@ const AdminLayout: React.FC = () => {
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             `}>
                 <div className="p-6 border-b border-gray-700 hidden md:block">
-                    <h1 className="text-2xl font-serif font-bold tracking-wider">Daniel Sushi Admin</h1>
+                    <h1 className="text-2xl font-serif font-bold tracking-wider">Admin Panel</h1>
                 </div>
 
                 {/* Mobile Close Button (Optional, but good for UX) */}
@@ -92,6 +93,18 @@ const AdminLayout: React.FC = () => {
 
                 <nav className="flex-1 overflow-y-auto py-4">
                     <ul className="space-y-1 px-3">
+                        {role === 'super_admin' && (
+                            <li className="mb-4 border-b border-gray-700 pb-2">
+                                <NavLink
+                                    to="/admin/super"
+                                    onClick={() => setIsSidebarOpen(false)}
+                                    className={({ isActive }) => `flex items-center px-3 py-2 rounded-md transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'text-indigo-300 hover:bg-indigo-900 hover:text-white'}`}
+                                >
+                                    <Shield className="h-5 w-5 mr-3" />
+                                    Super Admin
+                                </NavLink>
+                            </li>
+                        )}
                         <li>
                             <NavLink
                                 to="/admin/dashboard"

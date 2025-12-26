@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { Calendar, Clock, Users, User, ChevronRight } from 'lucide-react';
+import { useAdmin } from '../../context/AdminContext';
 import { Booking } from './CalendarView'; // Importing interface from CalendarView
 
 const DashboardBookings: React.FC = () => {
+    const { selectedRestaurantId } = useAdmin();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'day' | 'week' | 'month'>('day');
 
     useEffect(() => {
-        fetchBookings();
-    }, [filter]);
+        if (selectedRestaurantId) {
+            fetchBookings();
+        }
+    }, [filter, selectedRestaurantId]);
 
     const fetchBookings = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         try {
-            const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+            const restaurantId = selectedRestaurantId;
             const today = new Date();
             let startDate = new Date();
             let endDate = new Date();

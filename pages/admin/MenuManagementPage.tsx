@@ -99,33 +99,44 @@ const MenuManagementPage: React.FC = () => {
     }, [selectedRestaurantId]);
 
     const fetchData = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         await Promise.all([fetchCategories(), fetchItems(), fetchAddons()]);
         setLoading(false);
     };
 
     const fetchCategories = async () => {
+        if (!selectedRestaurantId) return;
         const { data, error } = await supabase
             .from('menu_categories')
             .select('*')
+            .eq('restaurant_id', selectedRestaurantId)
             .order('order_index', { ascending: true });
         if (data) setCategories(data);
         if (error) console.error('Error fetching categories:', error);
     };
 
     const fetchItems = async () => {
+        if (!selectedRestaurantId) return;
+        // Items are linked to categories or directly to restaurant? 
+        // Schema usually links items to restaurant_id too or via category
+        // Let's assume restaurant_id is on menu_items for direct filtering, or we filter by category.
+        // Checking schema via simple query: menu_items usually has restaurant_id in this codebase pattern.
         const { data, error } = await supabase
             .from('menu_items')
             .select('*')
+            .eq('restaurant_id', selectedRestaurantId)
             .order('name', { ascending: true });
         if (data) setItems(data);
         if (error) console.error('Error fetching items:', error);
     };
 
     const fetchAddons = async () => {
+        if (!selectedRestaurantId) return;
         const { data, error } = await supabase
             .from('addons')
             .select('*')
+            .eq('restaurant_id', selectedRestaurantId)
             .order('name', { ascending: true });
         if (data) setAddons(data);
         if (error) console.error('Error fetching addons:', error);
@@ -154,7 +165,8 @@ const MenuManagementPage: React.FC = () => {
 
     const handleCategorySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = { ...categoryForm };
+        if (!selectedRestaurantId) return;
+        const payload = { ...categoryForm, restaurant_id: selectedRestaurantId };
 
         if (editingCategory) {
             await supabase.from('menu_categories').update(payload).eq('id', editingCategory.id);
@@ -259,6 +271,8 @@ const MenuManagementPage: React.FC = () => {
 
     const handleItemSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!selectedRestaurantId) return;
+
         if (aiCheckStatus === 'rejected') {
             alert("Cannot save: Image was rejected by AI.");
             return;
@@ -277,7 +291,7 @@ const MenuManagementPage: React.FC = () => {
             }
         }
 
-        const payload = { ...itemForm, image_url: imageUrl };
+        const payload = { ...itemForm, image_url: imageUrl, restaurant_id: selectedRestaurantId };
 
         let itemId = editingItem?.id;
 
@@ -347,7 +361,8 @@ const MenuManagementPage: React.FC = () => {
 
     const handleAddonSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = { ...addonForm, restaurant_id: import.meta.env.VITE_RESTAURANT_ID };
+        if (!selectedRestaurantId) return;
+        const payload = { ...addonForm, restaurant_id: selectedRestaurantId };
 
         if (editingAddon) {
             await supabase.from('addons').update(payload).eq('id', editingAddon.id);

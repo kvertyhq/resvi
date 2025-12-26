@@ -5,10 +5,11 @@ import { supabase } from '../supabaseClient';
 interface AdminContextType {
     session: Session | null;
     user: User | null;
+    role: string | null;
     selectedRestaurantId: string | null;
     setSelectedRestaurantId: (id: string) => void;
     restaurants: { id: string; name: string }[];
-    login: (email: string) => Promise<void>; // Simplified for now, actual auth handled by Supabase
+    login: (email: string) => Promise<void>;
     logout: () => Promise<void>;
     loading: boolean;
 }
@@ -17,18 +18,18 @@ const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null);
+    const [role, setRole] = useState<string | null>(null);
     const [selectedRestaurantId, setSelectedRestaurantIdState] = useState<string | null>(() => {
         return localStorage.getItem('admin_selected_restaurant_id');
     });
     const [loading, setLoading] = useState(true);
-
     const [restaurants, setRestaurants] = useState<{ id: string; name: string }[]>([]);
 
     useEffect(() => {
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
-            setLoading(false);
+            if (!session) setLoading(false);
         });
 
         // Listen for auth changes
@@ -36,29 +37,75 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-        });
-
-        // Fetch restaurants
-        const fetchRestaurants = async () => {
-            const { data, error } = await supabase
-                .from('restaurant_settings')
-                .select('id, name');
-
-            if (error) {
-                console.error('Error fetching restaurants:', error);
-            } else if (data) {
-                setRestaurants(data);
-                // If no restaurant selected, select the first one
-                if (!selectedRestaurantId && data.length > 0) {
-                    setSelectedRestaurantId(data[0].id);
-                }
+            if (!session) {
+                setRole(null);
+                setRestaurants([]);
+                setLoading(false);
             }
-        };
-
-        fetchRestaurants();
+        });
 
         return () => subscription.unsubscribe();
     }, []);
+
+    // Fetch profile and restaurants when session changes
+    useEffect(() => {
+        const fetchAdminData = async () => {
+            if (!session) return;
+
+            // 1. Fetch Profile to get Role
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('role, restaurant_id')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+            if (profileError) {
+                console.error('Error fetching admin profile:', profileError);
+                setLoading(false);
+                return;
+            }
+
+            const userRole = profile?.role || 'customer'; // Default to customer if null, but expected to be set
+            setRole(userRole);
+
+            // 2. Fetch Restaurants based on Role
+            let query = supabase.from('restaurant_settings').select('id, name');
+
+            // If NOT super_admin, filter by assigned restaurant
+            if (userRole !== 'super_admin' && profile?.restaurant_id) {
+                query = query.eq('id', profile.restaurant_id);
+            } else if (userRole !== 'super_admin' && !profile?.restaurant_id) {
+                // If they have no restaurant assigned and are not super admin, they see nothing?
+                // Or maybe they see nothing.
+                console.warn('User has no assigned restaurant.');
+                setRestaurants([]);
+                setLoading(false);
+                return;
+            }
+
+            const { data: restaurantData, error: restaurantError } = await query;
+
+            if (restaurantError) {
+                console.error('Error fetching restaurants:', restaurantError);
+            } else if (restaurantData) {
+                setRestaurants(restaurantData);
+
+                // Auto-select logic
+                if (!selectedRestaurantId || !restaurantData.find(r => r.id === selectedRestaurantId)) {
+                    if (restaurantData.length > 0) {
+                        setSelectedRestaurantId(restaurantData[0].id);
+                    } else {
+                        setSelectedRestaurantIdState(null);
+                    }
+                }
+            }
+            setLoading(false);
+        };
+
+        if (session) {
+            fetchAdminData();
+        }
+    }, [session]);
 
     const setSelectedRestaurantId = (id: string) => {
         setSelectedRestaurantIdState(id);
@@ -66,14 +113,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const login = async (email: string) => {
-        // This is a placeholder. Actual login happens in the LoginPage component using supabase.auth.signInWithPassword
-        console.log('Login requested for', email);
+        console.log('Login logic handled by Supabase Auth UI');
     };
 
     const logout = async () => {
         await supabase.auth.signOut();
         localStorage.removeItem('admin_selected_restaurant_id');
         setSelectedRestaurantIdState(null);
+        setRole(null);
+        setRestaurants([]);
     };
 
     return (
@@ -81,6 +129,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             value={{
                 session,
                 user: session?.user ?? null,
+                role,
                 selectedRestaurantId,
                 setSelectedRestaurantId,
                 restaurants,

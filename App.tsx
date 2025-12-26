@@ -26,11 +26,13 @@ import ForgotPasswordPage from './pages/admin/ForgotPasswordPage';
 import ResetPasswordPage from './pages/admin/ResetPasswordPage';
 import CustomerManagementPage from './pages/admin/CustomerManagementPage';
 import ContactMessagesPage from './pages/admin/ContactMessagesPage';
+import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
 import { Navigate } from 'react-router-dom';
 
 // Components
 import Header from './components/Header';
 import Footer from './components/Footer';
+import AuthCallbackHandler from './components/AuthCallbackHandler';
 
 const App: React.FC = () => {
   const { settings } = useSettings();
@@ -39,6 +41,7 @@ const App: React.FC = () => {
   }, [settings]);
   return (
     <HashRouter>
+      <AuthCallbackHandler />
       <AdminProvider>
         <OrderProvider>
           <SettingsProvider>
@@ -121,7 +124,11 @@ const App: React.FC = () => {
                 <Route path="customers" element={<CustomerManagementPage />} />
                 <Route path="messages" element={<ContactMessagesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="super" element={<SuperAdminDashboard />} />
               </Route>
+
+              {/* Catch all - redirects to home for unknown routes (fixes Supabase hash routing issues) */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </SettingsProvider>
         </OrderProvider>

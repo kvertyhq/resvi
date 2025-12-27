@@ -22,6 +22,25 @@ const AdminLayout: React.FC = () => {
     const navigate = useNavigate();
 
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+    const [smsBalance, setSmsBalance] = React.useState<number | null>(null);
+
+    React.useEffect(() => {
+        const fetchCredits = async () => {
+            if (!selectedRestaurantId) return;
+            // Lazy import supabase to avoid circular dep issues if any, or just use context if available? 
+            // Better to use imported supabase client.
+            const { data, error } = await import('../../supabaseClient').then(mod =>
+                mod.supabase.from('restaurant_credits').select('balance').eq('restaurant_id', selectedRestaurantId).maybeSingle()
+            );
+
+            if (data) {
+                setSmsBalance(data.balance);
+            } else {
+                setSmsBalance(null);
+            }
+        };
+        fetchCredits();
+    }, [selectedRestaurantId]);
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen bg-gray-100">Loading...</div>;
@@ -201,6 +220,27 @@ const AdminLayout: React.FC = () => {
 
             {/* Main Content Area */}
             <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0">
+                {smsBalance !== null && smsBalance < 10 && role === 'admin' && (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <Shield className="h-5 w-5 text-red-500" /> {/* Using Shield as placeholder if AlertTriangle not imported, let me check imports */}
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm text-red-700">
+                                    <span className="font-bold">Low SMS Balance:</span> You have only {smsBalance} credits remaining.
+                                    Top up now to ensure notifications are sent.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => navigate('/admin/credits')}
+                            className="bg-red-100 hover:bg-red-200 text-red-800 text-sm font-medium py-1 px-3 rounded transition-colors"
+                        >
+                            Top Up
+                        </button>
+                    </div>
+                )}
                 <Outlet />
             </main>
         </div>

@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
-import { ShoppingBag, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { ShoppingBag, Users, DollarSign, TrendingUp, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import DashboardBookings from '../../components/admin/DashboardBookings';
 
 const DashboardPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         revenue: 0,
         activeOrders: 0,
         bookingsToday: 0,
-        avgOrderValue: 0
+        avgOrderValue: 0,
+        smsCredits: 0
     });
 
     useEffect(() => {
@@ -67,11 +70,21 @@ const DashboardPage: React.FC = () => {
 
             if (aovError) throw aovError;
 
+            // 5. SMS Credits
+            const { data: creditsData, error: creditsError } = await supabase
+                .from('restaurant_credits')
+                .select('balance')
+                .eq('restaurant_id', selectedRestaurantId)
+                .maybeSingle();
+
+            if (creditsError) console.error('Error fetching credits:', creditsError);
+
             setStats({
                 revenue: totalRevenue,
                 activeOrders: activeOrdersCount || 0,
                 bookingsToday: bookingsCount || 0,
-                avgOrderValue: aovData?.aov || 0
+                avgOrderValue: aovData?.aov || 0,
+                smsCredits: creditsData?.balance || 0
             });
 
         } catch (error) {
@@ -114,6 +127,13 @@ const DashboardPage: React.FC = () => {
             icon: TrendingUp,
             color: 'bg-orange-500'
         },
+        {
+            title: 'SMS Credits',
+            value: stats.smsCredits.toString(),
+            icon: MessageSquare,
+            color: 'bg-brand-gold',
+            link: '/admin/credits'
+        }
     ];
 
     return (
@@ -124,13 +144,18 @@ const DashboardPage: React.FC = () => {
                 <div className="text-center py-10">Loading stats...</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
                         {statCards.map((stat, index) => (
-                            <div key={index} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <div
+                                key={index}
+                                className={`bg-white p-6 rounded-lg shadow-sm border border-gray-200 ${stat.link ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                                onClick={() => stat.link && navigate(stat.link)}
+                            >
                                 <div className="flex items-center justify-between mb-4">
                                     <div className={`p-3 rounded-full ${stat.color} bg-opacity-10`}>
                                         <stat.icon className={`h-6 w-6 ${stat.color.replace('bg-', 'text-')}`} />
                                     </div>
+                                    {stat.link && <div className="text-xs text-gray-400">View &rarr;</div>}
                                 </div>
                                 <h3 className="text-gray-500 text-sm font-medium">{stat.title}</h3>
                                 <p className="text-2xl font-bold text-gray-800 mt-1">{stat.value}</p>

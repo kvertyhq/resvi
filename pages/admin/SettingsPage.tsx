@@ -13,6 +13,7 @@ import SettingsBookingPreorder from '../../components/admin/settings/SettingsBoo
 import SettingsDeliveryZones from '../../components/admin/settings/SettingsDeliveryZones';
 import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
+import SettingsSMS from '../../components/admin/settings/SettingsSMS';
 import { Users } from 'lucide-react';
 import UserManagementModal from '../../components/admin/UserManagementModal';
 
@@ -74,7 +75,14 @@ const SettingsPage: React.FC = () => {
         max_delivery_order_value: 1000,
         menu_pdf_url: '',
         is_menu_pdf_visible: true,
-        timezone: 'UTC'
+        timezone: 'UTC',
+        sms_preferences: {
+            new_booking_admin: true,
+            new_booking_customer: true,
+            booking_confirmed: true,
+            booking_cancelled: true,
+            table_assigned: true
+        }
     });
 
     // New states for advanced settings
@@ -135,7 +143,14 @@ const SettingsPage: React.FC = () => {
                         max_delivery_order_value: settings.max_delivery_order_value || 1000,
                         menu_pdf_url: settings.menu_pdf_url || '',
                         is_menu_pdf_visible: settings.is_menu_pdf_visible ?? true,
-                        timezone: settings.timezone || 'UTC'
+                        timezone: settings.timezone || 'UTC',
+                        sms_preferences: settings.sms_preferences || {
+                            new_booking_admin: true,
+                            new_booking_customer: true,
+                            booking_confirmed: true,
+                            booking_cancelled: true,
+                            table_assigned: true
+                        }
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});
@@ -203,6 +218,7 @@ const SettingsPage: React.FC = () => {
         { id: 'orders', label: 'Orders' },
         { id: 'payments', label: 'Payments' },
         { id: 'bookings', label: 'Bookings' },
+        { id: 'notifications', label: 'Notifications' },
         { id: 'team', label: 'Team' }
     ];
 
@@ -299,6 +315,12 @@ const SettingsPage: React.FC = () => {
                         <div className="space-y-8 animate-fadeIn">
                             <SettingsTableManagement />
                             <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
+                        </div>
+                    )}
+
+                    {activeTab === 'notifications' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsSMS formData={formData} setFormData={setFormData} />
                         </div>
                     )}
 

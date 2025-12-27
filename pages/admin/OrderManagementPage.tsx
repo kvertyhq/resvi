@@ -158,30 +158,7 @@ const OrderManagementPage: React.FC = () => {
 
     const updateStatus = async (id: string, newStatus: string) => {
         try {
-            // SMS Notification Logic
-            const statusesTriggeringSMS = ['confirmed', 'out_for_delivery', 'completed'];
 
-            if (statusesTriggeringSMS.includes(newStatus)) {
-                const order = orders.find(o => o.id === id);
-                const restaurantId = order?.restaurant_id || selectedRestaurantId;
-
-                if (restaurantId) {
-                    const { data: creditDeducted, error: creditError } = await supabase.rpc('deduct_sms_credit', {
-                        p_restaurant_id: restaurantId,
-                        p_amount: 1,
-                        p_description: `Order ${order?.readable_id || id} notification: ${newStatus}`
-                    });
-
-                    if (creditError) {
-                        console.error('Error deducting SMS credit:', creditError);
-                    } else if (creditDeducted) {
-                        console.log('SMS Credit deducted. Notification sent (simulated).');
-                    } else {
-                        console.warn('Insufficient SMS credits. Notification not sent.');
-                        alert('Warning: Insufficient SMS credits. Notification was not sent to customer.');
-                    }
-                }
-            }
 
             const { error } = await supabase
                 .from('orders')

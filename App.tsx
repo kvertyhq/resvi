@@ -26,6 +26,7 @@ import ForgotPasswordPage from './pages/admin/ForgotPasswordPage';
 import ResetPasswordPage from './pages/admin/ResetPasswordPage';
 import CustomerManagementPage from './pages/admin/CustomerManagementPage';
 import ContactMessagesPage from './pages/admin/ContactMessagesPage';
+import SMSCreditsPage from './pages/admin/SMSCreditsPage';
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
 import { Navigate } from 'react-router-dom';
 
@@ -123,7 +124,9 @@ const App: React.FC = () => {
                 <Route path="bookings" element={<BookingManagementPage />} />
                 <Route path="customers" element={<CustomerManagementPage />} />
                 <Route path="messages" element={<ContactMessagesPage />} />
+                <Route path="messages" element={<ContactMessagesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="credits" element={<SMSCreditsPage />} />
                 <Route path="super" element={<SuperAdminDashboard />} />
               </Route>
 

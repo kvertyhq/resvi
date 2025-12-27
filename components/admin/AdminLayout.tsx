@@ -175,6 +175,16 @@ const AdminLayout: React.FC = () => {
                                 Settings
                             </NavLink>
                         </li>
+                        <li>
+                            <NavLink
+                                to="/admin/credits"
+                                onClick={() => setIsSidebarOpen(false)}
+                                className={({ isActive }) => `flex items-center px-3 py-2 rounded-md transition-colors ${isActive ? 'bg-brand-gold text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}
+                            >
+                                <MessageSquare className="h-5 w-5 mr-3" />
+                                SMS Credits
+                            </NavLink>
+                        </li>
                     </ul>
                 </nav>
 

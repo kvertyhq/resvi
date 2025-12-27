@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { Trash2, Plus } from 'lucide-react';
+import { useAdmin } from '../../../context/AdminContext';
 
 interface TableInfo {
     id: string;
@@ -9,22 +10,26 @@ interface TableInfo {
 }
 
 const SettingsTableManagement: React.FC = () => {
+    const { selectedRestaurantId } = useAdmin();
     const [tables, setTables] = useState<TableInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [newTable, setNewTable] = useState({ table_name: '', count: 4 });
     const [isAdding, setIsAdding] = useState(false);
 
     useEffect(() => {
-        fetchTables();
-    }, []);
+        if (selectedRestaurantId) {
+            fetchTables();
+        }
+    }, [selectedRestaurantId]);
 
     const fetchTables = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('table_info')
                 .select('*')
-                .eq('restaurant_id', import.meta.env.VITE_RESTAURANT_ID)
+                .eq('restaurant_id', selectedRestaurantId)
                 .order('table_name');
 
             if (error) throw error;
@@ -37,14 +42,14 @@ const SettingsTableManagement: React.FC = () => {
     };
 
     const handleAddTable = async () => {
-        if (!newTable.table_name) return;
+        if (!newTable.table_name || !selectedRestaurantId) return;
 
         setIsAdding(true);
         try {
             const { error } = await supabase
                 .from('table_info')
                 .insert([{
-                    restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                    restaurant_id: selectedRestaurantId,
                     table_name: newTable.table_name,
                     count: newTable.count
                 }]);

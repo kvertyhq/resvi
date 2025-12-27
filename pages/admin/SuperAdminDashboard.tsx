@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
 import UserManagementModal from '../../components/admin/UserManagementModal';
-import { Plus, CreditCard, MessageSquare, Trash2, Shield, Users } from 'lucide-react';
+import SuperAdminSMSManagement from '../../components/admin/SuperAdminSMSManagement';
+import { Plus, CreditCard, MessageSquare, Shield, Users, Building2 } from 'lucide-react';
 
 interface Restaurant {
     id: string;
@@ -20,6 +21,8 @@ const SuperAdminDashboard: React.FC = () => {
     const { role } = useAdmin();
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'restaurants' | 'sms'>('restaurants');
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isCreditsModalOpen, setIsCreditsModalOpen] = useState(false);
 
@@ -146,114 +149,140 @@ const SuperAdminDashboard: React.FC = () => {
                     </h2>
                     <p className="text-gray-500 mt-1">Manage restaurants, subscriptions, and global settings.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-brand-dark-gray text-white px-4 py-2 rounded-md hover:bg-gray-800 flex items-center"
-                >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Add Restaurant
-                </button>
-            </div>
+                <div className="flex space-x-3">
+                    <button
+                        onClick={() => setActiveTab('restaurants')}
+                        className={`px-4 py-2 rounded-md font-medium text-sm flex items-center ${activeTab === 'restaurants' ? 'bg-brand-dark-gray text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
+                    >
+                        <Building2 className="w-4 h-4 mr-2" />
+                        Restaurants
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('sms')}
+                        className={`px-4 py-2 rounded-md font-medium text-sm flex items-center ${activeTab === 'sms' ? 'bg-brand-dark-gray text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
+                    >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        SMS & Coupons
+                    </button>
 
-            {/* Stats Overview (Optional Placeholder) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-gray-500 text-sm font-medium uppercase">Total Restaurants</h3>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{restaurants.length}</p>
-                </div>
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-gray-500 text-sm font-medium uppercase">Total SMS Credits</h3>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">
-                        {restaurants.reduce((acc, r) => acc + (r.sms_credits || 0), 0)}
-                    </p>
                 </div>
             </div>
 
-            {/* Restaurants List */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 className="font-bold text-gray-700">All Restaurants</h3>
-                </div>
-                {loading ? (
-                    <div className="p-8 text-center text-gray-500">Loading restaurants...</div>
-                ) : (
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMS Credits</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {restaurants.map(restaurant => (
-                                <tr key={restaurant.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                            <div className="text-sm font-medium text-gray-900">{restaurant.name}</div>
-                                            <div className="ml-2 text-xs text-gray-400">({restaurant.id.slice(0, 8)})</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                            ${restaurant.subscription_plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                                                restaurant.subscription_plan === 'pro' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-gray-100 text-gray-800'}`}>
-                                            {restaurant.subscription_plan || 'basic'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <div className="flex items-center">
-                                            <MessageSquare className="h-4 w-4 mr-2 text-gray-400" />
-                                            {restaurant.sms_credits || 0}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <div className="flex flex-col space-y-1">
-                                            <div className="flex items-center">
-                                                <span className="w-16 text-xs text-gray-400 uppercase">Admins:</span>
-                                                <span className="font-medium text-gray-900">{restaurant.stats?.admins || 0}</span>
-                                            </div>
-                                            <div className="flex items-center">
-                                                <span className="w-16 text-xs text-gray-400 uppercase">Staff:</span>
-                                                <span className="font-medium text-gray-900">{restaurant.stats?.staff || 0}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedRestaurantForUsers(restaurant);
-                                                    setIsUserModalOpen(true);
-                                                }}
-                                                className="text-indigo-600 hover:text-indigo-900 flex items-center mr-2"
-                                                title="Manage Users"
-                                            >
-                                                <Users className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedRestaurant(restaurant);
-                                                    setCreditsAmount(100);
-                                                    setIsCreditsModalOpen(true);
-                                                }}
-                                                className="text-brand-gold hover:text-yellow-600 flex items-center"
-                                                title="Add Credits"
-                                            >
-                                                <CreditCard className="h-4 w-4" />
-                                            </button>
+            {/* Content Area */}
+            {activeTab === 'sms' ? (
+                <SuperAdminSMSManagement />
+            ) : (
+                <>
+                    {/* Stats Overview */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h3 className="text-gray-500 text-sm font-medium uppercase">Total Restaurants</h3>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">{restaurants.length}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h3 className="text-gray-500 text-sm font-medium uppercase">Total SMS Credits</h3>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">
+                                {restaurants.reduce((acc, r) => acc + (r.sms_credits || 0), 0)}
+                            </p>
+                        </div>
+                    </div>
 
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+                    {/* Restaurants List */}
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-700">All Restaurants</h3>
+                            {activeTab === 'restaurants' && (
+                                <button
+                                    onClick={() => setIsCreateModalOpen(true)}
+                                    className="bg-brand-gold text-white px-4 py-2 rounded-md hover:bg-yellow-600 flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Restaurant
+                                </button>
+                            )}
+                        </div>
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-500">Loading restaurants...</div>
+                        ) : (
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMS Credits</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {restaurants.map(restaurant => (
+                                        <tr key={restaurant.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <div className="text-sm font-medium text-gray-900">{restaurant.name}</div>
+                                                    <div className="ml-2 text-xs text-gray-400">({restaurant.id.slice(0, 8)})</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                ${restaurant.subscription_plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
+                                                        restaurant.subscription_plan === 'pro' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-gray-100 text-gray-800'}`}>
+                                                    {restaurant.subscription_plan || 'basic'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div className="flex items-center">
+                                                    <MessageSquare className="h-4 w-4 mr-2 text-gray-400" />
+                                                    {restaurant.sms_credits || 0}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div className="flex flex-col space-y-1">
+                                                    <div className="flex items-center">
+                                                        <span className="w-16 text-xs text-gray-400 uppercase">Admins:</span>
+                                                        <span className="font-medium text-gray-900">{restaurant.stats?.admins || 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <span className="w-16 text-xs text-gray-400 uppercase">Staff:</span>
+                                                        <span className="font-medium text-gray-900">{restaurant.stats?.staff || 0}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex justify-end space-x-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedRestaurantForUsers(restaurant);
+                                                            setIsUserModalOpen(true);
+                                                        }}
+                                                        className="text-indigo-600 hover:text-indigo-900 flex items-center mr-2"
+                                                        title="Manage Users"
+                                                    >
+                                                        <Users className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedRestaurant(restaurant);
+                                                            setCreditsAmount(100);
+                                                            setIsCreditsModalOpen(true);
+                                                        }}
+                                                        className="text-brand-gold hover:text-yellow-600 flex items-center"
+                                                        title="Add Credits"
+                                                    >
+                                                        <CreditCard className="h-4 w-4" />
+                                                    </button>
+
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </>
+            )}
 
             {/* Create Modal */}
             {isCreateModalOpen && (

@@ -36,6 +36,7 @@ type Settings = {
       secret_key: string;
     };
   };
+  google_analytics_id?: string;
 };
 
 interface SettingsContextType {

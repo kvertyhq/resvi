@@ -34,6 +34,7 @@ import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthCallbackHandler from './components/AuthCallbackHandler';
+import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 
 const App: React.FC = () => {
   const { settings } = useSettings();
@@ -46,6 +47,7 @@ const App: React.FC = () => {
       <AdminProvider>
         <OrderProvider>
           <SettingsProvider>
+            <GoogleAnalyticsTracker />
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={

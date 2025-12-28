@@ -14,6 +14,7 @@ import SettingsDeliveryZones from '../../components/admin/settings/SettingsDeliv
 import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
 import SettingsSMS from '../../components/admin/settings/SettingsSMS';
+import SettingsIntegrations from '../../components/admin/settings/SettingsIntegrations';
 import { Users } from 'lucide-react';
 import UserManagementModal from '../../components/admin/UserManagementModal';
 
@@ -82,7 +83,8 @@ const SettingsPage: React.FC = () => {
             booking_confirmed: true,
             booking_cancelled: true,
             table_assigned: true
-        }
+        },
+        google_analytics_id: ''
     });
 
     // New states for advanced settings
@@ -150,7 +152,8 @@ const SettingsPage: React.FC = () => {
                             booking_confirmed: true,
                             booking_cancelled: true,
                             table_assigned: true
-                        }
+                        },
+                        google_analytics_id: settings.google_analytics_id || ''
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});
@@ -219,6 +222,7 @@ const SettingsPage: React.FC = () => {
         { id: 'payments', label: 'Payments' },
         { id: 'bookings', label: 'Bookings' },
         { id: 'notifications', label: 'Notifications' },
+        { id: 'integrations', label: 'Integrations' },
         { id: 'team', label: 'Team' }
     ];
 
@@ -321,6 +325,12 @@ const SettingsPage: React.FC = () => {
                     {activeTab === 'notifications' && (
                         <div className="space-y-8 animate-fadeIn">
                             <SettingsSMS formData={formData} setFormData={setFormData} />
+                        </div>
+                    )}
+
+                    {activeTab === 'integrations' && (
+                        <div className="space-y-8 animate-fadeIn">
+                            <SettingsIntegrations formData={formData} handleChange={handleChange} />
                         </div>
                     )}
 

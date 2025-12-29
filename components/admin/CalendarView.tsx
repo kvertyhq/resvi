@@ -21,6 +21,7 @@ export interface Booking {
         full_name: string;
         phone: string;
     };
+    metadata?: any;
 }
 
 interface CalendarViewProps {
@@ -172,7 +173,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, o
                                                 'bg-yellow-50 border-yellow-500 text-yellow-700'
                                             }`}
                                     >
-                                        {booking.booking_time.slice(0, 5)} - {booking.profiles?.full_name || booking.name || 'Guest'}
+                                        {booking.booking_time.slice(0, 5)} - {booking.profiles?.full_name || booking.name || booking.metadata?.guest_name || 'Guest'}
                                     </div>
                                 ))}
                                 {dayBookings.length > 3 && (
@@ -215,7 +216,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, onStatusUpdate, o
                                     <div className="mb-3">
                                         <div className="flex items-center text-gray-900 font-medium mb-1">
                                             <User className="h-4 w-4 mr-2 text-gray-400" />
-                                            {booking.profiles?.full_name || booking.name || 'Guest'}
+                                            {booking.profiles?.full_name || booking.name || booking.metadata?.guest_name || 'Guest'}
                                         </div>
                                         <div className="flex items-center text-gray-600 text-sm ml-6">
                                             <Users className="h-3 w-3 mr-1.5" />

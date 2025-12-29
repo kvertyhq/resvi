@@ -317,10 +317,10 @@ const BookingManagementPage: React.FC = () => {
 
                                             <div className="text-sm bg-gray-50 p-3 rounded-md">
                                                 <div className="font-medium text-gray-900">
-                                                    {booking.profiles?.full_name || booking.name || 'Guest'}
+                                                    {booking.profiles?.full_name || booking.name || booking.metadata?.guest_name || 'Guest'}
                                                     {booking.profiles && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Member</span>}
                                                 </div>
-                                                <div className="text-gray-500 text-xs mt-0.5">{booking.profiles?.phone || booking.phone}</div>
+                                                <div className="text-gray-500 text-xs mt-0.5">{booking.profiles?.phone || booking.phone || booking.metadata?.phone}</div>
                                                 {booking.special_request && (
                                                     <div className="text-xs text-gray-500 mt-2 italic border-t border-gray-200 pt-1">
                                                         "{booking.special_request}"
@@ -414,11 +414,11 @@ const BookingManagementPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="text-sm text-gray-900">
-                                                            {booking.profiles?.full_name || booking.name || 'Guest'}
+                                                            {booking.profiles?.full_name || booking.name || booking.metadata?.guest_name || 'Guest'}
                                                             {booking.profiles && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Member</span>}
                                                         </div>
-                                                        <div className="text-sm text-gray-500">{booking.customer_email}</div>
-                                                        <div className="text-sm text-gray-500">{booking.profiles?.phone || booking.phone}</div>
+                                                        <div className="text-sm text-gray-500">{booking.customer_email || booking.metadata?.email}</div>
+                                                        <div className="text-sm text-gray-500">{booking.profiles?.phone || booking.phone || booking.metadata?.phone}</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :

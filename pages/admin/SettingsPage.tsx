@@ -256,14 +256,14 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Tabs Navigation */}
-                <div className="bg-white rounded-lg shadow-sm mb-6 border border-gray-200">
-                    <div className="flex flex-wrap border-b border-gray-200">
+                <div className="bg-white rounded-lg shadow-sm mb-6 border border-gray-200 overflow-hidden">
+                    <div className="flex overflow-x-auto md:flex-wrap border-b border-gray-200 no-scrollbar">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`px-6 py-4 text-sm font-medium focus:outline-none transition-colors ${activeTab === tab.id
+                                className={`flex-shrink-0 px-6 py-4 text-sm font-medium focus:outline-none transition-colors whitespace-nowrap ${activeTab === tab.id
                                     ? 'text-brand-gold border-b-2 border-brand-gold bg-gray-50'
                                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                     }`}

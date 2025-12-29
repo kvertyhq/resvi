@@ -267,11 +267,11 @@ const OrderManagementPage: React.FC = () => {
                 </div>
             ) : (
                 <>
-                    <div className="flex justify-between items-center mb-8">
-                        <div className="flex items-center space-x-4">
-                            <h2 className="text-3xl font-serif font-bold text-gray-800">Order Management</h2>
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 space-y-4 md:space-y-0">
+                        <div className="flex items-center justify-between md:justify-start space-x-4">
+                            <h2 className="text-2xl md:text-3xl font-serif font-bold text-gray-800">Order Management</h2>
                             <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-400">Refreshing in {timeLeft}s</span>
+                                <span className="text-xs text-gray-400 hidden md:inline">Refreshing in {timeLeft}s</span>
                                 <button
                                     onClick={handleRefresh}
                                     className="p-2 bg-white border border-gray-300 rounded-full hover:bg-gray-50 text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
@@ -281,12 +281,12 @@ const OrderManagementPage: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 w-full md:w-auto">
                             <Filter className="h-5 w-5 text-gray-500" />
                             <select
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
-                                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-brand-gold focus:border-brand-gold"
+                                className="flex-1 md:flex-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-brand-gold focus:border-brand-gold"
                             >
                                 <option value="all">All Statuses</option>
                                 <option value="pending">Pending</option>
@@ -299,11 +299,11 @@ const OrderManagementPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 pb-20 md:pb-0">
                         {filteredOrders.map(order => (
-                            <div key={order.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
+                            <div key={order.id} className="bg-white p-4 md:p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                                 <div className="flex-1">
-                                    <div className="flex items-center space-x-3 mb-2">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <span className="font-bold text-lg text-gray-900">#{order.readable_id}</span>
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                             {formatStatus(order.status)}
@@ -314,7 +314,7 @@ const OrderManagementPage: React.FC = () => {
                                             }`}>
                                             {order.payment_status}
                                         </span>
-                                        <span className="text-sm text-gray-500 flex items-center">
+                                        <span className="text-sm text-gray-500 flex items-center ml-auto md:ml-0">
                                             <Clock className="h-4 w-4 mr-1" />
                                             {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
@@ -346,7 +346,7 @@ const OrderManagementPage: React.FC = () => {
 
                                         {/* Order Progress Indicator */}
                                         {order.status !== 'cancelled' && (
-                                            <div className="mt-3 mb-2">
+                                            <div className="mt-4 mb-3 overflow-x-auto">
                                                 <div className="flex items-center justify-between">
                                                     {getOrderProgress(order).map((step, index, array) => (
                                                         <React.Fragment key={step.name}>
@@ -460,64 +460,66 @@ const OrderManagementPage: React.FC = () => {
 
                     {/* Order Details Modal */}
                     {isModalOpen && selectedOrder && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+                            <div className="bg-white w-full md:rounded-lg md:shadow-xl md:max-w-2xl h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col rounded-t-xl animate-slideUp md:animate-none">
+                                <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
                                     <div>
                                         <h3 className="font-bold text-lg text-gray-900">Order #{selectedOrder.readable_id} Details</h3>
                                         <p className="text-sm text-gray-500">{new Date(selectedOrder.created_at).toLocaleString()}</p>
                                     </div>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500 p-2">
                                         <X className="h-6 w-6" />
                                     </button>
                                 </div>
 
-                                <div className="p-6 overflow-y-auto">
+                                <div className="p-4 md:p-6 overflow-y-auto flex-1 pb-20 md:pb-6">
                                     <div className="space-y-6">
                                         {/* Items List */}
                                         <div>
                                             <h4 className="font-semibold text-gray-900 mb-3">Ordered Items</h4>
                                             <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                                                <table className="min-w-full divide-y divide-gray-200">
-                                                    <thead className="bg-gray-100">
-                                                        <tr>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                                                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
-                                                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200">
-                                                        {selectedOrder.order_items?.map((item, idx) => {
-                                                            const addonsTotal = item.selected_addons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
-                                                            const itemTotal = (item.price_snapshot + addonsTotal) * item.quantity;
+                                                <div className="overflow-x-auto">
+                                                    <table className="min-w-full divide-y divide-gray-200">
+                                                        <thead className="bg-gray-100">
+                                                            <tr>
+                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Qty</th>
+                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase min-w-[150px]">Item</th>
+                                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Price</th>
+                                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-200">
+                                                            {selectedOrder.order_items?.map((item, idx) => {
+                                                                const addonsTotal = item.selected_addons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
+                                                                const itemTotal = (item.price_snapshot + addonsTotal) * item.quantity;
 
-                                                            return (
-                                                                <tr key={idx}>
-                                                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">{item.quantity}x</td>
-                                                                    <td className="px-4 py-3 text-sm text-gray-900">
-                                                                        <div className="font-medium">{item.name_snapshot}</div>
-                                                                        {item.selected_addons && item.selected_addons.length > 0 && (
-                                                                            <div className="text-xs text-gray-500 mt-1">
-                                                                                {item.selected_addons.map((addon, i) => (
-                                                                                    <span key={i} className="block">
-                                                                                        + {addon.name} (£{addon.price.toFixed(2)})
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-sm text-gray-500 text-right">
-                                                                        £{item.price_snapshot.toFixed(2)}
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">
-                                                                        £{itemTotal.toFixed(2)}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
+                                                                return (
+                                                                    <tr key={idx}>
+                                                                        <td className="px-4 py-3 text-sm text-gray-900 font-medium align-top">{item.quantity}x</td>
+                                                                        <td className="px-4 py-3 text-sm text-gray-900">
+                                                                            <div className="font-medium">{item.name_snapshot}</div>
+                                                                            {item.selected_addons && item.selected_addons.length > 0 && (
+                                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                                    {item.selected_addons.map((addon, i) => (
+                                                                                        <span key={i} className="block">
+                                                                                            + {addon.name} (£{addon.price.toFixed(2)})
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-sm text-gray-500 text-right align-top">
+                                                                            £{item.price_snapshot.toFixed(2)}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right align-top">
+                                                                            £{itemTotal.toFixed(2)}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -569,10 +571,10 @@ const OrderManagementPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+                                <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end pb-8 md:pb-4">
                                     <button
                                         onClick={() => setIsModalOpen(false)}
-                                        className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+                                        className="w-full md:w-auto px-4 py-3 md:py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium shadow-sm"
                                     >
                                         Close
                                     </button>
@@ -583,6 +585,7 @@ const OrderManagementPage: React.FC = () => {
                 </>
             )}
         </div>
+
     );
 };
 

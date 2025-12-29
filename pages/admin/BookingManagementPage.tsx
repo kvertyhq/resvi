@@ -281,7 +281,101 @@ const BookingManagementPage: React.FC = () => {
                             </div>
 
                             <div className="bg-white rounded-lg shadow overflow-hidden">
-                                <div className="overflow-x-auto">
+                                {/* Mobile Card View */}
+                                <div className="md:hidden">
+                                    {filteredBookings.map((booking) => (
+                                        <div key={booking.id} className="p-4 border-b border-gray-200 last:border-b-0 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center">
+                                                    <Calendar className="h-5 w-5 text-gray-400 mr-2" />
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-900">{booking.booking_date.split('-').reverse().join('-')}</div>
+                                                        <div className="text-xs text-gray-500">{booking.booking_time}</div>
+                                                    </div>
+                                                </div>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                                                    booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                    {booking.status}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="flex items-center text-gray-700">
+                                                    <Users className="h-4 w-4 mr-2 text-gray-400" />
+                                                    {booking.guest_count} Guests
+                                                </div>
+                                                <div className="text-right">
+                                                    {booking.table_assigned ? (
+                                                        <span className="font-bold text-gray-800">Table {booking.table_assigned}</span>
+                                                    ) : (
+                                                        <span className="text-gray-400 italic">No Table</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="text-sm bg-gray-50 p-3 rounded-md">
+                                                <div className="font-medium text-gray-900">
+                                                    {booking.profiles?.full_name || booking.name || 'Guest'}
+                                                    {booking.profiles && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Member</span>}
+                                                </div>
+                                                <div className="text-gray-500 text-xs mt-0.5">{booking.profiles?.phone || booking.phone}</div>
+                                                {booking.special_request && (
+                                                    <div className="text-xs text-gray-500 mt-2 italic border-t border-gray-200 pt-1">
+                                                        "{booking.special_request}"
+                                                    </div>
+                                                )}
+                                                {booking.preorder_summary && (
+                                                    <button
+                                                        onClick={() => setSelectedPreorder(booking.preorder_summary || '')}
+                                                        className="mt-2 text-xs flex items-center text-brand-gold hover:text-brand-dark transition-colors font-medium"
+                                                    >
+                                                        <List className="h-3 w-3 mr-1" />
+                                                        View Pre-order
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Mobile Actions */}
+                                            {booking.status !== 'cancelled' && (
+                                                <div className="flex space-x-2 pt-2">
+                                                    <button
+                                                        onClick={() => assignTable(booking.id)}
+                                                        className="flex-1 flex items-center justify-center py-2 bg-blue-50 text-blue-700 rounded-md text-xs font-medium"
+                                                    >
+                                                        <UserCheck className="h-4 w-4 mr-1.5" />
+                                                        Assign Table
+                                                    </button>
+
+                                                    {booking.status === 'pending' && (
+                                                        <button
+                                                            onClick={() => updateStatus(booking.id, 'confirmed')}
+                                                            className="flex-1 flex items-center justify-center py-2 bg-green-50 text-green-700 rounded-md text-xs font-medium"
+                                                        >
+                                                            <Check className="h-4 w-4 mr-1.5" />
+                                                            Confirm
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => updateStatus(booking.id, 'cancelled')}
+                                                        className="w-10 flex items-center justify-center py-2 bg-red-50 text-red-700 rounded-md"
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {filteredBookings.length === 0 && !loading && (
+                                        <div className="p-6 text-center text-gray-500 text-sm">No bookings found.</div>
+                                    )}
+                                </div>
+
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
                                             <tr>

@@ -91,7 +91,11 @@ const MenuPage: React.FC = () => {
   useEffect(() => {
     const fetchAddons = async () => {
       // Fetch all addons
-      const { data: allAddons } = await supabase.from('addons').select('*').eq('is_available', true);
+      const { data: allAddons } = await supabase
+        .from('addons')
+        .select('*')
+        .eq('is_available', true)
+        .eq('restaurant_id', import.meta.env.VITE_RESTAURANT_ID);
       // Fetch links
       const { data: links } = await supabase.from('menu_item_addons').select('*');
 
@@ -159,7 +163,10 @@ const MenuPage: React.FC = () => {
             apikey: SUPABASE_KEY,
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
-          body: JSON.stringify({ available_only: true }), // adjust if your RPC expects a different body
+          body: JSON.stringify({
+            p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+            p_available_only: true
+          }),
         });
 
         if (!res.ok) {

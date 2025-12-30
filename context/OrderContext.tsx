@@ -59,7 +59,7 @@ interface OrderContextType extends OrderState {
   updateQuantity: (cartId: string, quantity: number) => void;
   removeFromCart: (cartId: string) => void;
   clearCart: () => void;
-  submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any }>;
+  submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any; orderId?: string }>;
   cartCount: number;
   cartTotal: number;
 }
@@ -487,7 +487,7 @@ Notes: ${orderDetails.notes}
       if (data && data.success === true) {
         console.log('Order submitted successfully:', data);
         clearCart();
-        return { success: true };
+        return { success: true, orderId: data.order_id };
       } else {
         console.warn('Order submission returned data but success was not true:', data);
         return { success: false, error: data };

@@ -6,9 +6,10 @@ interface OrderResultModalProps {
     onClose: () => void;
     type: 'success' | 'error';
     message?: string;
+    orderId?: string;
 }
 
-const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, type, message }) => {
+const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, type, message, orderId }) => {
     const navigate = useNavigate();
 
     if (!isOpen) return null;
@@ -38,11 +39,18 @@ const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, ty
                         {isSuccess ? 'Order Placed!' : 'Something went wrong'}
                     </h3>
 
-                    <p className="text-gray-500 mb-8">
-                        {message || (isSuccess
-                            ? 'Your order has been successfully placed. We will start preparing it shortly.'
-                            : 'We couldn\'t place your order. Please try again or contact the restaurant.')}
-                    </p>
+                    {isSuccess && (
+                        <div className="mb-4">
+                            {message && <p className="text-gray-500 mb-2">{message}</p>}
+                            {orderId && (
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 inline-block">
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Order ID</p>
+                                    <p className="text-lg font-mono font-bold text-gray-800">{orderId}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {!isSuccess && <p className="text-gray-500 mb-8">{message || 'We couldn\'t place your order. Please try again or contact the restaurant.'}</p>}
 
                     <div className="space-y-3">
                         {isSuccess ? (
@@ -61,15 +69,6 @@ const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, ty
                                 className="w-full px-4 py-3 bg-brand-dark-gray text-white rounded-lg font-semibold hover:bg-brand-mid-gray transition-colors"
                             >
                                 Try Again
-                            </button>
-                        )}
-
-                        {isSuccess && (
-                            <button
-                                onClick={onClose}
-                                className="w-full px-4 py-3 bg-white text-brand-dark-gray border border-gray-200 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-                            >
-                                Close
                             </button>
                         )}
                     </div>

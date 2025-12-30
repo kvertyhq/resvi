@@ -17,6 +17,7 @@ const OrderSummary: React.FC = () => {
     const [resultModalOpen, setResultModalOpen] = useState(false);
     const [resultType, setResultType] = useState<'success' | 'error'>('success');
     const [resultMessage, setResultMessage] = useState('');
+    const [orderResultId, setOrderResultId] = useState<string | undefined>(undefined);
 
     const subtotal = cartTotal;
     const deliveryFeeDisplay = orderType === 'delivery' ? deliveryFee : 0;
@@ -51,10 +52,12 @@ const OrderSummary: React.FC = () => {
             setIsModalOpen(false);
             setResultType('success');
             setResultMessage('Your order has been successfully placed!');
+            setOrderResultId(result.orderId);
             setResultModalOpen(true);
         } else {
             setResultType('error');
             setResultMessage('Failed to place order. Please try again.');
+            setOrderResultId(undefined);
             setResultModalOpen(true);
         }
     };
@@ -159,6 +162,7 @@ const OrderSummary: React.FC = () => {
                 onClose={() => setResultModalOpen(false)}
                 type={resultType}
                 message={resultMessage}
+                orderId={orderResultId}
             />
         </aside>
     );

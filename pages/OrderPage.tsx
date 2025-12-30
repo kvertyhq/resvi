@@ -60,14 +60,52 @@ const OrderPage: React.FC = () => {
     const handleContinue = async () => {
         setIsCheckingCapacity(true);
         setCapacityError(null); // Reset error
-        const date = orderType === 'delivery' ? deliveryDate : localDate;
-        const time = orderType === 'delivery' ? deliveryTime : localTime;
 
-        if (!date || !time) {
-            setCapacityError("Please select both date and time.");
+        // Validation Logic
+        if (!orderType) {
+            setCapacityError("Please select a delivery method.");
             setIsCheckingCapacity(false);
             return;
         }
+
+        if (orderType === 'delivery') {
+            if (!localPostcode) {
+                setCapacityError("Please enter a postcode.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+            if (deliveryAvailable !== true) {
+                setCapacityError("Please check your postcode to ensure we deliver to your area.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+            if (!deliveryDate) {
+                setCapacityError("Please select a delivery date.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+            if (!deliveryTime) {
+                setCapacityError("Please select a time slot.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+        }
+
+        if (orderType === 'collection') {
+            if (!localDate) {
+                setCapacityError("Please select a collection date.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+            if (!localTime) {
+                setCapacityError("Please select a time slot.");
+                setIsCheckingCapacity(false);
+                return;
+            }
+        }
+
+        const date = orderType === 'delivery' ? deliveryDate : localDate;
+        const time = orderType === 'delivery' ? deliveryTime : localTime;
 
         try {
             const { data, error } = await supabase.rpc('check_timeslot_capacity', {
@@ -80,9 +118,9 @@ const OrderPage: React.FC = () => {
             if (error) throw error;
 
             if (data && (data.message === 'slot available' || data.unlimited === true)) {
-                if (isDeliveryReady) {
+                if (orderType === 'delivery') {
                     setDeliverySlot(deliveryDate, deliveryTime);
-                } else if (isCollectionReady) {
+                } else if (orderType === 'collection') {
                     setCollectionSlot(localDate, localTime);
                 }
                 navigate('/menu');
@@ -353,7 +391,7 @@ const OrderPage: React.FC = () => {
 
                     <button
                         onClick={handleContinue}
-                        disabled={!canContinue || isCheckingCapacity}
+                        disabled={isCheckingCapacity}
                         className="w-full mt-6 bg-brand-gold text-white py-4 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                     >
                         {isCheckingCapacity ? 'Checking Availability...' : 'Continue'}

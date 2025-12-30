@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useSettings } from '../../../context/SettingsContext';
+import { useAdmin } from '../../../context/AdminContext';
 import { supabase } from '../../../supabaseClient';
 
 const SettingsPayment: React.FC = () => {
-    const { settings } = useSettings();
+    const { selectedRestaurantId } = useAdmin();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -13,17 +13,44 @@ const SettingsPayment: React.FC = () => {
     const [stripeSecretKey, setStripeSecretKey] = useState('');
 
     useEffect(() => {
-        if (settings?.payment_settings) {
-            setEnableCash(settings.payment_settings.enable_cash ?? true);
-            setEnableCard(settings.payment_settings.enable_card ?? false);
-            if (settings.payment_settings.stripe_config) {
-                setStripePublishableKey(settings.payment_settings.stripe_config.publishable_key || '');
-                setStripeSecretKey(settings.payment_settings.stripe_config.secret_key || '');
+        // Reset state immediately when restaurant context changes
+        setEnableCash(true);
+        setEnableCard(false);
+        setStripePublishableKey('');
+        setStripeSecretKey('');
+
+        const fetchPaymentSettings = async () => {
+            if (!selectedRestaurantId) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('restaurant_settings')
+                    .select('payment_settings')
+                    .eq('id', selectedRestaurantId)
+                    .single();
+
+                if (error) throw error;
+
+                if (data?.payment_settings) {
+                    const settings = data.payment_settings as any;
+                    setEnableCash(settings.enable_cash ?? true);
+                    setEnableCard(settings.enable_card ?? false);
+
+                    // Safely handle stripe_config, ensuring we overwrite with empty strings if missing
+                    const stripeConfig = settings.stripe_config || {};
+                    setStripePublishableKey(stripeConfig.publishable_key || '');
+                    setStripeSecretKey(stripeConfig.secret_key || '');
+                }
+            } catch (err) {
+                console.error('Error fetching payment settings:', err);
             }
-        }
-    }, [settings]);
+        };
+
+        fetchPaymentSettings();
+    }, [selectedRestaurantId]);
 
     const handleSave = async () => {
+        if (!selectedRestaurantId) return;
         setLoading(true);
         setMessage(null);
 
@@ -40,7 +67,7 @@ const SettingsPayment: React.FC = () => {
             const { error } = await supabase
                 .from('restaurant_settings')
                 .update({ payment_settings })
-                .eq('id', import.meta.env.VITE_RESTAURANT_ID);
+                .eq('id', selectedRestaurantId);
 
             if (error) throw error;
             setMessage({ type: 'success', text: 'Payment settings updated successfully!' });

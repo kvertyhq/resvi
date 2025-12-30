@@ -88,8 +88,18 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
 
     const validateForm = () => {
         setError(null);
-        if (!formData.name || !formData.phone) return false;
-        if (orderType === 'delivery' && !formData.address) return false;
+        if (!formData.name) {
+            setError('Please enter your full name.');
+            return false;
+        }
+        if (!formData.phone) {
+            setError('Please enter your phone number.');
+            return false;
+        }
+        if (orderType === 'delivery' && !formData.address) {
+            setError('Please enter your delivery address.');
+            return false;
+        }
 
         const fullPhone = '+44' + formData.phone;
         const validatedPhone = validateUKPhone(fullPhone);
@@ -142,11 +152,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                 </div>
 
                 <div className="p-6 space-y-4 overflow-y-auto">
-                    {error && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
-                            {error}
-                        </div>
-                    )}
+
 
                     {/* Personal Details Form - Common for both */}
                     <div className="space-y-4">
@@ -232,8 +238,8 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     type="button"
                                     onClick={() => setPaymentMethod('cash')}
                                     className={`py-3 px-4 border rounded-lg text-center transition-all ${paymentMethod === 'cash'
-                                            ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                        ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
+                                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     Cash
@@ -244,8 +250,8 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     type="button"
                                     onClick={() => setPaymentMethod('card')}
                                     className={`py-3 px-4 border rounded-lg text-center transition-all ${paymentMethod === 'card'
-                                            ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                        ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
+                                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     Card
@@ -257,6 +263,11 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                     {/* Submit Actions */}
                     {paymentMethod === 'cash' && (
                         <div className="pt-2">
+                            {error && (
+                                <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-2">
+                                    {error}
+                                </div>
+                            )}
                             <button
                                 onClick={handleCashSubmit}
                                 disabled={isLoading}
@@ -285,10 +296,20 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     Let's pass children to PaymentForm or update it?
                                     Actually PaymentForm in previous step didn't have a button. I need to fix that.
                                 */}
+                                {error && (
+                                    <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mt-2">
+                                        {error}
+                                    </div>
+                                )}
                                 <button
                                     form="payment-form" // Assuming PaymentForm has id="payment-form"
                                     type="submit"
                                     disabled={isProcessingPayment}
+                                    onClick={(e) => {
+                                        if (!validateForm()) {
+                                            e.preventDefault();
+                                        }
+                                    }}
                                     className="w-full bg-brand-gold text-white font-bold py-3 rounded-lg uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed shadow-md mt-4"
                                 >
                                     {isProcessingPayment ? 'Processing...' : `Pay £${totalToPay.toFixed(2)}`}

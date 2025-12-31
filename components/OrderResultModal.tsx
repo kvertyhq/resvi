@@ -17,7 +17,7 @@ const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, ty
     const isSuccess = type === 'success';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative overflow-hidden">
                 {/* Decorative background element */}
                 <div className={`absolute top-0 left-0 w-full h-2 ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -36,7 +36,7 @@ const OrderResultModal: React.FC<OrderResultModalProps> = ({ isOpen, onClose, ty
                     </div>
 
                     <h3 className="text-2xl font-serif font-bold text-gray-900 mb-2">
-                        {isSuccess ? 'Order Placed!' : 'Something went wrong'}
+                        {isSuccess ? 'Order Placed!' : 'Order Process Issue'}
                     </h3>
 
                     {isSuccess && (

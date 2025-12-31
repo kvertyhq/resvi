@@ -55,8 +55,12 @@ const OrderSummary: React.FC = () => {
             setOrderResultId(result.orderId);
             setResultModalOpen(true);
         } else {
+            console.error("Order submission failed:", result);
             setResultType('error');
-            setResultMessage('Failed to place order. Please try again.');
+            const errorMessage = typeof result.error === 'string'
+                ? result.error
+                : result.error?.message || result.error?.details || 'Failed to place order. Please try again.';
+            setResultMessage(errorMessage);
             setOrderResultId(undefined);
             setResultModalOpen(true);
         }

@@ -112,8 +112,13 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
 
     const handleCashSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("Attempting cash submission...", formData);
         const validPhone = validateForm();
-        if (!validPhone) return;
+        if (!validPhone) {
+            console.warn("Validation failed for cash submission", formData);
+            return;
+        }
+        console.log("Validation passed, submitting...", validPhone);
 
         onSubmit({
             ...formData,
@@ -142,7 +147,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
     const totalToPay = cartTotal + (orderType === 'delivery' ? deliveryFee : 0);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-10 sm:pt-24 bg-black bg-opacity-50 backdrop-blur-sm shadow-2xl overflow-y-auto">
+        <div className="fixed inset-0 z-[1000] flex items-start justify-center p-4 pt-10 sm:pt-24 bg-black bg-opacity-50 backdrop-blur-sm shadow-2xl overflow-y-auto">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh] animate-fade-in my-auto">
                 <div className="flex justify-between items-center p-4 border-b border-gray-100 shrink-0 bg-white rounded-t-lg">
                     <h3 className="text-xl font-serif font-bold text-gray-800">Complete Your Order</h3>

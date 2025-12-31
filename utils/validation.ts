@@ -11,28 +11,27 @@
  * @returns The formatted phone number or null.
  */
 export const validateUKPhone = (phone: string): string | null => {
-    // Remove all non-numeric characters except leading +
-    let cleanPhone = phone.replace(/[^0-9+]/g, '');
+    // 1. Keep only digits
+    let cleanPhone = phone.replace(/\D/g, '');
 
-    // Handle leading +
-    if (cleanPhone.startsWith('+')) {
-        cleanPhone = cleanPhone.substring(1);
-    }
-
-    // Remove 44 prefix if present
-    if (cleanPhone.startsWith('44')) {
+    // 2. Remove leading '00' (international)
+    if (cleanPhone.startsWith('00')) {
         cleanPhone = cleanPhone.substring(2);
     }
 
-    // Ensure it starts with 0, if not add it (standardizing to 07...)
-    if (!cleanPhone.startsWith('0')) {
-        cleanPhone = '0' + cleanPhone;
+    // 3. Remove leading '44' (country code) - handle potential double prefix e.g. +44+44
+    // Using regex to remove one or more occurrences of 44 at start
+    cleanPhone = cleanPhone.replace(/^(44)+/, '');
+
+    // 4. Remove leading '0'
+    if (cleanPhone.startsWith('0')) {
+        cleanPhone = cleanPhone.substring(1);
     }
 
-    // UK mobile numbers start with 07 and are 11 digits long
-    if (/^07[0-9]{9}$/.test(cleanPhone)) {
-        // Format to +44
-        return '+44' + cleanPhone.substring(1);
+    // 5. Check valid UK mobile format: should be 10 digits starting with 7
+    // (Total 11 digits with leading 0, so 10 without)
+    if (/^7[0-9]{9}$/.test(cleanPhone)) {
+        return '+44' + cleanPhone;
     }
 
     return null;

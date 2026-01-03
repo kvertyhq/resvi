@@ -16,6 +16,13 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                         <option value="£">£ (GBP)</option>
                         <option value="$">$ (USD)</option>
                         <option value="€">€ (EUR)</option>
+                        <option value="INR">₹ (INR)</option>
+                        <option value="JPY">¥ (JPY)</option>
+                        <option value="CNY">¥ (CNY)</option>
+                        <option value="AUD">A$ (AUD)</option>
+                        <option value="CAD">C$ (CAD)</option>
+                        <option value="CHF">Fr (CHF)</option>
+                        <option value="BRL">R$ (BRL)</option>
                     </select>
                 </div>
                 <div>
@@ -67,7 +74,7 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                         <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
                                     </div>
-                                    <input type="number" name="delivery_fee" value={formData.delivery_fee} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
+                                    <input type="number" name="delivery_fee" value={formData.delivery_fee} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-12 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
                                 </div>
                             </div>
                             <div>
@@ -76,7 +83,7 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                         <span className="text-gray-500 sm:text-sm">{formData.currency}</span>
                                     </div>
-                                    <input type="number" name="delivery_minimum" value={formData.delivery_minimum} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-7 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
+                                    <input type="number" name="delivery_minimum" value={formData.delivery_minimum} onChange={handleChange} step="0.01" className="block w-full rounded-md border-gray-300 pl-12 pr-3 focus:border-brand-gold focus:ring-brand-gold sm:text-sm py-2" />
                                 </div>
                             </div>
                         </div>

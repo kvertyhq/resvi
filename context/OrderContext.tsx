@@ -395,60 +395,77 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(s => ({ ...s, cart: [] }));
   }
 
+  const validateOrderPrerequisites = async (orderDetails: any): Promise<{ success: boolean; error?: string }> => {
+    const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
+
+    // 1. Delivery Min/Max Check
+    if (finalOrderType === 'delivery' && state.deliverySettings) {
+      const cartValue = state.cart.reduce((total, item) => {
+        const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+        return total + (item.price + addonsPrice) * item.quantity;
+      }, 0);
+
+      if (state.deliverySettings.delivery_minimum > 0 && cartValue < state.deliverySettings.delivery_minimum) {
+        return { success: false, error: `Minimum delivery order value is £${state.deliverySettings.delivery_minimum.toFixed(2)}` };
+      }
+
+      if (state.deliverySettings.max_delivery_order_value > 0 && cartValue > state.deliverySettings.max_delivery_order_value) {
+        return { success: false, error: `Maximum delivery order value is £${state.deliverySettings.max_delivery_order_value.toFixed(2)}` };
+      }
+    }
+
+    // 2. Capacity Check
+    let dateForCheck = null;
+    let timeForCheck = null;
+
+    if (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) {
+      dateForCheck = state.collectionDate;
+      timeForCheck = state.collectionTime;
+    } else if (finalOrderType === 'delivery' && state.deliveryDate && state.deliveryTime) {
+      dateForCheck = state.deliveryDate;
+      timeForCheck = state.deliveryTime;
+    }
+
+    if (dateForCheck && timeForCheck) {
+      console.log(`Validating capacity for ${dateForCheck} ${timeForCheck}`);
+      const { data: capacityData, error: capacityError } = await supabase.rpc('check_timeslot_capacity', {
+        p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+        p_date: dateForCheck,
+        p_time: timeForCheck,
+        p_order_type: finalOrderType
+      });
+
+      if (capacityError) {
+        console.error('Capacity check error:', capacityError);
+        return { success: false, error: "Unable to verify timeslot availability. Please try again." };
+      }
+
+      if (capacityData && !(capacityData.message === 'slot available' || capacityData.unlimited === true)) {
+        return { success: false, error: "Sorry, this timeslot became fully booked. Please select another time." };
+      }
+    }
+
+    return { success: true };
+  };
+
   const submitOrder = async (orderDetails: any) => {
     console.log('Submitting order with details:', orderDetails);
     try {
+      // 1. Run Validation
+      const validation = await validateOrderPrerequisites(orderDetails);
+      if (!validation.success) {
+        return { success: false, error: validation.error };
+      }
+
       const finalOrderType = orderDetails.orderType || state.orderType || 'collection';
 
       let scheduledTime = null;
-      let dateForCheck = null;
-      let timeForCheck = null;
-
+      // dateForCheck and timeForCheck are now handled by validateOrderPrerequisites,
+      // but we still need scheduledTime for the order submission.
       if (finalOrderType === 'collection' && state.collectionDate && state.collectionTime) {
         scheduledTime = `${state.collectionDate} ${state.collectionTime}`;
-        dateForCheck = state.collectionDate;
-        timeForCheck = state.collectionTime;
       } else if (finalOrderType === 'delivery' && state.deliveryDate && state.deliveryTime) {
         scheduledTime = `${state.deliveryDate} ${state.deliveryTime}`;
-        dateForCheck = state.deliveryDate;
-        timeForCheck = state.deliveryTime;
-
-        // DELIVERY MIN/MAX CHECK
-        if (state.deliverySettings) {
-          const cartValue = state.cart.reduce((total, item) => {
-            const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
-            return total + (item.price + addonsPrice) * item.quantity;
-          }, 0);
-
-          if (state.deliverySettings.delivery_minimum > 0 && cartValue < state.deliverySettings.delivery_minimum) {
-            return { success: false, error: `Minimum delivery order value is £${state.deliverySettings.delivery_minimum.toFixed(2)}` };
-          }
-
-          if (state.deliverySettings.max_delivery_order_value > 0 && cartValue > state.deliverySettings.max_delivery_order_value) {
-            return { success: false, error: `Maximum delivery order value is £${state.deliverySettings.max_delivery_order_value.toFixed(2)}` };
-          }
-        }
-      }
-
-      // Final Capacity Check
-      if (dateForCheck && timeForCheck) {
-        const { data: capacityData, error: capacityError } = await supabase.rpc('check_timeslot_capacity', {
-          p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
-          p_date: dateForCheck,
-          p_time: timeForCheck,
-          p_order_type: finalOrderType
-        });
-
-        if (capacityError) {
-          console.error('Final capacity check error:', capacityError);
-          // Fallback: Proceed if check fails? Or block? usually block to be safe.
-          // For now, let's block to prevent overbooking if DB is reachable but errors.
-          return { success: false, error: "Unable to verify timeslot availability. Please try again." };
-        }
-
-        if (capacityData && !(capacityData.message === 'slot available' || capacityData.unlimited === true)) {
-          return { success: false, error: "Sorry, this timeslot became fully booked while you were ordering. Please select another time." };
-        }
       }
 
       // OrderFormModal passes 'paymentType' (from OrderDetails interface), not 'paymentMethod'
@@ -525,6 +542,7 @@ Notes: ${orderDetails.notes}
         submitOrder,
         cartCount,
         cartTotal,
+        validateOrderPrerequisites,
       }}
     >
       {children}

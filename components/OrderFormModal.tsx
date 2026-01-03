@@ -26,7 +26,7 @@ export interface OrderDetails {
 
 const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubmit, orderType, isLoading }) => {
     const { settings } = useSettings();
-    const { postcode, getAddressList, cartTotal, deliveryFee } = useOrder();
+    const { postcode, getAddressList, cartTotal, deliveryFee, validateOrderPrerequisites } = useOrder();
 
     // Payment State
     const [stripePromise, setStripePromise] = useState<any>(null);
@@ -110,6 +110,28 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
         return validatedPhone; // Returns cleaned phone
     };
 
+    const handleBeforePayment = async (): Promise<{ success: boolean; error?: string }> => {
+        // 1. Validate Form Fields (Name, Phone, etc.)
+        const validPhone = validateForm();
+        if (!validPhone) {
+            return { success: false, error: 'Please fix the errors in the form.' };
+        }
+
+        // 2. Validate Order Prerequisites (Min Order, Capacity) via Server/Context
+        try {
+            const check = await validateOrderPrerequisites({
+                ...formData,
+                phone: validPhone,
+                paymentType: 'card',
+                orderType: orderType
+            });
+            return check;
+        } catch (err: any) {
+            console.error("Validation error:", err);
+            return { success: false, error: "Validation failed. Please try again." };
+        }
+    };
+
     const handleCashSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         console.log("Attempting cash submission...", formData);
@@ -147,7 +169,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
     const totalToPay = cartTotal + (orderType === 'delivery' ? deliveryFee : 0);
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-start justify-center p-4 pt-10 sm:pt-24 bg-black bg-opacity-50 backdrop-blur-sm shadow-2xl overflow-y-auto">
+        <div className="fixed inset-0 z-[1000] flex items-start justify-center p-4 pt-24 sm:pt-32 bg-black bg-opacity-50 backdrop-blur-sm shadow-2xl overflow-y-auto">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh] animate-fade-in my-auto">
                 <div className="flex justify-between items-center p-4 border-b border-gray-100 shrink-0 bg-white rounded-t-lg">
                     <h3 className="text-xl font-serif font-bold text-gray-800">Complete Your Order</h3>
@@ -292,20 +314,16 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     onError={handleCardError}
                                     processing={isProcessingPayment}
                                     setProcessing={setIsProcessingPayment}
+                                    onBeforePayment={handleBeforePayment}
                                 />
-                                {/* Standard Submit Button inside PaymentForm is hidden/custom, 
+                                {/* Standard Submit Button inside PaymentForm is hidden/custom,
                                     but Element's form handles submission.
-                                    We need to ensure the button is PART of the PaymentForm or triggered by it. 
+                                    We need to ensure the button is PART of the PaymentForm or triggered by it.
                                     Since PaymentForm was designed to wrap the button, let's verify PaymentForm implementation.
                                     Ah, PaymentForm has form onSubmit. We need a submit button INSIDE it.
                                     Let's pass children to PaymentForm or update it?
                                     Actually PaymentForm in previous step didn't have a button. I need to fix that.
                                 */}
-                                {error && (
-                                    <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mt-2">
-                                        {error}
-                                    </div>
-                                )}
                                 <button
                                     form="payment-form" // Assuming PaymentForm has id="payment-form"
                                     type="submit"

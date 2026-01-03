@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useOrder, MenuItemData, Addon } from '../context/OrderContext';
 import OrderSummary from '../components/OrderSummary';
 import { useSettings } from "../context/SettingsContext";
@@ -70,7 +71,8 @@ const MenuItem: React.FC<{ item: MenuItemData; onAdd: (item: MenuItemData) => vo
 };
 
 const MenuPage: React.FC = () => {
-  const { addToCart } = useOrder();
+  const navigate = useNavigate();
+  const { addToCart, orderType, deliveryDate, deliveryTime, collectionDate, collectionTime } = useOrder();
 
   const [groupedMenu, setGroupedMenu] = useState<Record<string, MenuItemData[]>>({});
   const [categoryMeta, setCategoryMeta] = useState<
@@ -113,6 +115,24 @@ const MenuPage: React.FC = () => {
     };
     fetchAddons();
   }, []);
+
+  // Enforce order flow - redirect if prerequisites not met
+  useEffect(() => {
+    if (!orderType) {
+      navigate('/order');
+      return;
+    }
+
+    if (orderType === 'delivery' && (!deliveryDate || !deliveryTime)) {
+      navigate('/order');
+      return;
+    }
+
+    if (orderType === 'collection' && (!collectionDate || !collectionTime)) {
+      navigate('/order');
+      return;
+    }
+  }, [orderType, deliveryDate, deliveryTime, collectionDate, collectionTime, navigate]);
 
   const handleAddItem = (item: MenuItemData) => {
     const availableAddons = menuItemAddons[item.id];

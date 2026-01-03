@@ -8,9 +8,10 @@ interface PaymentFormProps {
     amount: number; // Amount in pounds
     processing: boolean;
     setProcessing: (processing: boolean) => void;
+    onBeforePayment?: () => Promise<{ success: boolean; error?: string }>;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, onError, amount, processing, setProcessing }) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, onError, amount, processing, setProcessing, onBeforePayment }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [cardError, setCardError] = useState<string | null>(null);
@@ -25,6 +26,26 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, onError, amount, p
 
         setProcessing(true);
         setCardError(null);
+
+        // 0. Run Pre-Payment Checks (e.g., Min Order, Capacity)
+        if (onBeforePayment) {
+            try {
+                const check = await onBeforePayment();
+                if (!check.success) {
+                    const msg = check.error || 'Validations failed.';
+                    setCardError(msg);
+                    onError(msg);
+                    setProcessing(false);
+                    return;
+                }
+            } catch (err: any) {
+                const msg = err.message || 'Validation error occurred.';
+                setCardError(msg);
+                onError(msg);
+                setProcessing(false);
+                return;
+            }
+        }
 
         // 1. Create Payment Intent on Server (via Supabase RPC or Edge Function)
         // Here we assume a client-side helper function calls the backend

@@ -59,7 +59,7 @@ const SettingsDeliveryZones: React.FC = () => {
 
     const handleAddZone = async () => {
         if (!newZone.postcode_prefix || !newZone.zone_name) {
-            alert('Please enter a Zone Name and Postcode Prefix');
+            alert('Please enter a Zone Name and Postcode');
             return;
         }
 
@@ -89,7 +89,7 @@ const SettingsDeliveryZones: React.FC = () => {
     const handleUpdateZone = async () => {
         if (!editingId) return;
         if (!newZone.postcode_prefix || !newZone.zone_name) {
-            alert('Please enter a Zone Name and Postcode Prefix');
+            alert('Please enter a Zone Name and Postcode');
             return;
         }
 
@@ -156,14 +156,14 @@ const SettingsDeliveryZones: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
             <h3 className="text-xl font-serif font-bold text-gray-800 mb-6">Postcode Delivery Zones</h3>
             <p className="text-sm text-gray-500 mb-6">
-                Define specific rules for postcode areas. Matches are based on prefix (e.g., "BA21").
+                Define specific rules for postcode areas. Matches are based on fixed postcode (e.g., "BA215LW").
                 These rules take precedence over general radius settings.
             </p>
 
             {/* Add/Edit Zone Form */}
             <div className={`grid grid-cols-1 md:grid-cols-6 gap-4 mb-8 p-4 rounded-lg transition-colors ${editingId ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
                 <div className="md:col-span-1">
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Prefix (e.g. BA21)</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Postcode (e.g. BA215LW)</label>
                     <input
                         type="text"
                         value={newZone.postcode_prefix}
@@ -252,7 +252,7 @@ const SettingsDeliveryZones: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase">
-                                <th className="py-3 px-2">Prefix</th>
+                                <th className="py-3 px-2">Postcode</th>
                                 <th className="py-3 px-2">Name</th>
                                 <th className="py-3 px-2">Min Order</th>
                                 <th className="py-3 px-2">Max Order</th>

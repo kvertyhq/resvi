@@ -42,7 +42,7 @@ serve(async (req) => {
             throw new Error('Forbidden: Admin access required');
         }
 
-        const { action, email, password, restaurantId } = await req.json();
+        const { action, email, password, restaurantId, role } = await req.json();
 
         // Enforce restaurant scope for non-super admins
         if (profile.role !== 'super_admin') {
@@ -87,17 +87,20 @@ serve(async (req) => {
             if (error) throw error;
 
             if (data.user) {
-                await supabaseAdmin.from('profiles').update({
-                    role: 'restaurant_admin',
+                await supabaseAdmin.from('profiles').upsert({
+                    id: data.user.id,
+                    role: 'admin',
                     restaurant_id: restaurantId
-                }).eq('id', data.user.id);
+                });
             }
-            return new Response(JSON.stringify({ message: 'Invite sent' }), {
+            return new Response(JSON.stringify({ message: 'Invite sent', data }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
 
         if (action === 'create-staff') {
+            const desiredRole = role || 'staff';
+
             const { data, error } = await supabaseAdmin.auth.admin.createUser({
                 email,
                 password,
@@ -106,10 +109,11 @@ serve(async (req) => {
             if (error) throw error;
 
             if (data.user) {
-                await supabaseAdmin.from('profiles').update({
-                    role: 'staff',
+                await supabaseAdmin.from('profiles').upsert({
+                    id: data.user.id,
+                    role: desiredRole,
                     restaurant_id: restaurantId
-                }).eq('id', data.user.id);
+                });
             }
             return new Response(JSON.stringify({ message: 'Staff created' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },

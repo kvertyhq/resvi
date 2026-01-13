@@ -15,8 +15,8 @@ import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
 import SettingsSMS from '../../components/admin/settings/SettingsSMS';
 import SettingsIntegrations from '../../components/admin/settings/SettingsIntegrations';
+
 import { Users } from 'lucide-react';
-import UserManagementModal from '../../components/admin/UserManagementModal';
 
 // Simple Toast Component
 const Toast = ({ message, onClose }: { message: { type: 'success' | 'error', text: string }, onClose: () => void }) => {
@@ -40,7 +40,6 @@ const SettingsPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -222,8 +221,7 @@ const SettingsPage: React.FC = () => {
         { id: 'payments', label: 'Payments' },
         { id: 'bookings', label: 'Bookings' },
         { id: 'notifications', label: 'Notifications' },
-        { id: 'integrations', label: 'Integrations' },
-        { id: 'team', label: 'Team' }
+        { id: 'integrations', label: 'Integrations' }
     ];
 
     if (!selectedRestaurantId) {
@@ -334,34 +332,8 @@ const SettingsPage: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'team' && (
-                        <div className="space-y-8 animate-fadeIn flex flex-col items-center justify-center py-12">
-                            <div className="p-4 bg-gray-100 rounded-full mb-4">
-                                <Users className="h-12 w-12 text-gray-500" />
-                            </div>
-                            <h3 className="text-xl font-medium text-gray-900">Manage Team Members</h3>
-                            <p className="text-gray-500 mb-8 max-w-sm text-center">
-                                Invite new administrators or staff members to help manage your restaurant.
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => setIsUserModalOpen(true)}
-                                className="bg-brand-gold text-white px-6 py-3 rounded-md font-medium hover:bg-opacity-90 transition-colors shadow-sm flex items-center"
-                            >
-                                <Users className="h-5 w-5 mr-2" />
-                                Manage Team
-                            </button>
-                        </div>
-                    )}
                 </div>
             </form>
-
-            <UserManagementModal
-                isOpen={isUserModalOpen}
-                onClose={() => setIsUserModalOpen(false)}
-                restaurantId={selectedRestaurantId}
-                restaurantName={formData.name || 'Restaurant'}
-            />
         </div>
     );
 };

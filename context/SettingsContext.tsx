@@ -37,6 +37,7 @@ type Settings = {
     };
   };
   google_analytics_id?: string;
+  currency?: string;
 };
 
 interface SettingsContextType {

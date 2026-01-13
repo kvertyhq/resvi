@@ -85,6 +85,7 @@ const OrderManagementPage: React.FC = () => {
                     )
                 `)
                 .eq('restaurant_id', restaurantId)
+                .in('order_type', ['delivery', 'collection'])
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -127,13 +128,19 @@ const OrderManagementPage: React.FC = () => {
         const channel = supabase
             .channel('public:orders')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-                console.log('New order received:', payload);
-                playNotificationSound();
-                fetchOrders();
+                const newOrder = payload.new as any;
+                if (newOrder.restaurant_id === selectedRestaurantId && ['delivery', 'collection'].includes(newOrder.order_type)) {
+                    console.log('New order received:', payload);
+                    playNotificationSound();
+                    fetchOrders();
+                }
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-                console.log('Order updated:', payload);
-                fetchOrders();
+                const updatedOrder = payload.new as any;
+                if (updatedOrder.restaurant_id === selectedRestaurantId && ['delivery', 'collection'].includes(updatedOrder.order_type)) {
+                    console.log('Order updated:', payload);
+                    fetchOrders();
+                }
             })
             .subscribe();
 
@@ -339,9 +346,9 @@ const OrderManagementPage: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            Subtotal: £{order.metadata.subtotal.toFixed(2)} •
-                                            Tax: £{order.metadata.tax.toFixed(2)}
-                                            {order.metadata.delivery_fee > 0 && ` • Delivery: £${order.metadata.delivery_fee.toFixed(2)}`}
+                                            Subtotal: £{(order.metadata?.subtotal || 0).toFixed(2)} •
+                                            Tax: £{(order.metadata?.tax || 0).toFixed(2)}
+                                            {(order.metadata?.delivery_fee || 0) > 0 && ` • Delivery: £${order.metadata.delivery_fee.toFixed(2)}`}
                                         </div>
 
                                         {/* Order Progress Indicator */}
@@ -527,13 +534,13 @@ const OrderManagementPage: React.FC = () => {
                                         <div className="border-t border-gray-200 pt-4">
                                             <div className="flex justify-between text-sm mb-1">
                                                 <span className="text-gray-600">Subtotal</span>
-                                                <span className="font-medium">£{selectedOrder.metadata.subtotal.toFixed(2)}</span>
+                                                <span className="font-medium">£{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-sm mb-1">
                                                 <span className="text-gray-600">Tax</span>
-                                                <span className="font-medium">£{selectedOrder.metadata.tax.toFixed(2)}</span>
+                                                <span className="font-medium">£{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
                                             </div>
-                                            {selectedOrder.metadata.delivery_fee > 0 && (
+                                            {(selectedOrder.metadata?.delivery_fee || 0) > 0 && (
                                                 <div className="flex justify-between text-sm mb-1">
                                                     <span className="text-gray-600">Delivery Fee</span>
                                                     <span className="font-medium">£{selectedOrder.metadata.delivery_fee.toFixed(2)}</span>

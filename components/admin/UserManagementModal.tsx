@@ -42,6 +42,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
     // Form States
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [createRole, setCreateRole] = useState('staff');
 
     useEffect(() => {
         if (isOpen && restaurantId) {
@@ -50,6 +51,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
             setMessage(null);
             setEmail('');
             setPassword('');
+            setCreateRole('staff');
         }
     }, [isOpen, restaurantId]);
 
@@ -97,6 +99,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
             if (action !== 'reset-password') {
                 setEmail('');
                 setPassword('');
+                setCreateRole('staff');
                 fetchUsers(); // Refresh list
                 if (action === 'invite-admin' || action === 'create-staff') {
                     // Optional: Switch back to list?
@@ -260,8 +263,21 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
                                         placeholder="Min. 6 characters"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                                    <select
+                                        value={createRole}
+                                        onChange={e => setCreateRole(e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-gold focus:border-brand-gold p-2 border"
+                                    >
+                                        <option value="staff">Staff/Waiter</option>
+                                        <option value="kitchen">Kitchen</option>
+                                        <option value="driver">Driver</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
                                 <button
-                                    onClick={() => handleAction('create-staff', { email, password })}
+                                    onClick={() => handleAction('create-staff', { email, password, role: createRole })}
                                     disabled={actionLoading || !email || !password}
                                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
                                 >

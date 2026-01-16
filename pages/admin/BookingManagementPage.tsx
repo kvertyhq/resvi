@@ -74,35 +74,53 @@ const BookingManagementPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('today');
     const [viewType, setViewType] = useState<ViewType>('list');
     const [selectedPreorder, setSelectedPreorder] = useState<string | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
     // Auto Refresh
-    const { timeLeft } = useAutoRefresh(() => fetchBookings(false), 15000);
+    const { timeLeft } = useAutoRefresh(() => fetchBookings(), 15000);
 
     useEffect(() => {
         // Initialize audio
         audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    }, []);
 
+    useEffect(() => {
+        if (selectedRestaurantId) {
+            setCurrentPage(1); // Reset to page 1 when tab changes
+            fetchBookings();
+        }
+    }, [selectedRestaurantId, activeTab]);
+
+    useEffect(() => {
         if (selectedRestaurantId) {
             fetchBookings();
-
-            const channel = supabase
-                .channel('public:bookings')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, (payload) => {
-                    console.log('New booking received:', payload);
-                    playNotificationSound();
-                    fetchBookings();
-                })
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, (payload) => {
-                    fetchBookings();
-                })
-                .subscribe();
-
-            return () => {
-                supabase.removeChannel(channel);
-            };
         }
-    }, [selectedRestaurantId]);
+    }, [currentPage]);
+
+    useEffect(() => {
+        if (!selectedRestaurantId) return;
+
+        const channel = supabase
+            .channel('public:bookings')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, (payload) => {
+                console.log('New booking received:', payload);
+                playNotificationSound();
+                fetchBookings();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, (payload) => {
+                fetchBookings();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [selectedRestaurantId, activeTab, currentPage]);
 
     const playNotificationSound = () => {
         if (audioRef.current) {
@@ -113,13 +131,24 @@ const BookingManagementPage: React.FC = () => {
     };
 
     const handleRefresh = () => {
-        fetchBookings(true);
+        fetchBookings();
     };
 
-    const fetchBookings = async (showLoading = true) => {
-        if (showLoading && bookings.length === 0) setLoading(true); // Only show loading if empty or forced
+    const getTodayDate = () => {
+        const today = new Date();
+        return today.toISOString().split('T')[0]; // YYYY-MM-DD
+    };
 
-        const { data, error } = await supabase
+    const fetchBookings = async () => {
+        setLoading(true);
+        if (!selectedRestaurantId) return;
+
+        const today = getTodayDate();
+        const from = (currentPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        // Build base query with date filter
+        let query = supabase
             .from('bookings')
             .select(`
                 *,
@@ -127,14 +156,34 @@ const BookingManagementPage: React.FC = () => {
                     full_name,
                     phone
                 )
-            `)
-            .eq('restaurant_id', selectedRestaurantId)
+            `, { count: 'exact' })
+            .eq('restaurant_id', selectedRestaurantId);
+
+        // Apply date filter based on active tab
+        switch (activeTab) {
+            case 'today':
+                query = query.eq('booking_date', today);
+                break;
+            case 'upcoming':
+                query = query.gt('booking_date', today);
+                break;
+            case 'past':
+                query = query.lt('booking_date', today);
+                break;
+        }
+
+        // Apply pagination and ordering
+        const { data, error, count } = await query
             .order('booking_date', { ascending: false })
-            .order('booking_time', { ascending: false });
+            .order('booking_time', { ascending: false })
+            .range(from, to);
 
         if (error) {
             console.error('Error fetching bookings:', error);
+            setBookings([]);
+            setTotalCount(0);
         } else {
+            // Check for new bookings (for sound notification)
             if (data && data.length > 0 && bookings.length > 0) {
                 const currentIds = new Set(bookings.map(b => b.id));
                 const newBookings = data.filter(b => !currentIds.has(b.id));
@@ -145,31 +194,13 @@ const BookingManagementPage: React.FC = () => {
                 }
             }
             setBookings(data || []);
+            setTotalCount(count || 0);
         }
         setLoading(false);
     };
 
-    const getTodayDate = () => {
-        const today = new Date();
-        return today.toISOString().split('T')[0]; // YYYY-MM-DD
-    };
-
-    const filterBookingsByTab = (bookings: Booking[], tab: TabType): Booking[] => {
-        const today = getTodayDate();
-
-        switch (tab) {
-            case 'today':
-                return bookings.filter(booking => booking.booking_date === today);
-            case 'upcoming':
-                return bookings.filter(booking => booking.booking_date > today);
-            case 'past':
-                return bookings.filter(booking => booking.booking_date < today);
-            default:
-                return bookings;
-        }
-    };
-
-    const filteredBookings = filterBookingsByTab(bookings, activeTab);
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+    const paginatedBookings = bookings; // Already paginated from server
 
     const updateStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
         const { error } = await supabase
@@ -283,7 +314,7 @@ const BookingManagementPage: React.FC = () => {
                             <div className="bg-white rounded-lg shadow overflow-hidden">
                                 {/* Mobile Card View */}
                                 <div className="md:hidden">
-                                    {filteredBookings.map((booking) => (
+                                    {paginatedBookings.map((booking) => (
                                         <div key={booking.id} className="p-4 border-b border-gray-200 last:border-b-0 space-y-3">
                                             <div className="flex justify-between items-start">
                                                 <div className="flex items-center">
@@ -369,7 +400,7 @@ const BookingManagementPage: React.FC = () => {
                                             )}
                                         </div>
                                     ))}
-                                    {filteredBookings.length === 0 && !loading && (
+                                    {paginatedBookings.length === 0 && !loading && (
                                         <div className="p-6 text-center text-gray-500 text-sm">No bookings found.</div>
                                     )}
                                 </div>
@@ -387,7 +418,7 @@ const BookingManagementPage: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
-                                            {filteredBookings.map((booking) => (
+                                            {paginatedBookings.map((booking) => (
                                                 <tr key={booking.id}>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center">
@@ -454,7 +485,7 @@ const BookingManagementPage: React.FC = () => {
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {filteredBookings.length === 0 && !loading && (
+                                            {paginatedBookings.length === 0 && !loading && (
                                                 <tr>
                                                     <td colSpan={5} className="px-6 py-4 text-center text-gray-500">No bookings found for this category.</td>
                                                 </tr>
@@ -463,14 +494,118 @@ const BookingManagementPage: React.FC = () => {
                                     </table>
                                 </div>
                             </div>
+
+                            {/* Pagination Controls */}
+                            {totalCount > 0 && (
+                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div className="flex flex-1 justify-between sm:hidden">
+                                        <button
+                                            onClick={() => setCurrentPage(page => Math.max(page - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm text-gray-700">
+                                                Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, totalCount)}</span> of{' '}
+                                                <span className="font-medium">{totalCount}</span> results
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                                <button
+                                                    onClick={() => setCurrentPage(page => Math.max(page - 1, 1))}
+                                                    disabled={currentPage === 1}
+                                                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Previous</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                {/* Logic to show limited page numbers can be added here if needed, for now showing all active pages in range or simple prev/next for large sets. 
+                                                    Let's stick to showing all if manageable or implementing a smarter range. 
+                                                    Given daily views, page count won't be huge. */}
+                                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setCurrentPage(page)}
+                                                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === page
+                                                            ? 'bg-brand-gold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold'
+                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))}
+                                                    disabled={currentPage === totalPages}
+                                                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Next</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
-                        <CalendarView
-                            bookings={bookings}
-                            onStatusUpdate={updateStatus}
-                            onAssignTable={assignTable}
-                            onViewPreorder={(summary) => setSelectedPreorder(summary)}
-                        />
+                        <>
+                            {/* Tab Navigation for Calendar View */}
+                            <div className="mb-6 border-b border-gray-200">
+                                <nav className="-mb-px flex space-x-8">
+                                    <button
+                                        onClick={() => setActiveTab('today')}
+                                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'today'
+                                            ? 'border-brand-gold text-brand-gold'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        Today
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('upcoming')}
+                                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'upcoming'
+                                            ? 'border-brand-gold text-brand-gold'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        Upcoming
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('past')}
+                                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'past'
+                                            ? 'border-brand-gold text-brand-gold'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        Past
+                                    </button>
+                                </nav>
+                            </div>
+
+                            <CalendarView
+                                bookings={bookings}
+                                onStatusUpdate={updateStatus}
+                                onAssignTable={assignTable}
+                                onViewPreorder={(summary) => setSelectedPreorder(summary)}
+                            />
+                        </>
                     )}
                     {selectedPreorder && (
                         <PreOrderModal

@@ -64,7 +64,7 @@ const KDSPage: React.FC = () => {
                     )
                 `)
                 .eq('restaurant_id', settings?.id)
-                .in('status', ['pending', 'preparing'])
+                .in('status', ['pending', 'preparing', 'ready'])
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
@@ -151,6 +151,23 @@ const KDSPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Ready Orders Summary Banner */}
+            {orders.some(o => o.status === 'ready') && (
+                <div className="bg-green-600 text-white p-3 px-4 shadow-md flex items-center justify-between flex-shrink-0 z-10 transition-all duration-500 ease-in-out">
+                    <div className="font-bold flex items-center gap-3">
+                        <span className="text-2xl animate-bounce">🔔</span>
+                        <span className="tracking-wider text-xl">READY TO SERVE:</span>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto py-1 hide-scrollbar">
+                        {orders.filter(o => o.status === 'ready').map(order => (
+                            <div key={order.id} className="bg-white text-green-700 font-extrabold px-4 py-2 rounded-lg text-xl shadow-lg border-2 border-green-800 whitespace-nowrap transform hover:scale-105 transition-transform">
+                                {order.table_info?.table_name}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="flex-1 p-4 gap-4 overflow-x-auto flex flex-nowrap items-start w-full">
                 {filteredOrders.length === 0 ? (
                     <div className="w-full flex items-center justify-center h-64 text-gray-500 text-2xl">
@@ -162,7 +179,7 @@ const KDSPage: React.FC = () => {
                             {/* Header */}
                             <div className={`p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center ${order.status === 'pending' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
                                 <div>
-                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">{order.table_info?.table_name}</h3>
+                                    <h3 className="font-black text-3xl text-gray-900 dark:text-white uppercase tracking-wider">{order.table_info?.table_name}</h3>
                                     <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(order.created_at), 'h:mm a')}</div>
                                 </div>
                                 <StatusBadge status={order.status} />
@@ -218,6 +235,14 @@ const KDSPage: React.FC = () => {
                                         className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg active:scale-95 transition-all"
                                     >
                                         Mark Ready
+                                    </button>
+                                )}
+                                {order.status === 'ready' && (
+                                    <button
+                                        onClick={() => updateStatus(order.id, 'served')}
+                                        className="w-full bg-gray-800 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-bold py-3 rounded-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <span>✅</span> Mark Served
                                     </button>
                                 )}
                             </div>

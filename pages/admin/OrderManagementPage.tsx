@@ -50,7 +50,11 @@ const OrderManagementPage: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
 
     // Modal State
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -213,7 +217,25 @@ const OrderManagementPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const filteredOrders = filterStatus === 'all' ? orders : orders.filter(o => o.status === filterStatus);
+    const filteredOrders = orders.filter(o => {
+        // Base view mode filter
+        const isHistory = o.status === 'completed' || o.status === 'cancelled';
+        if (viewMode === 'active' && isHistory) return false;
+        if (viewMode === 'history' && !isHistory) return false;
+
+        // Additional status filter
+        if (filterStatus !== 'all' && o.status !== filterStatus) return false;
+
+        return true;
+    });
+
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterStatus, viewMode]);
 
     // Helper function to parse notes field
     const parseNotesField = (notesString: string | null) => {
@@ -288,26 +310,59 @@ const OrderManagementPage: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2 w-full md:w-auto">
-                            <Filter className="h-5 w-5 text-gray-500" />
-                            <select
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="flex-1 md:flex-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-brand-gold focus:border-brand-gold"
-                            >
-                                <option value="all">All Statuses</option>
-                                <option value="pending">Pending</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="preparing">Preparing</option>
-                                <option value="out_for_delivery">Out for Delivery</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
+
+                        {/* View Mode & Filter Controls */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+                            {/* Tabs for Active/History */}
+                            <div className="bg-gray-100 p-1 rounded-lg flex">
+                                <button
+                                    onClick={() => setViewMode('active')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'active'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Active Orders
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('history')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'history'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    History
+                                </button>
+                            </div>
+
+                            <div className="flex items-center space-x-2 w-full sm:w-auto">
+                                <Filter className="h-5 w-5 text-gray-500" />
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="flex-1 md:flex-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-brand-gold focus:border-brand-gold"
+                                >
+                                    <option value="all">All Statuses</option>
+                                    {viewMode === 'active' ? (
+                                        <>
+                                            <option value="pending">Pending</option>
+                                            <option value="confirmed">Confirmed</option>
+                                            <option value="preparing">Preparing</option>
+                                            <option value="out_for_delivery">Out for Delivery</option>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <option value="completed">Completed</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </>
+                                    )}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
                     <div className="grid gap-4 pb-20 md:pb-0">
-                        {filteredOrders.map(order => (
+                        {paginatedOrders.map(order => (
                             <div key={order.id} className="bg-white p-4 md:p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                                 <div className="flex-1">
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -465,6 +520,72 @@ const OrderManagementPage: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Pagination Controls */}
+                    {filteredOrders.length > 0 && (
+                        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow-sm border border-gray-200">
+                            <div className="flex flex-1 justify-between sm:hidden">
+                                <button
+                                    onClick={() => setCurrentPage(page => Math.max(page - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                    className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(startIndex + itemsPerPage, filteredOrders.length)}</span> of{' '}
+                                        <span className="font-medium">{filteredOrders.length}</span> results
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                        <button
+                                            onClick={() => setCurrentPage(page => Math.max(page - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">Previous</span>
+                                            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                            <button
+                                                key={page}
+                                                onClick={() => setCurrentPage(page)}
+                                                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === page
+                                                    ? 'bg-brand-gold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold'
+                                                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                                    }`}
+                                            >
+                                                {page}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                        >
+                                            <span className="sr-only">Next</span>
+                                            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Order Details Modal */}
                     {isModalOpen && selectedOrder && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
@@ -592,7 +713,6 @@ const OrderManagementPage: React.FC = () => {
                 </>
             )}
         </div>
-
     );
 };
 

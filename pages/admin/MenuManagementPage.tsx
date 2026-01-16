@@ -48,6 +48,15 @@ const MenuManagementPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons'>('items');
     const [loading, setLoading] = useState(false);
 
+    // Pagination State
+    const itemsPerPage = 10;
+    const [itemsPage, setItemsPage] = useState(1);
+    const [itemsTotalCount, setItemsTotalCount] = useState(0);
+    const [categoriesPage, setCategoriesPage] = useState(1);
+    const [categoriesTotalCount, setCategoriesTotalCount] = useState(0);
+    const [addonsPage, setAddonsPage] = useState(1);
+    const [addonsTotalCount, setAddonsTotalCount] = useState(0);
+
     // Data State
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
@@ -94,9 +103,34 @@ const MenuManagementPage: React.FC = () => {
 
     useEffect(() => {
         if (selectedRestaurantId) {
+            // Reset all pages when restaurant changes
+            setItemsPage(1);
+            setCategoriesPage(1);
+            setAddonsPage(1);
             fetchData();
         }
     }, [selectedRestaurantId]);
+
+    useEffect(() => {
+        if (selectedRestaurantId) {
+            // Reset page when switching tabs
+            if (activeTab === 'items') setItemsPage(1);
+            else if (activeTab === 'categories') setCategoriesPage(1);
+            else if (activeTab === 'addons') setAddonsPage(1);
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (selectedRestaurantId) fetchItems();
+    }, [itemsPage]);
+
+    useEffect(() => {
+        if (selectedRestaurantId) fetchCategories();
+    }, [categoriesPage]);
+
+    useEffect(() => {
+        if (selectedRestaurantId) fetchAddons();
+    }, [addonsPage]);
 
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
@@ -107,38 +141,52 @@ const MenuManagementPage: React.FC = () => {
 
     const fetchCategories = async () => {
         if (!selectedRestaurantId) return;
-        const { data, error } = await supabase
+        const from = (categoriesPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        const { data, error, count } = await supabase
             .from('menu_categories')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('restaurant_id', selectedRestaurantId)
-            .order('order_index', { ascending: true });
+            .order('order_index', { ascending: true })
+            .range(from, to);
+
         if (data) setCategories(data);
+        if (count !== null) setCategoriesTotalCount(count);
         if (error) console.error('Error fetching categories:', error);
     };
 
     const fetchItems = async () => {
         if (!selectedRestaurantId) return;
-        // Items are linked to categories or directly to restaurant? 
-        // Schema usually links items to restaurant_id too or via category
-        // Let's assume restaurant_id is on menu_items for direct filtering, or we filter by category.
-        // Checking schema via simple query: menu_items usually has restaurant_id in this codebase pattern.
-        const { data, error } = await supabase
+        const from = (itemsPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        const { data, error, count } = await supabase
             .from('menu_items')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('restaurant_id', selectedRestaurantId)
-            .order('name', { ascending: true });
+            .order('name', { ascending: true })
+            .range(from, to);
+
         if (data) setItems(data);
+        if (count !== null) setItemsTotalCount(count);
         if (error) console.error('Error fetching items:', error);
     };
 
     const fetchAddons = async () => {
         if (!selectedRestaurantId) return;
-        const { data, error } = await supabase
+        const from = (addonsPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        const { data, error, count } = await supabase
             .from('addons')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('restaurant_id', selectedRestaurantId)
-            .order('name', { ascending: true });
+            .order('name', { ascending: true })
+            .range(from, to);
+
         if (data) setAddons(data);
+        if (count !== null) setAddonsTotalCount(count);
         if (error) console.error('Error fetching addons:', error);
     };
 
@@ -449,6 +497,72 @@ const MenuManagementPage: React.FC = () => {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination Controls for Categories */}
+                            {categoriesTotalCount > 0 && (
+                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                                    <div className="flex flex-1 justify-between sm:hidden">
+                                        <button
+                                            onClick={() => setCategoriesPage(page => Math.max(page - 1, 1))}
+                                            disabled={categoriesPage === 1}
+                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => setCategoriesPage(page => Math.min(page + 1, Math.ceil(categoriesTotalCount / itemsPerPage)))}
+                                            disabled={categoriesPage === Math.ceil(categoriesTotalCount / itemsPerPage)}
+                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm text-gray-700">
+                                                Showing <span className="font-medium">{(categoriesPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(categoriesPage * itemsPerPage, categoriesTotalCount)}</span> of{' '}
+                                                <span className="font-medium">{categoriesTotalCount}</span> results
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                                <button
+                                                    onClick={() => setCategoriesPage(page => Math.max(page - 1, 1))}
+                                                    disabled={categoriesPage === 1}
+                                                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Previous</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                {Array.from({ length: Math.ceil(categoriesTotalCount / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setCategoriesPage(page)}
+                                                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${categoriesPage === page
+                                                            ? 'bg-brand-gold text-white focus:z-20'
+                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setCategoriesPage(page => Math.min(page + 1, Math.ceil(categoriesTotalCount / itemsPerPage)))}
+                                                    disabled={categoriesPage === Math.ceil(categoriesTotalCount / itemsPerPage)}
+                                                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Next</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -501,6 +615,72 @@ const MenuManagementPage: React.FC = () => {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination Controls for Items */}
+                            {itemsTotalCount > 0 && (
+                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                                    <div className="flex flex-1 justify-between sm:hidden">
+                                        <button
+                                            onClick={() => setItemsPage(page => Math.max(page - 1, 1))}
+                                            disabled={itemsPage === 1}
+                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => setItemsPage(page => Math.min(page + 1, Math.ceil(itemsTotalCount / itemsPerPage)))}
+                                            disabled={itemsPage === Math.ceil(itemsTotalCount / itemsPerPage)}
+                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm text-gray-700">
+                                                Showing <span className="font-medium">{(itemsPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(itemsPage * itemsPerPage, itemsTotalCount)}</span> of{' '}
+                                                <span className="font-medium">{itemsTotalCount}</span> results
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                                <button
+                                                    onClick={() => setItemsPage(page => Math.max(page - 1, 1))}
+                                                    disabled={itemsPage === 1}
+                                                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Previous</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                {Array.from({ length: Math.ceil(itemsTotalCount / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setItemsPage(page)}
+                                                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${itemsPage === page
+                                                            ? 'bg-brand-gold text-white focus:z-20'
+                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setItemsPage(page => Math.min(page + 1, Math.ceil(itemsTotalCount / itemsPerPage)))}
+                                                    disabled={itemsPage === Math.ceil(itemsTotalCount / itemsPerPage)}
+                                                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Next</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -538,6 +718,72 @@ const MenuManagementPage: React.FC = () => {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination Controls for Add-ons */}
+                            {addonsTotalCount > 0 && (
+                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                                    <div className="flex flex-1 justify-between sm:hidden">
+                                        <button
+                                            onClick={() => setAddonsPage(page => Math.max(page - 1, 1))}
+                                            disabled={addonsPage === 1}
+                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => setAddonsPage(page => Math.min(page + 1, Math.ceil(addonsTotalCount / itemsPerPage)))}
+                                            disabled={addonsPage === Math.ceil(addonsTotalCount / itemsPerPage)}
+                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm text-gray-700">
+                                                Showing <span className="font-medium">{(addonsPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(addonsPage * itemsPerPage, addonsTotalCount)}</span> of{' '}
+                                                <span className="font-medium">{addonsTotalCount}</span> results
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                                <button
+                                                    onClick={() => setAddonsPage(page => Math.max(page - 1, 1))}
+                                                    disabled={addonsPage === 1}
+                                                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Previous</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                {Array.from({ length: Math.ceil(addonsTotalCount / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setAddonsPage(page)}
+                                                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${addonsPage === page
+                                                            ? 'bg-brand-gold text-white focus:z-20'
+                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setAddonsPage(page => Math.min(page + 1, Math.ceil(addonsTotalCount / itemsPerPage)))}
+                                                    disabled={addonsPage === Math.ceil(addonsTotalCount / itemsPerPage)}
+                                                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                                                >
+                                                    <span className="sr-only">Next</span>
+                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

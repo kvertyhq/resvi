@@ -62,7 +62,7 @@ const POSTablesPage: React.FC = () => {
                 .from('orders')
                 .select('*')
                 .eq('restaurant_id', settings?.id)
-                .in('status', ['pending', 'preparing', 'ready', 'paid', 'served']) // All active statuses
+                .in('status', ['pending', 'preparing', 'ready', 'served']) // All active statuses
                 .neq('status', 'completed')
                 .neq('status', 'cancelled');
 

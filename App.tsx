@@ -36,6 +36,7 @@ import POSLayout from './components/pos/POSLayout';
 import POSTablesPage from './pages/pos/POSTablesPage';
 import POSOrderPage from './pages/pos/POSOrderPage';
 import POSLoginPage from './pages/pos/POSLoginPage';
+import POSWalkInPage from './pages/pos/POSWalkInPage';
 import CustomerMenuPage from './pages/CustomerMenuPage';
 import POSMyOrdersPage from './pages/pos/POSMyOrdersPage';
 import KDSPage from './pages/pos/KDSPage';
@@ -164,6 +165,7 @@ function App() {
                     </RequirePOSAuth>
                   }>
                     <Route index element={<POSTablesPage />} />
+                    <Route path="walk-in" element={<POSWalkInPage />} />
                     <Route path="my-orders" element={<POSMyOrdersPage />} />
                     <Route path="kds" element={<KDSPage />} />
                     <Route path="calls" element={<POSCallHistoryPage />} />

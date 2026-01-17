@@ -5,8 +5,12 @@ import { useSettings } from '../../context/SettingsContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
+import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
+import POSPaymentModal from '../../components/pos/POSPaymentModal';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -29,6 +33,9 @@ const POSOrderPage: React.FC = () => {
     const { staff } = usePOS();
     const { isOnline, addToQueue } = useOffline();
 
+    // Check if this is a walk-in order
+    const isWalkIn = tableId === 'walk-in';
+
     const [categories, setCategories] = useState<any[]>([]);
     const [menuItems, setMenuItems] = useState<any[]>([]);
     const [itemModifiersMap, setItemModifiersMap] = useState<Set<string>>(new Set()); // Set of itemIds that have modifiers
@@ -36,6 +43,12 @@ const POSOrderPage: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [loading, setLoading] = useState(true);
     const [tableName, setTableName] = useState('');
+
+    // Walk-in customer selection
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [customerResults, setCustomerResults] = useState<any[]>([]);
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
     // Mobile Responsive State
     const [mobileTab, setMobileTab] = useState<'menu' | 'cart'>('menu');
@@ -49,24 +62,38 @@ const POSOrderPage: React.FC = () => {
     const [itemForModal, setItemForModal] = useState<any>(null);
 
     // Discount State
-    const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('flat');
+    const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('percentage');
     const [discountValue, setDiscountValue] = useState(0);
     const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+
+    // Success Modal
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [createdOrderId, setCreatedOrderId] = useState('');
+
+    // Payment Modal
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+    const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
+    const [stripePromise, setStripePromise] = useState<any>(null);
 
     useEffect(() => {
         if (settings?.id) {
             fetchData();
         }
+        // Initialize Stripe
+        if (settings?.payment_settings?.stripe_config?.publishable_key) {
+            setStripePromise(loadStripe(settings.payment_settings.stripe_config.publishable_key));
+        }
     }, [settings?.id]);
 
     useEffect(() => {
-        if (tableId) {
+        if (tableId && !isWalkIn) {
             supabase.from('table_info').select('table_name').eq('id', tableId).single()
                 .then(({ data }) => {
                     if (data) setTableName(data.table_name);
                 });
         }
-    }, [tableId]);
+    }, [tableId, isWalkIn]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -109,12 +136,48 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
-    // Fetch existing open order for table
+    // Search for customers (for walk-in orders)
+    const searchCustomers = async (query: string) => {
+        if (!query || query.length < 2) {
+            setCustomerResults([]);
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, phone')
+                .eq('restaurant_id', settings?.id)
+                .eq('role', 'customer')
+                .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
+                .limit(10);
+
+            if (error) throw error;
+            setCustomerResults(data || []);
+            setShowCustomerDropdown(true);
+        } catch (error) {
+            console.error('Error searching customers:', error);
+        }
+    };
+
+    // Debounced customer search
     useEffect(() => {
-        if (tableId) {
+        const timer = setTimeout(() => {
+            if (isWalkIn && customerSearch) {
+                searchCustomers(customerSearch);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [customerSearch, isWalkIn]);
+
+
+    // Fetch existing open order for table (skip for walk-in)
+    useEffect(() => {
+        if (tableId && !isWalkIn) {
             fetchExistingOrder();
         }
-    }, [tableId]);
+    }, [tableId, isWalkIn]);
 
     // Existing Items State
     const [submittedItems, setSubmittedItems] = useState<any[]>([]);
@@ -153,21 +216,74 @@ const POSOrderPage: React.FC = () => {
     };
 
     const addToCart = (item: any, modifiers: any[], finalPrice: number) => {
-        const newItem: CartItem = {
-            tempId: crypto.randomUUID(),
-            id: item.id,
-            name: item.name,
-            basePrice: item.price,
-            price: finalPrice,
-            quantity: 1,
-            modifiers: modifiers,
-            course: 'Main' // Default
-        };
-        setCartItems(prev => [...prev, newItem]);
+        // Check if item with same ID, price, and modifiers already exists
+        const existingItemIndex = cartItems.findIndex(cartItem => {
+            // Check if same item ID and price
+            if (cartItem.id !== item.id || cartItem.price !== finalPrice) {
+                return false;
+            }
+
+            // Check if modifiers match
+            if (cartItem.modifiers.length !== modifiers.length) {
+                return false;
+            }
+
+            // Compare each modifier
+            const cartModifierIds = cartItem.modifiers.map(m => m.id).sort();
+            const newModifierIds = modifiers.map(m => m.id).sort();
+
+            return JSON.stringify(cartModifierIds) === JSON.stringify(newModifierIds);
+        });
+
+        if (existingItemIndex !== -1) {
+            // Item exists, increment quantity
+            setCartItems(prev => prev.map((cartItem, index) =>
+                index === existingItemIndex
+                    ? { ...cartItem, quantity: cartItem.quantity + 1 }
+                    : cartItem
+            ));
+        } else {
+            // New item, add to cart
+            const newItem: CartItem = {
+                tempId: crypto.randomUUID(),
+                id: item.id,
+                name: item.name,
+                basePrice: item.price,
+                price: finalPrice,
+                quantity: 1,
+                modifiers: modifiers,
+                course: 'Main' // Default
+            };
+            setCartItems(prev => [...prev, newItem]);
+        }
     };
 
     const removeFromCart = (tempId: string) => {
         setCartItems(prev => prev.filter(i => i.tempId !== tempId));
+    };
+
+    const incrementQuantity = (tempId: string) => {
+        setCartItems(prev => prev.map(i =>
+            i.tempId === tempId ? { ...i, quantity: i.quantity + 1 } : i
+        ));
+    };
+
+    const decrementQuantity = (tempId: string) => {
+        setCartItems(prev => {
+            const updated = prev.map(i => {
+                if (i.tempId === tempId) {
+                    const newQuantity = i.quantity - 1;
+                    // Only remove if quantity would become 0
+                    if (newQuantity <= 0) {
+                        return null; // Mark for removal
+                    }
+                    return { ...i, quantity: newQuantity };
+                }
+                return i;
+            }).filter(i => i !== null); // Remove null items
+
+            return updated as CartItem[];
+        });
     };
 
     const updateItemNote = (tempId: string, note: string) => {
@@ -175,12 +291,66 @@ const POSOrderPage: React.FC = () => {
     };
 
     const updateItemCourse = (tempId: string, course: string) => {
-        setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, course: course } : i));
+        setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, course } : i));
+    };
+
+    const handlePaymentSuccess = async (method: string, transactionId?: string) => {
+        setPaymentMethod(method);
+        setPaymentTransactionId(transactionId || null);
+        setShowPaymentModal(false);
+
+        // Create order with payment details
+        setLoading(true);
+        try {
+            const orderItems = cartItems.map(item => ({
+                menu_item_id: item.id,
+                quantity: item.quantity,
+                price: item.price,
+                modifiers: item.modifiers,
+                notes: item.notes || null,
+                course: item.course
+            }));
+
+            const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
+                p_restaurant_id: settings?.id,
+                p_staff_id: staff?.id,
+                p_order_items: orderItems,
+                p_total_amount: total,
+                p_user_id: selectedCustomer?.id || null,
+                p_discount_type: discountType || null,
+                p_discount_amount: discountAmount || 0,
+                p_payment_method: method,
+                p_payment_transaction_id: transactionId || null
+            });
+
+            if (rpcError) throw rpcError;
+
+            const result = data as any;
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to create walk-in order');
+            }
+
+            // Success - show modal
+            setCreatedOrderId(result.order_id);
+            setShowSuccessModal(true);
+            setCartItems([]);
+        } catch (error) {
+            console.error('Order failed:', error);
+            alert('Failed to create order. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handlePlaceOrder = async () => {
         if (cartItems.length === 0) return;
         if (!settings?.id) return;
+
+        // For walk-in orders, show payment modal first
+        if (isWalkIn) {
+            setShowPaymentModal(true);
+            return;
+        }
 
         // Offline Handling
         if (!isOnline) {
@@ -209,24 +379,29 @@ const POSOrderPage: React.FC = () => {
 
             if (!orderId) {
                 // 1. Create New Order
-                const { data: orderData, error: orderError } = await supabase
-                    .from('orders')
-                    .insert({
-                        restaurant_id: settings?.id,
-                        table_id: tableId,
-                        total_amount: total,
-                        status: 'pending',
-                        order_type: 'dine_in',
-                        is_pos: true,
-                        staff_id: staff?.id,
-                        discount_amount: discountAmount,
-                        discount_type: discountType
-                    })
-                    .select()
-                    .single();
+                // Walk-in orders are now handled by payment modal
+                if (!isWalkIn) {
+                    // Regular table order - use direct insert
+                    const { data: orderData, error: orderError } = await supabase
+                        .from('orders')
+                        .insert({
+                            restaurant_id: settings?.id,
+                            table_id: tableId,
+                            total_amount: total,
+                            status: 'pending',
+                            order_type: 'dine_in',
+                            is_pos: true,
+                            staff_id: staff?.id,
+                            discount_amount: discountAmount,
+                            discount_type: discountType,
+                            user_id: null
+                        })
+                        .select()
+                        .single();
 
-                if (orderError) throw orderError;
-                orderId = orderData.id;
+                    if (orderError) throw orderError;
+                    orderId = orderData.id;
+                }
             } else {
                 // 2. Update Existing Order Total
                 // Calculate new items total (with tax logic matching main render)
@@ -253,7 +428,7 @@ const POSOrderPage: React.FC = () => {
                 if (updateError) throw updateError;
             }
 
-            // 3. Create Order Items (New Items Only)
+            // 3. Create Order Items (New Items Only) - Only for table orders
             const orderItems = cartItems.map(item => ({
                 order_id: orderId,
                 menu_item_id: item.id,
@@ -336,25 +511,82 @@ const POSOrderPage: React.FC = () => {
 
             {/* Left Side: Menu Area */}
             <div className={`flex-1 flex flex-col p-4 gap-4 overflow-hidden border-r border-gray-200 dark:border-gray-800 transition-colors duration-300 ${mobileTab === 'menu' ? 'flex' : 'hidden md:flex'}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            {tableName || 'Unknown Table'}
-                            <span className="md:hidden text-xs font-normal text-gray-500">
-                                ({filteredItems.length} items)
-                            </span>
-                        </h2>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-2 flex-1">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => navigate(isWalkIn ? '/pos/walk-in' : '/pos')}
+                                className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                title={isWalkIn ? 'Back to Walk-In Orders' : 'Back to Map'}
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                            </button>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                {isWalkIn ? 'Walk-In Order' : (tableName || 'Unknown Table')}
+                                <span className="md:hidden text-xs font-normal text-gray-500">
+                                    ({filteredItems.length} items)
+                                </span>
+                            </h2>
+                        </div>
+                        {isWalkIn && (
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search customer (name, phone)..."
+                                    value={selectedCustomer ? selectedCustomer.full_name : customerSearch}
+                                    onChange={(e) => {
+                                        setCustomerSearch(e.target.value);
+                                        if (selectedCustomer) setSelectedCustomer(null);
+                                    }}
+                                    onFocus={() => setShowCustomerDropdown(true)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                />
+                                {selectedCustomer && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCustomer(null);
+                                            setCustomerSearch('');
+                                        }}
+                                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                                {showCustomerDropdown && customerResults.length > 0 && !selectedCustomer && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                        {customerResults.map((customer) => (
+                                            <button
+                                                key={customer.id}
+                                                onClick={() => {
+                                                    setSelectedCustomer(customer);
+                                                    setShowCustomerDropdown(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-0"
+                                            >
+                                                <div className="font-medium text-gray-900 dark:text-white">{customer.full_name}</div>
+                                                {customer.phone && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {customer.phone}
+                                                    </div>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="md:hidden">
                         <button
                             onClick={() => setMobileTab('cart')}
-                            className="md:hidden bg-[var(--theme-color)] text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg animate-pulse"
+                            className="bg-[var(--theme-color)] text-white px-3 py-1 rounded-lg text-sm font-bold shadow-lg animate-pulse"
                         >
                             Cart ({cartItems.length})
-                        </button>
-                        <button onClick={() => navigate('/pos')} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-lg text-sm transition-colors">
-                            Back to Map
                         </button>
                     </div>
                 </div>
@@ -435,12 +667,40 @@ const POSOrderPage: React.FC = () => {
                             <div key={item.tempId} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between group animate-fadeIn transition-colors">
                                 <div className="flex-1">
                                     <div className="flex justify-between items-start">
-                                        <span className="text-gray-900 dark:text-white font-bold">{item.name}</span>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{item.price.toFixed(2)}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-900 dark:text-white font-bold">{item.name}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
+
+                                            {/* Quantity Controls */}
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => decrementQuantity(item.tempId)}
+                                                    className="w-6 h-6 flex items-center justify-center bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded transition-colors"
+                                                    title="Decrease quantity"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                                                    </svg>
+                                                </button>
+                                                <span className="w-8 text-center text-sm font-bold text-gray-900 dark:text-white">
+                                                    {item.quantity}
+                                                </span>
+                                                <button
+                                                    onClick={() => incrementQuantity(item.tempId)}
+                                                    className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                    title="Increase quantity"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
                                             <button
                                                 onClick={() => removeFromCart(item.tempId)}
-                                                className="text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-xs mt-1"
+                                                className="text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-xs"
                                             >
                                                 Remove
                                             </button>
@@ -601,12 +861,35 @@ const POSOrderPage: React.FC = () => {
                                     onClick={() => setIsDiscountModalOpen(false)}
                                     className="flex-1 py-3 bg-[var(--theme-color)] text-white rounded-xl font-bold hover:brightness-110"
                                 >
-                                    Apply
+                                    Done
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* Payment Modal */}
+                {stripePromise && (
+                    <Elements stripe={stripePromise}>
+                        <POSPaymentModal
+                            isOpen={showPaymentModal}
+                            onClose={() => setShowPaymentModal(false)}
+                            amount={total}
+                            onPaymentSuccess={handlePaymentSuccess}
+                        />
+                    </Elements>
+                )}
+
+                {/* Success Modal */}
+                <OrderSuccessModal
+                    isOpen={showSuccessModal}
+                    onClose={() => {
+                        setShowSuccessModal(false);
+                        navigate('/pos/walk-in');
+                    }}
+                    orderId={createdOrderId}
+                    orderType="walkin"
+                />
             </div>
         </div>
     );

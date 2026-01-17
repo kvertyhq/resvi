@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import POSQRModal from '../../components/pos/POSQRModal';
 import ManageFloorsModal from '../../components/pos/ManageFloorsModal';
 import POSTableEditModal from '../../components/pos/POSTableEditModal';
+import POSTableOrderModal from '../../components/pos/POSTableOrderModal';
 
 const POSTablesPage: React.FC = () => {
     const { settings } = useSettings();
@@ -22,6 +23,10 @@ const POSTablesPage: React.FC = () => {
     // QR Modal State
     const [qrTable, setQrTable] = useState<any>(null);
     const [editTable, setEditTable] = useState<any>(null);
+
+    // Order View Modal State
+    const [viewOrderTable, setViewOrderTable] = useState<any>(null);
+    const [viewOrder, setViewOrder] = useState<any>(null);
 
     useEffect(() => {
         if (settings?.id) {
@@ -206,13 +211,35 @@ const POSTablesPage: React.FC = () => {
         }
     };
 
-    const handleTableClick = (table: any) => {
+    const handleTableClick = async (table: any) => {
         if (isEditMode) {
             setEditTable(table);
         } else if (isQRMode) {
             setQrTable(table);
         } else {
-            navigate(`/pos/order/${table.id}`);
+            // If table has active order, show modal first
+            if (table.activeOrder) {
+                // Fetch full order details with items
+                const { data: orderData } = await supabase
+                    .from('orders')
+                    .select(`
+                        *,
+                        order_items (
+                            *,
+                            menu_items ( name )
+                        )
+                    `)
+                    .eq('id', table.activeOrder.id)
+                    .single();
+
+                if (orderData) {
+                    setViewOrder(orderData);
+                    setViewOrderTable(table);
+                }
+            } else {
+                // No active order, go directly to order page
+                navigate(`/pos/order/${table.id}`);
+            }
         }
     };
 
@@ -320,6 +347,17 @@ const POSTablesPage: React.FC = () => {
                 onClose={() => setEditTable(null)}
                 table={editTable}
                 onUpdate={fetchData}
+            />
+
+            <POSTableOrderModal
+                isOpen={!!viewOrder}
+                onClose={() => {
+                    setViewOrder(null);
+                    setViewOrderTable(null);
+                }}
+                order={viewOrder}
+                tableName={viewOrderTable?.table_name || ''}
+                tableId={viewOrderTable?.id || ''}
             />
         </div>
     );

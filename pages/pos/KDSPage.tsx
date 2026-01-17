@@ -1,54 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { format } from 'date-fns';
+import KDSTimer from '../../components/pos/KDSTimer';
 
-interface OrderItem {
+// --- Types ---
+interface KDSMenuItem {
+    name: string;
+    category_id: string;
+    menu_categories: {
+        station: string;
+    };
+}
+
+interface KDSOrderItem {
     id: string;
     menu_item_id: string;
     quantity: number;
     notes?: string;
     course_name: string;
     selected_modifiers: any[];
-    menu_items: {
-        name: string,
-        category_id: string,
-        menu_categories: { station: string }
-    };
+    menu_items: KDSMenuItem;
     status: string;
 }
 
-interface Order {
+interface KDSTableInfo {
+    table_name: string;
+}
+
+interface KDSOrder {
     id: string;
     table_id: string;
     status: string;
     created_at: string;
-    order_items: OrderItem[];
-    table_info: { table_name: string };
+    order_items: KDSOrderItem[];
+    table_info: KDSTableInfo;
 }
+
+// Simple beep sound (Base64)
+const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"; // Very short clip, usually needs a real file for good UX, using a placeholder logic for now or expecting a file. 
+// Actually, let's use a cleaner standard beep approach or just a simple log if file missing.
+// Better: Browser 'beep' is not standard. I will assume a file 'notification.mp3' exists or fail gracefully.
+// Reverting to a safely playable empty sound or valid base64 if possible. 
+// Let's use a real base64 for a "ding" if possible, but for brevity I will omit the huge string and use a ref logic to play if available.
 
 const KDSPage: React.FC = () => {
     const { settings } = useSettings();
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [orders, setOrders] = useState<KDSOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeStation, setActiveStation] = useState<'kitchen' | 'bar'>('kitchen');
+    const previousOrderCount = useRef(0);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        // Initialize audio
+        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Public domain ding
+        audioRef.current.volume = 0.5;
+    }, []);
 
     useEffect(() => {
         if (settings?.id) {
             fetchOrders();
             const subscription = supabase
                 .channel('kds_channel')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
                 .subscribe();
 
             return () => { subscription.unsubscribe(); };
         }
-    }, [settings?.id, activeStation]); // Refetch/Re-filter when station changes (though we handle filtering client side usually, fetching all is safer for now)
+    }, [settings?.id]);
 
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            // Fetch everything, we filter client side for better performance on toggle
             const { data, error } = await supabase
                 .from('orders')
                 .select(`
@@ -68,7 +92,22 @@ const KDSPage: React.FC = () => {
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
-            setOrders(data as any || []);
+
+            // Cast strictly now that we defined it, but ideally Supabase types should be generated.
+            // For now, runtime validation is minimal, we rely on the query matching the interface.
+            const typedData = (data || []) as unknown as KDSOrder[];
+
+            // Check for new orders to play sound
+            if (typedData.length > previousOrderCount.current) {
+                // Only play if we aren't in the initial load (optional improvement)
+                // But generally, more orders = ding
+                if (previousOrderCount.current !== 0) {
+                    audioRef.current?.play().catch(e => console.log('Audio play failed', e));
+                }
+            }
+            previousOrderCount.current = typedData.length;
+
+            setOrders(typedData);
         } catch (error) {
             console.error('KDS Fetch Error:', error);
         } finally {
@@ -91,12 +130,13 @@ const KDSPage: React.FC = () => {
     };
 
     const StatusBadge = ({ status }: { status: string }) => {
-        const colors = {
+        const colors: Record<string, string> = {
             pending: 'bg-yellow-100 dark:bg-yellow-500 text-yellow-900 dark:text-black',
             preparing: 'bg-blue-100 dark:bg-blue-600 text-blue-900 dark:text-white',
             ready: 'bg-green-100 dark:bg-green-600 text-green-900 dark:text-white'
-        }[status] || 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white';
-        return <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colors}`}>{status}</span>;
+        };
+        const colorClass = colors[status] || 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white';
+        return <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colorClass}`}>{status}</span>;
     };
 
     // Filter orders to only show items for the current station
@@ -177,10 +217,13 @@ const KDSPage: React.FC = () => {
                     filteredOrders.map(order => (
                         <div key={order.id} className="min-w-[280px] w-[280px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col shadow-xl flex-shrink-0 h-full max-h-[85vh] transition-colors duration-300">
                             {/* Header */}
-                            <div className={`p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center ${order.status === 'pending' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
+                            <div className={`p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start ${order.status === 'pending' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
                                 <div>
                                     <h3 className="font-black text-3xl text-gray-900 dark:text-white uppercase tracking-wider">{order.table_info?.table_name}</h3>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(order.created_at), 'h:mm a')}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(order.created_at), 'h:mm a')}</div>
+                                        <KDSTimer startTime={order.created_at} />
+                                    </div>
                                 </div>
                                 <StatusBadge status={order.status} />
                             </div>

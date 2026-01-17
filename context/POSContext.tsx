@@ -71,7 +71,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 .select('id, full_name, role, restaurant_id')
                 .eq('restaurant_id', settings.id)
                 .eq('pin_code', pin)
-                .single();
+                .maybeSingle();
 
             if (error || !data) {
                 return false;

@@ -30,11 +30,13 @@ interface KDSTableInfo {
 
 interface KDSOrder {
     id: string;
+    readable_id: string;
     table_id: string;
     status: string;
     created_at: string;
     order_items: KDSOrderItem[];
     table_info: KDSTableInfo;
+    order_type?: string;
 }
 
 // Simple beep sound (Base64)
@@ -74,22 +76,7 @@ const KDSPage: React.FC = () => {
         setLoading(true);
         try {
             const { data, error } = await supabase
-                .from('orders')
-                .select(`
-                    id, table_id, status, created_at,
-                    table_info ( table_name ),
-                    order_items (
-                        id, quantity, notes, course_name, selected_modifiers,
-                        menu_items ( 
-                            name,
-                            category_id,
-                            menu_categories ( station ) 
-                        )
-                    )
-                `)
-                .eq('restaurant_id', settings?.id)
-                .in('status', ['pending', 'preparing', 'ready'])
-                .order('created_at', { ascending: true });
+                .rpc('get_pos_kds_orders', { p_restaurant_id: settings?.id });
 
             if (error) throw error;
 
@@ -132,11 +119,16 @@ const KDSPage: React.FC = () => {
     const StatusBadge = ({ status }: { status: string }) => {
         const colors: Record<string, string> = {
             pending: 'bg-yellow-100 dark:bg-yellow-500 text-yellow-900 dark:text-black',
+            confirmed: 'bg-purple-100 dark:bg-purple-600 text-purple-900 dark:text-white',
             preparing: 'bg-blue-100 dark:bg-blue-600 text-blue-900 dark:text-white',
             ready: 'bg-green-100 dark:bg-green-600 text-green-900 dark:text-white'
         };
         const colorClass = colors[status] || 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white';
-        return <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colorClass}`}>{status}</span>;
+        return (
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${colorClass}`}>
+                {status}
+            </span>
+        );
     };
 
     // Filter orders to only show items for the current station
@@ -164,7 +156,7 @@ const KDSPage: React.FC = () => {
         <div className="flex flex-col h-full w-full bg-white dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden transition-colors duration-300">
             {/* Station Selector Header */}
             <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 transition-colors duration-300">
-                <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 justify-center md:justify-start">
+                <div className="flex gap-4 w-full md:w-auto overflow-x-auto p-1 justify-center md:justify-start md:ml-12">
                     <button
                         onClick={() => setActiveStation('kitchen')}
                         style={activeStation === 'kitchen' ? { backgroundColor: 'var(--theme-color)' } : {}}
@@ -217,9 +209,22 @@ const KDSPage: React.FC = () => {
                     filteredOrders.map(order => (
                         <div key={order.id} className="min-w-[280px] w-[280px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col shadow-xl flex-shrink-0 h-full max-h-[85vh] transition-colors duration-300">
                             {/* Header */}
-                            <div className={`p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start ${order.status === 'pending' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
-                                <div>
-                                    <h3 className="font-black text-3xl text-gray-900 dark:text-white uppercase tracking-wider">{order.table_info?.table_name}</h3>
+                            <div className={`p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start gap-2 ${order.status === 'pending' || order.status === 'confirmed' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        {/* Only show small ID if we have a table name (otherwise ID is the main header) */}
+                                        {order.table_info?.table_name && (
+                                            <span className="text-sm font-bold text-gray-500 dark:text-gray-400">#{order.readable_id}</span>
+                                        )}
+                                        {order.order_type && (
+                                            <span className="bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                                                {order.order_type.replace('_', ' ')}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h3 className="font-black text-3xl text-gray-900 dark:text-white uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {order.table_info?.table_name || `#${order.readable_id}`}
+                                    </h3>
                                     <div className="flex items-center gap-2 mt-1">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(order.created_at), 'h:mm a')}</div>
                                         <KDSTimer startTime={order.created_at} />
@@ -269,7 +274,7 @@ const KDSPage: React.FC = () => {
 
                             {/* Footer Actions */}
                             <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-lg">
-                                {order.status === 'pending' && (
+                                {(order.status === 'pending' || order.status === 'confirmed') && (
                                     <button
                                         onClick={() => updateStatus(order.id, 'preparing')}
                                         style={{ backgroundColor: 'var(--theme-color)' }}

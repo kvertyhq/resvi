@@ -67,21 +67,22 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
             // 1. Find profile with this PIN code for this restaurant
             const { data, error } = await supabase
-                .from('profiles')
-                .select('id, full_name, role, restaurant_id')
-                .eq('restaurant_id', settings.id)
-                .eq('pin_code', pin)
+                .rpc('pos_login', {
+                    p_restaurant_id: settings.id,
+                    p_pin_code: pin
+                })
                 .maybeSingle();
 
             if (error || !data) {
                 return false;
             }
 
+            const profileData = data as any;
             const profile: StaffProfile = { // Ensure type matches StaffProfile
-                id: data.id,
-                full_name: data.full_name,
-                role: data.role,
-                restaurant_id: data.restaurant_id
+                id: profileData.id,
+                full_name: profileData.full_name,
+                role: profileData.role,
+                restaurant_id: profileData.restaurant_id
             };
 
             // 2. Set State

@@ -4,7 +4,8 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
 import { useSettings } from '../../context/SettingsContext';
-import { LogOut, Clock, PhoneIncoming } from 'lucide-react';
+import { LogOut, Clock, PhoneIncoming, Printer } from 'lucide-react';
+import PrinterConfigModal from './PrinterConfigModal';
 
 const POSLayout: React.FC = () => {
     const { user, loading: adminLoading } = useAdmin();
@@ -12,6 +13,8 @@ const POSLayout: React.FC = () => {
     const { isOnline, queueLength, sync } = useOffline();
     const { settings } = useSettings();
     const navigate = useNavigate();
+
+    const [showPrinterModal, setShowPrinterModal] = React.useState(false);
 
     // Default to orange if no theme color set
     const themeColor = settings?.theme_color || '#f97316';
@@ -40,12 +43,7 @@ const POSLayout: React.FC = () => {
 
     const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-    // 1. Admin Login Check (Must be logged into Supabase Auth first)
-    useEffect(() => {
-        if (!adminLoading && !user) {
-            navigate('/admin/login');
-        }
-    }, [user, adminLoading, navigate]);
+
 
     // 2. POS Staff Check (Must be logged in with PIN)
     useEffect(() => {
@@ -137,9 +135,22 @@ const POSLayout: React.FC = () => {
                                 )}
                             </button>
 
+
+
+
+                            {/* Printer Settings Button */}
                             <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 flex items-center justify-center text-xs font-bold" style={{ color: 'var(--theme-color)' }}>
                                 {staff.full_name.charAt(0)}
                             </div>
+
+                            <button
+                                onClick={() => setShowPrinterModal(true)}
+                                className="p-3 bg-gray-800 rounded-xl text-gray-400 hover:text-white transition-all mt-4 hover:bg-gray-700"
+                                title="Printer Settings"
+                            >
+                                <Printer size={24} />
+                            </button>
+
                             <button
                                 onClick={handleLogout}
                                 className="p-3 bg-gray-800 rounded-xl text-gray-400 hover:bg-red-600 hover:text-white transition-all mt-4"
@@ -147,6 +158,10 @@ const POSLayout: React.FC = () => {
                             >
                                 <LogOut size={24} />
                             </button>
+
+
+
+
 
                             {/* Sync Button */}
                             {(queueLength > 0 || !isOnline) && (
@@ -194,6 +209,8 @@ const POSLayout: React.FC = () => {
             <main className="flex-1 flex overflow-hidden relative mb-16 md:mb-0">
                 <Outlet />
             </main>
+            {/* Printer Configuration Modal */}
+            <PrinterConfigModal isOpen={showPrinterModal} onClose={() => setShowPrinterModal(false)} />
         </div >
     );
 };

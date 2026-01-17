@@ -3,11 +3,13 @@ import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { usePOS } from '../../context/POSContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, CreditCard, Trash2 } from 'lucide-react';
+import { Plus, Eye, CreditCard, Trash2, Printer } from 'lucide-react';
 import OrderDetailsModal from '../../components/pos/OrderDetailsModal';
+import { receiptService } from '../../services/ReceiptService';
 
 interface WalkInOrder {
     id: string;
+    readable_id?: string;
     created_at: string;
     total_amount: number;
     status: string;
@@ -18,6 +20,9 @@ interface WalkInOrder {
         phone: string;
     };
     order_items?: any[];
+    payments?: {
+        payment_method: string;
+    }[];
 }
 
 const POSWalkInPage: React.FC = () => {
@@ -81,7 +86,8 @@ const POSWalkInPage: React.FC = () => {
                 .select(`
                     *,
                     profiles!orders_user_id_fkey ( full_name, phone ),
-                    order_items ( id, quantity, price_snapshot )
+                    order_items ( id, quantity, price_snapshot ),
+                    payments ( payment_method )
                 `)
                 .eq('restaurant_id', settings?.id)
                 .eq('order_type', 'takeaway')
@@ -255,23 +261,27 @@ const POSWalkInPage: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                         <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                            {order.profiles?.full_name || 'Guest'}
+                                            {(order.profiles?.full_name || order.profiles?.phone) ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span>{order.profiles.full_name || order.profiles.phone}</span>
+                                                    <button
+                                                        onClick={() => setShowCustomerDetails(prev => ({
+                                                            ...prev,
+                                                            [order.id]: !prev[order.id]
+                                                        }))}
+                                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                                                        title="View customer details"
+                                                    >
+                                                        <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                `Order #${order.readable_id || order.id.slice(0, 8)}`
+                                            )}
                                         </div>
-                                        {order.profiles?.phone && (
-                                            <button
-                                                onClick={() => setShowCustomerDetails(prev => ({
-                                                    ...prev,
-                                                    [order.id]: !prev[order.id]
-                                                }))}
-                                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                                title="View customer details"
-                                            >
-                                                <Eye className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                            </button>
-                                        )}
                                     </div>
                                     {showCustomerDetails[order.id] && order.profiles?.phone && (
-                                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 pl-1">
                                             {order.profiles.phone}
                                         </div>
                                     )}
@@ -301,11 +311,16 @@ const POSWalkInPage: React.FC = () => {
                                 {order.payment_status && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600 dark:text-gray-400">Payment:</span>
-                                        <span className={`font-medium ${order.payment_status === 'paid'
+                                        <span className={`font-medium capitalize ${order.payment_status === 'paid'
                                             ? 'text-green-600 dark:text-green-400'
                                             : 'text-yellow-600 dark:text-yellow-400'
                                             }`}>
                                             {order.payment_status}
+                                            {order.payment_status === 'paid' && order.payments?.[0]?.payment_method && (
+                                                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    ({order.payments[0].payment_method.replace('_', ' ')})
+                                                </span>
+                                            )}
                                         </span>
                                     </div>
                                 )}
@@ -343,6 +358,16 @@ const POSWalkInPage: React.FC = () => {
                                             <span>Pay</span>
                                         </button>
                                     )}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            receiptService.printOrder(order.id);
+                                        }}
+                                        className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm transition-colors flex items-center justify-center"
+                                        title="Print Receipt"
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                    </button>
                                 </div>
 
                                 {/* Cancel/Delete button */}

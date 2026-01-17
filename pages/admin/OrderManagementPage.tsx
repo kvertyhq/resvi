@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X, RefreshCcw } from 'lucide-react';
+import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X, RefreshCcw, Printer } from 'lucide-react';
+import { receiptService } from '../../services/ReceiptService';
 
 interface OrderItem {
     id: string;
@@ -318,8 +319,8 @@ const OrderManagementPage: React.FC = () => {
                                 <button
                                     onClick={() => setViewMode('active')}
                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'active'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     Active Orders
@@ -327,8 +328,8 @@ const OrderManagementPage: React.FC = () => {
                                 <button
                                     onClick={() => setViewMode('history')}
                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'history'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     History
@@ -470,6 +471,16 @@ const OrderManagementPage: React.FC = () => {
                                             Mark as Paid
                                         </button>
                                     )}
+
+                                    <button
+                                        onClick={() => {
+                                            receiptService.printOrder(order.id);
+                                        }}
+                                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center border border-gray-200"
+                                        title="Print Receipt"
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                    </button>
 
                                     <button
                                         onClick={() => openOrderDetails(order)}

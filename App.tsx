@@ -22,6 +22,7 @@ import MenuManagementPage from './pages/admin/MenuManagementPage';
 import OrderManagementPage from './pages/admin/OrderManagementPage';
 import BookingManagementPage from './pages/admin/BookingManagementPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import ReceiptSettingsPage from './pages/admin/ReceiptSettingsPage';
 import ForgotPasswordPage from './pages/admin/ForgotPasswordPage';
 import ResetPasswordPage from './pages/admin/ResetPasswordPage';
 import StaffManagementPage from './pages/admin/StaffManagementPage';
@@ -39,6 +40,7 @@ import POSLoginPage from './pages/pos/POSLoginPage';
 import POSWalkInPage from './pages/pos/POSWalkInPage';
 import CustomerMenuPage from './pages/CustomerMenuPage';
 import POSMyOrdersPage from './pages/pos/POSMyOrdersPage';
+import PublicReceiptPage from './pages/public/PublicReceiptPage';
 import KDSPage from './pages/pos/KDSPage';
 import POSPaymentPage from './pages/pos/POSPaymentPage';
 import POSCallHistoryPage from './pages/pos/POSCallHistoryPage';
@@ -152,6 +154,7 @@ function App() {
                     <Route path="staff" element={<StaffManagementPage />} />
                     <Route path="messages" element={<ContactMessagesPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="settings/receipts" element={<ReceiptSettingsPage />} />
                     <Route path="credits" element={<SMSCreditsPage />} />
                     <Route path="super" element={<SuperAdminDashboard />} />
                   </Route>
@@ -176,6 +179,7 @@ function App() {
 
                   {/* Public Customer Routes */}
                   <Route path="/menu/:tableId" element={<CustomerMenuPage />} />
+                  <Route path="/r/:orderId" element={<PublicReceiptPage />} />
 
                   {/* Catch all - redirects to home for unknown routes (fixes Supabase hash routing issues) */}
                   <Route path="*" element={<Navigate to="/" replace />} />

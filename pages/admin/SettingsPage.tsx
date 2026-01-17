@@ -15,6 +15,7 @@ import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
 import SettingsSMS from '../../components/admin/settings/SettingsSMS';
 import SettingsIntegrations from '../../components/admin/settings/SettingsIntegrations';
+import SettingsReceipts from '../../components/admin/settings/SettingsReceipts';
 
 import { Users } from 'lucide-react';
 
@@ -221,7 +222,8 @@ const SettingsPage: React.FC = () => {
         { id: 'payments', label: 'Payments' },
         { id: 'bookings', label: 'Bookings' },
         { id: 'notifications', label: 'Notifications' },
-        { id: 'integrations', label: 'Integrations' }
+        { id: 'integrations', label: 'Integrations' },
+        { id: 'receipts', label: 'Receipts' }
     ];
 
     if (!selectedRestaurantId) {
@@ -234,104 +236,153 @@ const SettingsPage: React.FC = () => {
     }
 
     return (
-        <div className="max-w-6xl mx-auto pb-10">
+        <div className="max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
             {message && (
                 <Toast message={message} onClose={() => setMessage(null)} />
             )}
 
             <form onSubmit={handleSubmit}>
                 {/* Header with Save Button */}
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-serif font-bold text-gray-800">Restaurant Settings</h2>
+                <div className="flex justify-between items-center mb-6 pt-6">
+                    <div>
+                        <h2 className="text-3xl font-serif font-bold text-gray-900">Restaurant Settings</h2>
+                        <p className="mt-1 text-sm text-gray-500">Manage your restaurant details, operations, and preferences.</p>
+                    </div>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-brand-dark-gray text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50 shadow-sm"
+                        className="bg-brand-dark-gray text-white px-3 py-1.5 md:px-6 md:py-2 text-sm md:text-base rounded-md font-medium hover:bg-gray-800 flex items-center disabled:opacity-50 shadow-sm transition-colors"
                     >
-                        <Save className="h-5 w-5 mr-2" />
-                        {loading ? 'Saving...' : 'Save Settings'}
+                        <Save className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2" />
+                        {loading ? 'Saving...' : (
+                            <>
+                                <span className="md:hidden">Save</span>
+                                <span className="hidden md:inline">Save Settings</span>
+                            </>
+                        )}
                     </button>
                 </div>
 
-                {/* Tabs Navigation */}
-                <div className="bg-white rounded-lg shadow-sm mb-6 border border-gray-200 overflow-hidden">
-                    <div className="flex overflow-x-auto md:flex-wrap border-b border-gray-200 no-scrollbar">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex-shrink-0 px-6 py-4 text-sm font-medium focus:outline-none transition-colors whitespace-nowrap ${activeTab === tab.id
-                                    ? 'text-brand-gold border-b-2 border-brand-gold bg-gray-50'
-                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                    }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
+                <div className="flex flex-col md:flex-row gap-8">
+                    {/* Navigation Sidebar */}
+                    <aside className="w-full md:w-64 flex-shrink-0">
+                        <nav className="space-y-1">
+                            {/* Mobile: Horizontal Scroll */}
+                            <div className="md:hidden overflow-x-auto flex pb-4 mb-4 border-b border-gray-200 gap-2 no-scrollbar">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === tab.id
+                                            ? 'bg-brand-gold text-white shadow-sm'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Desktop: Vertical List */}
+                            <div className="hidden md:block bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`w-full text-left px-4 py-3 text-sm font-medium border-l-4 transition-colors flex justify-between items-center ${activeTab === tab.id
+                                            ? 'border-brand-gold bg-amber-50 text-amber-900'
+                                            : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        {tab.label}
+                                        {activeTab === tab.id && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-gold"></span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </nav>
+                    </aside>
+
+                    {/* Content Area */}
+                    <div className="flex-1 min-w-0">
+                        <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden min-h-[500px]">
+                            {/* Content Header (Optional, makes it clear what section we are in) */}
+                            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                                    {tabs.find(t => t.id === activeTab)?.label}
+                                </h3>
+                            </div>
+
+                            <div className="p-6">
+                                {activeTab === 'general' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsBasicInfo formData={formData} handleChange={handleChange} />
+                                        <SettingsLocation formData={formData} handleChange={handleChange} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'media' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'operations' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsOperations formData={formData} handleChange={handleChange} />
+                                        <SettingsOpeningHours formData={formData} setFormData={setFormData} />
+                                        <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'orders' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsDeliveryZones />
+                                        <SettingsTimeslots
+                                            timeSlots={collectionTimeSlots}
+                                            setTimeSlots={setCollectionTimeSlots}
+                                            capacities={timeslotCapacities}
+                                            setCapacities={setTimeslotCapacities}
+                                        />
+                                    </div>
+                                )}
+
+                                {activeTab === 'payments' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsPayment />
+                                    </div>
+                                )}
+
+                                {activeTab === 'bookings' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsTableManagement />
+                                        <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'notifications' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsSMS formData={formData} setFormData={setFormData} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'integrations' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsIntegrations formData={formData} handleChange={handleChange} />
+                                    </div>
+                                )}
+
+                                {activeTab === 'receipts' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsReceipts />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                {/* Tab Content */}
-                <div className="bg-white shadow rounded-lg overflow-hidden p-6 space-y-8 min-h-[500px]">
-                    {activeTab === 'general' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsBasicInfo formData={formData} handleChange={handleChange} />
-                            <SettingsLocation formData={formData} handleChange={handleChange} />
-                        </div>
-                    )}
-
-                    {activeTab === 'media' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
-                        </div>
-                    )}
-
-                    {activeTab === 'operations' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsOperations formData={formData} handleChange={handleChange} />
-                            <SettingsOpeningHours formData={formData} setFormData={setFormData} />
-                            <SettingsClosureDates closureDates={closureDates} setClosureDates={setClosureDates} />
-                        </div>
-                    )}
-
-                    {activeTab === 'orders' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsDeliveryZones />
-                            <SettingsTimeslots
-                                timeSlots={collectionTimeSlots}
-                                setTimeSlots={setCollectionTimeSlots}
-                                capacities={timeslotCapacities}
-                                setCapacities={setTimeslotCapacities}
-                            />
-                        </div>
-                    )}
-
-                    {activeTab === 'payments' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsPayment />
-                        </div>
-                    )}
-
-                    {activeTab === 'bookings' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsTableManagement />
-                            <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
-                        </div>
-                    )}
-
-                    {activeTab === 'notifications' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsSMS formData={formData} setFormData={setFormData} />
-                        </div>
-                    )}
-
-                    {activeTab === 'integrations' && (
-                        <div className="space-y-8 animate-fadeIn">
-                            <SettingsIntegrations formData={formData} handleChange={handleChange} />
-                        </div>
-                    )}
-
                 </div>
             </form>
         </div>

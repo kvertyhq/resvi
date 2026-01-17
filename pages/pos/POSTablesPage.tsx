@@ -39,10 +39,7 @@ const POSTablesPage: React.FC = () => {
         try {
             // 1. Fetch Floors
             const { data: floorData } = await supabase
-                .from('restaurant_floors')
-                .select('*')
-                .eq('restaurant_id', settings?.id)
-                .order('order_index', { ascending: true });
+                .rpc('get_pos_floors', { p_restaurant_id: settings?.id });
 
             const loadedFloors = floorData || [];
             setFloors(loadedFloors);
@@ -55,10 +52,7 @@ const POSTablesPage: React.FC = () => {
 
             // 2. Fetch Tables
             const { data: tableData, error } = await supabase
-                .from('table_info')
-                .select('*')
-                .eq('restaurant_id', settings?.id)
-                .order('table_name');
+                .rpc('get_pos_tables', { p_restaurant_id: settings?.id });
 
             if (error) throw error;
 

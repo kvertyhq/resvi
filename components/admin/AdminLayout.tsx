@@ -222,6 +222,7 @@ const AdminLayout: React.FC = () => {
                                 Settings
                             </NavLink>
                         </li>
+
                     </ul>
                 </nav>
 

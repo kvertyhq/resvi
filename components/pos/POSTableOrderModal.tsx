@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Plus, CreditCard, Eye } from 'lucide-react';
+import { X, Plus, CreditCard, Eye, CheckCircle } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
 interface OrderItem {
@@ -30,6 +31,7 @@ interface POSTableOrderModalProps {
     order: Order | null;
     tableName: string;
     tableId: string;
+    onUpdate?: () => void;
 }
 
 const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
@@ -37,9 +39,33 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
     onClose,
     order,
     tableName,
-    tableId
+    tableId,
+    onUpdate
 }) => {
+
+
     const navigate = useNavigate();
+
+    const handleComplete = async () => {
+        if (!order) return;
+
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    status: 'completed',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', order.id);
+
+            if (error) throw error;
+            if (onUpdate) onUpdate();
+            onClose();
+        } catch (error) {
+            console.error('Error completing order:', error);
+            alert('Failed to complete order');
+        }
+    };
 
     if (!isOpen || !order) return null;
 
@@ -70,8 +96,8 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                             </span>
                             {order.payment_status && (
                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${order.payment_status === 'paid'
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                     }`}>
                                     {order.payment_status}
                                 </span>
@@ -160,16 +186,26 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                         <Plus className="h-5 w-5" />
                         Add Items
                     </button>
-                    <button
-                        onClick={() => {
-                            navigate(`/pos/payment/${order.id}`);
-                            onClose();
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                    >
-                        <CreditCard className="h-5 w-5" />
-                        Payment
-                    </button>
+                    {order.payment_status === 'paid' ? (
+                        <button
+                            onClick={handleComplete}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[var(--theme-color)] text-white rounded-lg transition-colors font-bold shadow-lg hover:brightness-110"
+                        >
+                            <CheckCircle className="h-5 w-5" />
+                            Mark as Completed
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                navigate(`/pos/payment/${order.id}`);
+                                onClose();
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                        >
+                            <CreditCard className="h-5 w-5" />
+                            Payment
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { usePOS } from '../../context/POSContext';
+import { receiptService } from '../../services/ReceiptService';
 import { PrinterService } from '../../utils/sunmiPrinter';
-
+import PaymentSuccessModal from '../../components/pos/PaymentSuccessModal';
 const POSPaymentPage: React.FC = () => {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
@@ -19,6 +20,19 @@ const POSPaymentPage: React.FC = () => {
     const [numSplits, setNumSplits] = useState(2);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card');
     const [processing, setProcessing] = useState(false);
+
+    // Modal State
+    const [successModalData, setSuccessModalData] = useState<{
+        isOpen: boolean;
+        amountPaid: number;
+        remaining: number;
+        isFullyPaid: boolean;
+    }>({
+        isOpen: false,
+        amountPaid: 0,
+        remaining: 0,
+        isFullyPaid: false
+    });
 
     useEffect(() => {
         if (orderId) fetchOrderAndPayments();
@@ -114,12 +128,15 @@ const POSPaymentPage: React.FC = () => {
                 throw new Error(result.error || 'Payment processing failed');
             }
 
-            // Show success message
-            if (result.fully_paid) {
-                alert('Order Paid in Full!');
-                navigate('/pos');
-            } else {
-                alert(`Payment of $${amount.toFixed(2)} recorded. Remaining: $${result.remaining.toFixed(2)}`);
+            // Show success modal
+            setSuccessModalData({
+                isOpen: true,
+                amountPaid: amount,
+                remaining: result.remaining || 0,
+                isFullyPaid: result.fully_paid
+            });
+
+            if (!result.fully_paid) {
                 fetchOrderAndPayments(); // Refresh to show new balance
             }
 
@@ -173,16 +190,7 @@ const POSPaymentPage: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => {
-                            // Map structure for printer
-                            const items = order.order_items.map((i: any) => ({
-                                name: i.menu_items?.name,
-                                price: i.menu_items?.price,
-                                quantity: i.quantity,
-                                modifiers: i.selected_modifiers
-                            }));
-                            PrinterService.printReceipt(order, items);
-                        }}
+                        onClick={() => receiptService.printOrder(order.id)}
                         className="mt-4 w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 rounded font-bold transition-colors"
                     >
                         🖨️ Print Receipt
@@ -270,6 +278,19 @@ const POSPaymentPage: React.FC = () => {
                 </div>
 
             </div>
+
+            <PaymentSuccessModal
+                isOpen={successModalData.isOpen}
+                onClose={() => {
+                    setSuccessModalData(prev => ({ ...prev, isOpen: false }));
+                    if (successModalData.isFullyPaid) {
+                        navigate('/pos');
+                    }
+                }}
+                amountPaid={successModalData.amountPaid}
+                remaining={successModalData.remaining}
+                isFullyPaid={successModalData.isFullyPaid}
+            />
         </div>
     );
 };

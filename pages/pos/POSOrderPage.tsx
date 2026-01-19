@@ -6,6 +6,7 @@ import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
 import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
+import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
@@ -68,6 +69,8 @@ const POSOrderPage: React.FC = () => {
 
     // Success Modal
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [updateModalTitle, setUpdateModalTitle] = useState('');
     const [createdOrderId, setCreatedOrderId] = useState('');
 
     // Payment Modal
@@ -401,8 +404,10 @@ const POSOrderPage: React.FC = () => {
 
                     if (orderError) throw orderError;
                     orderId = orderData.id;
+                    setUpdateModalTitle('Order Created Successfully!');
                 }
             } else {
+                setUpdateModalTitle('Order Updated Successfully!');
                 // 2. Update Existing Order Total
                 // Calculate new items total (with tax logic matching main render)
                 const cartSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -446,9 +451,10 @@ const POSOrderPage: React.FC = () => {
             if (itemsError) throw itemsError;
 
             // Success
-            alert('Order Updated Successfully!');
+            setCreatedOrderId(orderId);
+            setShowUpdateModal(true);
             setCartItems([]);
-            navigate('/pos'); // Return to map
+            // navigate('/pos'); // Handled by modal close
         } catch (error) {
             console.error('Order failed:', error);
             alert('Failed to place order.');
@@ -507,6 +513,16 @@ const POSOrderPage: React.FC = () => {
                 menuItem={itemForModal}
                 onClose={() => setIsModalOpen(false)}
                 onAddToCart={addToCart}
+            />
+
+            <OrderUpdatedModal
+                isOpen={showUpdateModal}
+                orderId={createdOrderId}
+                title={updateModalTitle}
+                onClose={() => {
+                    setShowUpdateModal(false);
+                    navigate('/pos');
+                }}
             />
 
             {/* Left Side: Menu Area */}
@@ -637,7 +653,7 @@ const POSOrderPage: React.FC = () => {
                                                 {item.quantity}x {item.menu_item?.name || 'Unknown Item'}
                                             </span>
                                             <span className="text-gray-900 dark:text-white font-mono text-sm">
-                                                {settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}
+                                                {settings?.currency || '$'}{((item.price_snapshot || item.price) * item.quantity).toFixed(2)}
                                             </span>
                                         </div>
                                         {/* Modifiers? */}

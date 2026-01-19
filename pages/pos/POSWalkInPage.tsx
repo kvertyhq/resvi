@@ -261,28 +261,27 @@ const POSWalkInPage: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                         <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                            {(order.profiles?.full_name || order.profiles?.phone) ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span>{order.profiles.full_name || order.profiles.phone}</span>
-                                                    <button
-                                                        onClick={() => setShowCustomerDetails(prev => ({
-                                                            ...prev,
-                                                            [order.id]: !prev[order.id]
-                                                        }))}
-                                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                                        title="View customer details"
-                                                    >
-                                                        <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                `Order #${order.readable_id || order.id.slice(0, 8)}`
-                                            )}
+                                            Order #{order.readable_id || order.id.slice(0, 8)}
                                         </div>
+                                        {(order.profiles?.full_name || order.profiles?.phone) && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowCustomerDetails(prev => ({
+                                                        ...prev,
+                                                        [order.id]: !prev[order.id]
+                                                    }));
+                                                }}
+                                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                                                title="View customer details"
+                                            >
+                                                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                            </button>
+                                        )}
                                     </div>
-                                    {showCustomerDetails[order.id] && order.profiles?.phone && (
+                                    {showCustomerDetails[order.id] && (order.profiles?.full_name || order.profiles?.phone) && (
                                         <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 pl-1">
-                                            {order.profiles.phone}
+                                            {order.profiles.full_name} {order.profiles.phone ? `(${order.profiles.phone})` : ''}
                                         </div>
                                     )}
                                     <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">

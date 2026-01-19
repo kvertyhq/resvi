@@ -352,6 +352,7 @@ const POSTablesPage: React.FC = () => {
                 order={viewOrder}
                 tableName={viewOrderTable?.table_name || ''}
                 tableId={viewOrderTable?.id || ''}
+                onUpdate={fetchData}
             />
         </div>
     );

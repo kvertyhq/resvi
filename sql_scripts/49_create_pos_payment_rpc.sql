@@ -42,15 +42,13 @@ BEGIN
         payment_method,
         transaction_id,
         status,
-        created_by,
         created_at
     ) VALUES (
         p_order_id,
         p_amount,
-        p_payment_method,
+        p_payment_method::payment_method,
         p_transaction_id,
-        'completed',
-        p_staff_id,
+        'paid',
         NOW()
     ) RETURNING id INTO v_payment_id;
     
@@ -58,7 +56,7 @@ BEGIN
     SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
     FROM payments
     WHERE order_id = p_order_id 
-    AND status = 'completed';
+    AND status = 'paid';
     
     -- Update order payment status
     IF v_total_paid >= v_order.total_amount THEN

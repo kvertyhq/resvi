@@ -15,7 +15,7 @@ interface Table {
     count: number;
     zone: string;
     status?: 'available' | 'occupied' | 'billed' | 'reserved';
-    activeOrder?: any;
+    activeOrders?: any[];
 }
 
 interface TableMapProps {
@@ -48,6 +48,10 @@ const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () 
         reserved: 'bg-blue-100 dark:bg-blue-900 border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-100'
     }[table.status || 'available'];
 
+    // Calculate total from all orders
+    const totalAmount = table.activeOrders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+    const orderCount = table.activeOrders?.length || 0;
+
     return (
         <div
             ref={setNodeRef}
@@ -78,13 +82,19 @@ const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () 
                         table.status === 'reserved' ? 'Reserved' :
                             'Vacant'}
             </span>
-            {table.activeOrder && (
+            {orderCount > 0 && (
                 <div className="mt-1 flex flex-col items-center">
-                    <span className="text-[10px] font-mono font-bold opacity-80">
-                        #{table.activeOrder.readable_id || table.activeOrder.id.slice(0, 4)}
-                    </span>
+                    {orderCount > 1 ? (
+                        <span className="text-[10px] font-mono font-bold opacity-80">
+                            {orderCount} Orders
+                        </span>
+                    ) : (
+                        <span className="text-[10px] font-mono font-bold opacity-80">
+                            #{table.activeOrders![0].readable_id || table.activeOrders![0].id.slice(0, 4)}
+                        </span>
+                    )}
                     <span className="text-[10px] font-bold">
-                        ${(table.activeOrder.total_amount || 0).toFixed(2)}
+                        ${totalAmount.toFixed(2)}
                     </span>
                 </div>
             )}

@@ -26,7 +26,7 @@ const POSTablesPage: React.FC = () => {
 
     // Order View Modal State
     const [viewOrderTable, setViewOrderTable] = useState<any>(null);
-    const [viewOrder, setViewOrder] = useState<any>(null);
+    const [viewOrders, setViewOrders] = useState<any[]>([]);
 
     useEffect(() => {
         if (settings?.id) {
@@ -65,12 +65,12 @@ const POSTablesPage: React.FC = () => {
                 .neq('status', 'completed')
                 .neq('status', 'cancelled');
 
-            // Map table_id -> Order
-            const orderMap = new Map();
+            // Map table_id -> Orders[]
+            const orderMap = new Map<string, any[]>();
             if (activeOrders) {
-                // sort by created_at desc to get latest? Usually only 1 active.
                 activeOrders.forEach(order => {
-                    orderMap.set(order.table_id, order);
+                    const existing = orderMap.get(order.table_id) || [];
+                    orderMap.set(order.table_id, [...existing, order]);
                 });
             }
 
@@ -101,13 +101,17 @@ const POSTablesPage: React.FC = () => {
                     }
                 }
 
-                const activeOrder = orderMap.get(t.id);
+                const activeOrders = orderMap.get(t.id) || [];
                 let status = 'available';
-                if (activeOrder) {
-                    if (activeOrder.payment_status === 'paid') {
-                        status = 'billed';
-                    } else {
+
+                if (activeOrders.length > 0) {
+                    // If ANY order is occupied -> occupied
+                    // If ALL are paid -> billed
+                    const hasOccupied = activeOrders.some((o: any) => o.payment_status !== 'paid');
+                    if (hasOccupied) {
                         status = 'occupied';
+                    } else {
+                        status = 'billed';
                     }
                 }
 
@@ -119,7 +123,7 @@ const POSTablesPage: React.FC = () => {
                     height: t.height || 100,
                     shape: t.shape || 'rectangle',
                     status: status,
-                    activeOrder: activeOrder, // Pass full order
+                    activeOrders: activeOrders,
                     updated: false
                 };
             });
@@ -212,9 +216,9 @@ const POSTablesPage: React.FC = () => {
             setQrTable(table);
         } else {
             // If table has active order, show modal first
-            if (table.activeOrder) {
-                // Fetch full order details with items
-                const { data: orderData } = await supabase
+            if (table.activeOrders && table.activeOrders.length > 0) {
+                // Fetch full order details with items for ALL orders
+                const { data: ordersData } = await supabase
                     .from('orders')
                     .select(`
                         *,
@@ -223,11 +227,10 @@ const POSTablesPage: React.FC = () => {
                             menu_items ( name )
                         )
                     `)
-                    .eq('id', table.activeOrder.id)
-                    .single();
+                    .in('id', table.activeOrders.map((o: any) => o.id));
 
-                if (orderData) {
-                    setViewOrder(orderData);
+                if (ordersData) {
+                    setViewOrders(ordersData);
                     setViewOrderTable(table);
                 }
             } else {
@@ -344,12 +347,12 @@ const POSTablesPage: React.FC = () => {
             />
 
             <POSTableOrderModal
-                isOpen={!!viewOrder}
+                isOpen={viewOrders.length > 0}
                 onClose={() => {
-                    setViewOrder(null);
+                    setViewOrders([]);
                     setViewOrderTable(null);
                 }}
-                order={viewOrder}
+                orders={viewOrders}
                 tableName={viewOrderTable?.table_name || ''}
                 tableId={viewOrderTable?.id || ''}
                 onUpdate={fetchData}

@@ -176,7 +176,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // 1. Check for Configured Delivery Zones First via RPC
     const { data: zoneMatches, error: zoneError } = await supabase.rpc('get_matching_delivery_zone', {
-      p_postcode: cleanPostcode
+      p_postcode: cleanPostcode,
+      p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID
     });
 
     if (zoneError) console.error("Error checking zones:", zoneError);

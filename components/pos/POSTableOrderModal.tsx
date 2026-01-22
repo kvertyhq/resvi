@@ -28,7 +28,7 @@ interface Order {
 interface POSTableOrderModalProps {
     isOpen: boolean;
     onClose: () => void;
-    order: Order | null;
+    orders: Order[];
     tableName: string;
     tableId: string;
     onUpdate?: () => void;
@@ -37,18 +37,14 @@ interface POSTableOrderModalProps {
 const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
     isOpen,
     onClose,
-    order,
+    orders,
     tableName,
     tableId,
     onUpdate
 }) => {
-
-
     const navigate = useNavigate();
 
-    const handleComplete = async () => {
-        if (!order) return;
-
+    const handleComplete = async (orderId: string) => {
         try {
             const { error } = await supabase
                 .from('orders')
@@ -56,10 +52,12 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                     status: 'completed',
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', order.id);
+                .eq('id', orderId);
 
             if (error) throw error;
             if (onUpdate) onUpdate();
+            // Don't close immediately if there are other orders? 
+            // For now, close to refresh state cleanly.
             onClose();
         } catch (error) {
             console.error('Error completing order:', error);
@@ -67,7 +65,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
         }
     };
 
-    if (!isOpen || !order) return null;
+    if (!isOpen) return null;
 
     const getStatusColor = (status: string) => {
         const colors = {
@@ -79,133 +77,129 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
         return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
     };
 
-    const subtotal = order.order_items?.reduce((sum, item) => sum + (item.price_snapshot * item.quantity), 0) || 0;
-    const discount = order.discount_amount || 0;
-    const total = order.total_amount || 0;
-
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{tableName}</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold uppercase ${getStatusColor(order.status)}`}>
-                                {order.status}
-                            </span>
-                            {order.payment_status && (
-                                <span className={`px-2 py-1 rounded text-xs font-semibold ${order.payment_status === 'paid'
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                                    }`}>
-                                    {order.payment_status}
-                                </span>
-                            )}
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {orders.length} Active {orders.length === 1 ? 'Order' : 'Orders'}
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                    >
-                        <X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-                    </button>
-                </div>
-
-                {/* Order Items */}
-                <div className="flex-1 overflow-y-auto p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Order Items</h3>
-                    <div className="space-y-3">
-                        {order.order_items?.map((item) => (
-                            <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <div className="font-medium text-gray-900 dark:text-white">
-                                            {item.quantity}x {item.menu_items?.name || 'Unknown Item'}
-                                        </div>
-                                        {item.course_name && (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                {item.course_name}
-                                            </div>
-                                        )}
-                                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 pl-4">
-                                                {item.selected_modifiers.map((mod: any, idx: number) => (
-                                                    <div key={idx}>+ {mod.name}</div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {item.notes && (
-                                            <div className="mt-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-2 text-sm">
-                                                <div className="font-semibold text-yellow-900 dark:text-yellow-200">Note:</div>
-                                                <div className="text-yellow-800 dark:text-yellow-300">{item.notes}</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="text-right ml-4">
-                                        <div className="font-semibold text-gray-900 dark:text-white">
-                                            £{(item.price_snapshot * item.quantity).toFixed(2)}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                                            £{item.price_snapshot.toFixed(2)} each
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Totals */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                        <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                            <span>Subtotal:</span>
-                            <span>£{subtotal.toFixed(2)}</span>
-                        </div>
-                        {discount > 0 && (
-                            <div className="flex justify-between text-green-600 dark:text-green-400">
-                                <span>Discount:</span>
-                                <span>-£{discount.toFixed(2)}</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <span>Total:</span>
-                            <span>£{total.toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                    <button
-                        onClick={() => {
-                            navigate(`/pos/order/${tableId}`);
-                            onClose();
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Add Items
-                    </button>
-                    {order.payment_status === 'paid' ? (
-                        <button
-                            onClick={handleComplete}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[var(--theme-color)] text-white rounded-lg transition-colors font-bold shadow-lg hover:brightness-110"
-                        >
-                            <CheckCircle className="h-5 w-5" />
-                            Mark as Completed
-                        </button>
-                    ) : (
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => {
-                                navigate(`/pos/payment/${order.id}`);
+                                navigate(`/pos/order/${tableId}`); // New Order
                                 onClose();
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"
                         >
-                            <CreditCard className="h-5 w-5" />
-                            Payment
+                            <Plus className="h-4 w-4" />
+                            New Order
                         </button>
-                    )}
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        >
+                            <X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Orders List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {orders.map((order) => {
+                        const subtotal = order.order_items?.reduce((sum, item) => sum + (item.price_snapshot * item.quantity), 0) || 0;
+                        const total = order.total_amount || 0;
+
+                        return (
+                            <div key={order.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                                {/* Order Header */}
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex gap-2 items-center">
+                                        <span className="font-mono font-bold text-gray-500 dark:text-gray-400">
+                                            #{order.id.slice(0, 8).toUpperCase()}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${getStatusColor(order.status)}`}>
+                                            {order.status}
+                                        </span>
+                                        {order.payment_status && (
+                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${order.payment_status === 'paid'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
+                                                }`}>
+                                                {order.payment_status}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="font-bold text-lg text-gray-900 dark:text-white">
+                                        £{total.toFixed(2)}
+                                    </div>
+                                </div>
+
+                                {/* Items */}
+                                <div className="space-y-2 mb-4">
+                                    {order.order_items?.map((item) => (
+                                        <div key={item.id} className="flex justify-between text-sm">
+                                            <div className="flex-1">
+                                                <span className="font-medium text-gray-900 dark:text-white">{item.quantity}x {item.menu_items?.name}</span>
+                                                {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                                    <div className="text-gray-500 ml-4 text-xs">
+                                                        {item.selected_modifiers.map((m: any) => m.name).join(', ')}
+                                                    </div>
+                                                )}
+                                                {item.notes && <div className="text-orange-500 text-xs ml-4 italic">{item.notes}</div>}
+                                            </div>
+                                            <span className="text-gray-600 dark:text-gray-400">£{(item.price_snapshot * item.quantity).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-2 justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    {order.status === 'pending' && (
+                                        <button
+                                            onClick={() => {
+                                                navigate(`/pos/order/${tableId}`); // Should technically load THIS order ID if we want to edit it?
+                                                // Actually, if we navigate to /pos/order/:tableId, it fetches the 'pending' order.
+                                                // If there are MULTIPLE pending orders, which one does it fetch?
+                                                // The POSOrderPage code needs to be smart enough to fetch the correct one or creating a new one.
+                                                // But usually, only ONE pending order should exist per table?
+                                                // Let's assume navigating to table ID opens the interface, 
+                                                // but we might need to look into POSOrderPage logic to support picking a specific order ID.
+                                                // For now, let's keep it simple: Add Items goes to the main ordering page.
+                                                onClose();
+                                            }}
+                                            className="px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 text-sm font-medium"
+                                        >
+                                            Add Items / Edit
+                                        </button>
+                                    )}
+
+                                    {order.payment_status === 'paid' ? (
+                                        <button
+                                            onClick={() => handleComplete(order.id)}
+                                            className="px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm font-bold shadow"
+                                        >
+                                            Mark Completed
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                navigate(`/pos/payment/${order.id}`);
+                                                onClose();
+                                            }}
+                                            className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium shadow"
+                                        >
+                                            Payment
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

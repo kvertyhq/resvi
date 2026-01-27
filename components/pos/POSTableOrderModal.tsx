@@ -23,6 +23,7 @@ interface Order {
     order_items?: OrderItem[];
     discount_amount?: number;
     payment_status?: string;
+    daily_order_number?: number;
 }
 
 interface POSTableOrderModalProps {
@@ -120,7 +121,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex gap-2 items-center">
                                         <span className="font-mono font-bold text-gray-500 dark:text-gray-400">
-                                            #{order.id.slice(0, 8).toUpperCase()}
+                                            #{order.daily_order_number || order.id.slice(0, 8).toUpperCase()}
                                         </span>
                                         <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${getStatusColor(order.status)}`}>
                                             {order.status}

@@ -10,6 +10,7 @@ import { receiptService } from '../../services/ReceiptService';
 interface WalkInOrder {
     id: string;
     readable_id?: string;
+    daily_order_number?: number;
     created_at: string;
     total_amount: number;
     status: string;
@@ -151,6 +152,7 @@ const POSWalkInPage: React.FC = () => {
                 .from('orders')
                 .select(`
                     *,
+                    daily_order_number,
                     profiles!orders_user_id_fkey ( full_name, phone ),
                     order_items (
                         id,
@@ -261,7 +263,7 @@ const POSWalkInPage: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                         <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                            Order #{order.readable_id || order.id.slice(0, 8)}
+                                            Order #{order.daily_order_number || order.readable_id || order.id.slice(0, 8)}
                                         </div>
                                         {(order.profiles?.full_name || order.profiles?.phone) && (
                                             <button

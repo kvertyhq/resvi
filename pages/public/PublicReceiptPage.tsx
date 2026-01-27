@@ -26,6 +26,7 @@ const PublicReceiptPage: React.FC = () => {
                 .from('orders')
                 .select(`
                     *,
+                    daily_order_number,
                     order_items (
                         quantity,
                         name_snapshot,
@@ -93,7 +94,7 @@ const PublicReceiptPage: React.FC = () => {
 
                     {/* Order Info */}
                     <div className="mb-4 text-center border-b border-dashed border-gray-300 pb-2">
-                        <p className="font-bold text-lg">Order #{order.readable_id}</p>
+                        <p className="font-bold text-lg">Order #{order.daily_order_number || order.readable_id}</p>
                         <p className="text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
 

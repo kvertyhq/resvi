@@ -31,6 +31,7 @@ interface KDSTableInfo {
 interface KDSOrder {
     id: string;
     readable_id: string;
+    daily_order_number?: number;
     table_id: string;
     status: string;
     created_at: string;
@@ -193,7 +194,7 @@ const KDSPage: React.FC = () => {
                     <div className="flex gap-3 overflow-x-auto py-1 hide-scrollbar">
                         {orders.filter(o => o.status === 'ready').map(order => (
                             <div key={order.id} className="bg-white text-green-700 font-extrabold px-4 py-2 rounded-lg text-xl shadow-lg border-2 border-green-800 whitespace-nowrap transform hover:scale-105 transition-transform">
-                                {order.table_info?.table_name}
+                                {order.table_info?.table_name || `#${order.daily_order_number || order.readable_id}`}
                             </div>
                         ))}
                     </div>
@@ -214,7 +215,7 @@ const KDSPage: React.FC = () => {
                                     <div className="flex items-center gap-2 mb-1">
                                         {/* Only show small ID if we have a table name (otherwise ID is the main header) */}
                                         {order.table_info?.table_name && (
-                                            <span className="text-sm font-bold text-gray-500 dark:text-gray-400">#{order.readable_id}</span>
+                                            <span className="text-sm font-bold text-gray-500 dark:text-gray-400">#{order.daily_order_number || order.readable_id}</span>
                                         )}
                                         {order.order_type && (
                                             <span className="bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider">
@@ -223,7 +224,7 @@ const KDSPage: React.FC = () => {
                                         )}
                                     </div>
                                     <h3 className="font-black text-3xl text-gray-900 dark:text-white uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
-                                        {order.table_info?.table_name || `#${order.readable_id}`}
+                                        {order.table_info?.table_name || `#${order.daily_order_number || order.readable_id}`}
                                     </h3>
                                     <div className="flex items-center gap-2 mt-1">
                                         <div className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(order.created_at), 'h:mm a')}</div>

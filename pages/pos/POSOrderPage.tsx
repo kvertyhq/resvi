@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
@@ -30,6 +30,9 @@ const COURSES = ['Starter', 'Main', 'Dessert', 'Drink'];
 const POSOrderPage: React.FC = () => {
     const { tableId } = useParams<{ tableId: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const mode = searchParams.get('mode');
+    const specificOrderId = searchParams.get('orderId');
     const { settings } = useSettings();
     const { staff } = usePOS();
     const { isOnline, addToQueue } = useOffline();
@@ -72,6 +75,7 @@ const POSOrderPage: React.FC = () => {
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [updateModalTitle, setUpdateModalTitle] = useState('');
     const [createdOrderId, setCreatedOrderId] = useState('');
+    const [createdDailyOrderNumber, setCreatedDailyOrderNumber] = useState<number | undefined>(undefined);
 
     // Payment Modal
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -186,7 +190,10 @@ const POSOrderPage: React.FC = () => {
     const [submittedItems, setSubmittedItems] = useState<any[]>([]);
 
     const fetchExistingOrder = async () => {
-        const { data, error } = await supabase
+        // If mode is new, don't fetch any existing order (start fresh)
+        if (mode === 'new') return;
+
+        let query = supabase
             .from('orders')
             .select(`
                 *,
@@ -195,9 +202,17 @@ const POSOrderPage: React.FC = () => {
                     menu_item: menu_items ( name )
                 )
             `)
-            .eq('table_id', tableId)
-            .in('status', ['pending', 'preparing', 'ready']) // Open statuses
-            .maybeSingle();
+            .eq('table_id', tableId);
+
+        // If specific ID requested, fetch that one
+        if (specificOrderId) {
+            query = query.eq('id', specificOrderId);
+        } else {
+            // Otherwise fetch any open status
+            query = query.in('status', ['pending', 'preparing', 'ready']);
+        }
+
+        const { data } = await query.maybeSingle();
 
         if (data) {
             setCurrentOrder(data);
@@ -335,6 +350,7 @@ const POSOrderPage: React.FC = () => {
 
             // Success - show modal
             setCreatedOrderId(result.order_id);
+            setCreatedDailyOrderNumber(result.daily_order_number);
             setShowSuccessModal(true);
             setCartItems([]);
         } catch (error) {
@@ -378,7 +394,10 @@ const POSOrderPage: React.FC = () => {
         if (!tableId) return;
 
         try {
-            let orderId = currentOrder?.id;
+            // Only update if status is pending or confirmed (and not in new mode)
+            const canUpdate = currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new';
+
+            let orderId = canUpdate ? currentOrder.id : null;
 
             if (!orderId) {
                 // 1. Create New Order
@@ -403,7 +422,9 @@ const POSOrderPage: React.FC = () => {
                         .single();
 
                     if (orderError) throw orderError;
+                    if (orderError) throw orderError;
                     orderId = orderData.id;
+                    if (orderData.daily_order_number) setCreatedDailyOrderNumber(orderData.daily_order_number);
                     setUpdateModalTitle('Order Created Successfully!');
                 }
             } else {
@@ -429,6 +450,10 @@ const POSOrderPage: React.FC = () => {
                         total_amount: newTotal,
                     })
                     .eq('id', orderId);
+
+                if (currentOrder.daily_order_number) {
+                    setCreatedDailyOrderNumber(currentOrder.daily_order_number);
+                }
 
                 if (updateError) throw updateError;
             }
@@ -518,6 +543,7 @@ const POSOrderPage: React.FC = () => {
             <OrderUpdatedModal
                 isOpen={showUpdateModal}
                 orderId={createdOrderId}
+                dailyOrderNumber={createdDailyOrderNumber}
                 title={updateModalTitle}
                 onClose={() => {
                     setShowUpdateModal(false);
@@ -824,7 +850,7 @@ const POSOrderPage: React.FC = () => {
                             style={{ backgroundColor: 'var(--theme-color)' }}
                             className={`flex-[2] text-white py-4 rounded-xl font-bold shadow-lg text-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all`}
                         >
-                            {currentOrder ? 'Update Order' : 'Place Order'}
+                            {currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new' ? 'Update Order' : 'Place Order'}
                         </button>
                     </div>
                 </div>
@@ -904,6 +930,7 @@ const POSOrderPage: React.FC = () => {
                         navigate('/pos/walk-in');
                     }}
                     orderId={createdOrderId}
+                    dailyOrderNumber={createdDailyOrderNumber}
                     orderType="walkin"
                 />
             </div>

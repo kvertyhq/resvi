@@ -5,10 +5,11 @@ interface OrderSuccessModalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId: string;
+    dailyOrderNumber?: number;
     orderType: 'walkin' | 'table';
 }
 
-const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, orderId, orderType }) => {
+const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, orderId, dailyOrderNumber, orderType }) => {
     if (!isOpen) return null;
 
     return (
@@ -38,7 +39,7 @@ const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, 
                         Order ID
                     </div>
                     <div className="text-lg font-mono font-bold text-center text-gray-900 dark:text-white">
-                        #{orderId.slice(0, 8).toUpperCase()}
+                        #{dailyOrderNumber || orderId.slice(0, 8).toUpperCase()}
                     </div>
                 </div>
 

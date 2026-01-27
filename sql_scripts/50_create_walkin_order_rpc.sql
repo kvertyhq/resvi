@@ -21,6 +21,7 @@ DECLARE
     v_item JSONB;
     v_result JSON;
     v_readable_order_id text;
+    v_daily_order_number INTEGER;
 BEGIN
     -- Validate inputs
     IF p_restaurant_id IS NULL THEN
@@ -79,7 +80,7 @@ BEGIN
         p_discount_amount,
         NOW()
     )
-    RETURNING readable_id, id INTO  v_readable_order_id, v_order_id;
+    RETURNING readable_id, id, daily_order_number INTO v_readable_order_id, v_order_id, v_daily_order_number;
     
     -- Insert order items
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_order_items)
@@ -126,6 +127,7 @@ BEGIN
     v_result := json_build_object(
         'success', true,
         'order_id', v_readable_order_id,
+        'daily_order_number', v_daily_order_number,
         'message', 'Walk-in order created successfully'
     );
 

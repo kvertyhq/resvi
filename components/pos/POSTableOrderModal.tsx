@@ -91,7 +91,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => {
-                                navigate(`/pos/order/${tableId}`); // New Order
+                                navigate(`/pos/order/${tableId}?mode=new`); // New Order
                                 onClose();
                             }}
                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"
@@ -162,14 +162,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
                                     {order.status === 'pending' && (
                                         <button
                                             onClick={() => {
-                                                navigate(`/pos/order/${tableId}`); // Should technically load THIS order ID if we want to edit it?
-                                                // Actually, if we navigate to /pos/order/:tableId, it fetches the 'pending' order.
-                                                // If there are MULTIPLE pending orders, which one does it fetch?
-                                                // The POSOrderPage code needs to be smart enough to fetch the correct one or creating a new one.
-                                                // But usually, only ONE pending order should exist per table?
-                                                // Let's assume navigating to table ID opens the interface, 
-                                                // but we might need to look into POSOrderPage logic to support picking a specific order ID.
-                                                // For now, let's keep it simple: Add Items goes to the main ordering page.
+                                                navigate(`/pos/order/${tableId}?orderId=${order.id}`);
                                                 onClose();
                                             }}
                                             className="px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 text-sm font-medium"

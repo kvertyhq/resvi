@@ -90,7 +90,7 @@ const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () 
                         </span>
                     ) : (
                         <span className="text-[10px] font-mono font-bold opacity-80">
-                            #{table.activeOrders![0].readable_id || table.activeOrders![0].id.slice(0, 4)}
+                            #{table.activeOrders![0].daily_order_number || table.activeOrders![0].readable_id || table.activeOrders![0].id.slice(0, 4)}
                         </span>
                     )}
                     <span className="text-[10px] font-bold">

@@ -19,6 +19,7 @@ interface OrderItem {
 interface Order {
     id: string;
     readable_id: number;
+    daily_order_number?: number;
     user_id: string;
     created_at: string;
     updated_at: string;
@@ -76,6 +77,7 @@ const OrderManagementPage: React.FC = () => {
                 .from('orders')
                 .select(`
                     *,
+                    daily_order_number,
                     profiles:user_id (
                         full_name,
                         phone
@@ -367,7 +369,7 @@ const OrderManagementPage: React.FC = () => {
                             <div key={order.id} className="bg-white p-4 md:p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                                 <div className="flex-1">
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <span className="font-bold text-lg text-gray-900">#{order.readable_id}</span>
+                                        <span className="font-bold text-lg text-gray-900">#{order.daily_order_number || order.readable_id}</span>
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                             {formatStatus(order.status)}
                                         </span>
@@ -603,7 +605,7 @@ const OrderManagementPage: React.FC = () => {
                             <div className="bg-white w-full md:rounded-lg md:shadow-xl md:max-w-2xl h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col rounded-t-xl animate-slideUp md:animate-none">
                                 <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
                                     <div>
-                                        <h3 className="font-bold text-lg text-gray-900">Order #{selectedOrder.readable_id} Details</h3>
+                                        <h3 className="font-bold text-lg text-gray-900">Order #{selectedOrder.daily_order_number || selectedOrder.readable_id} Details</h3>
                                         <p className="text-sm text-gray-500">{new Date(selectedOrder.created_at).toLocaleString()}</p>
                                     </div>
                                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-500 p-2">

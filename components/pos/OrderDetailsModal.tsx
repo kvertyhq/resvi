@@ -18,6 +18,7 @@ interface OrderDetailsModalProps {
     order: {
         id: string;
         readable_id?: string;
+        daily_order_number?: number;
         created_at: string;
         total_amount: number;
         status: string;
@@ -48,7 +49,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                             Order Details
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {order.readable_id || `#${order.id.slice(0, 8)}`} • {new Date(order.created_at).toLocaleString()}
+                            {order.daily_order_number ? `#${order.daily_order_number}` : (order.readable_id || `#${order.id.slice(0, 8)}`)} • {new Date(order.created_at).toLocaleString()}
                         </p>
                     </div>
                     <button
@@ -140,8 +141,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                         <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                             <div className="text-sm text-gray-500 dark:text-gray-400">Payment</div>
                             <div className={`font-semibold capitalize ${order.payment_status === 'paid'
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : 'text-yellow-600 dark:text-yellow-400'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-yellow-600 dark:text-yellow-400'
                                 }`}>
                                 {order.payment_status}
                             </div>

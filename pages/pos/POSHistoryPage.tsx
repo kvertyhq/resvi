@@ -20,6 +20,7 @@ interface OrderItem {
 interface Order {
     id: string;
     readable_id: number;
+    daily_order_number?: number;
     user_id: string;
     created_at: string;
     status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'completed' | 'cancelled';
@@ -59,6 +60,7 @@ const POSHistoryPage: React.FC = () => {
                 .from('orders')
                 .select(`
                     *,
+                    daily_order_number,
                     table_info (table_name),
                     order_items (
                         id,
@@ -176,7 +178,7 @@ const POSHistoryPage: React.FC = () => {
                                 {/* Left Info */}
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
-                                        <span className="font-bold text-lg text-gray-900 dark:text-white">#{order.readable_id}</span>
+                                        <span className="font-bold text-lg text-gray-900 dark:text-white">#{order.daily_order_number || order.readable_id}</span>
                                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                             {order.status.replace('_', ' ')}
                                         </span>
@@ -235,7 +237,7 @@ const POSHistoryPage: React.FC = () => {
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                                    Order #{selectedOrder.readable_id}
+                                    Order #{selectedOrder.daily_order_number || selectedOrder.readable_id}
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedOrder.status)}`}>
                                         {selectedOrder.status.replace('_', ' ')}
                                     </span>

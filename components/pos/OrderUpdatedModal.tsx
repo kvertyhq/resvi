@@ -5,10 +5,11 @@ interface OrderUpdatedModalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId?: string;
+    dailyOrderNumber?: number;
     title?: string;
 }
 
-const OrderUpdatedModal: React.FC<OrderUpdatedModalProps> = ({ isOpen, onClose, orderId, title }) => {
+const OrderUpdatedModal: React.FC<OrderUpdatedModalProps> = ({ isOpen, onClose, orderId, dailyOrderNumber, title }) => {
     if (!isOpen) return null;
 
     return (
@@ -28,9 +29,9 @@ const OrderUpdatedModal: React.FC<OrderUpdatedModalProps> = ({ isOpen, onClose, 
                 </h2>
 
                 {/* Order ID */}
-                {orderId && (
+                {(dailyOrderNumber || orderId) && (
                     <div className="text-center text-gray-500 dark:text-gray-400 mb-6 font-mono bg-gray-100 dark:bg-gray-700 py-2 rounded-lg">
-                        Order #{orderId.slice(0, 8).toUpperCase()}
+                        Order #{dailyOrderNumber || (orderId ? orderId.slice(0, 8).toUpperCase() : '')}
                     </div>
                 )}
 

@@ -4,7 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
 import { useSettings } from '../../context/SettingsContext';
-import { LogOut, Clock, PhoneIncoming, Printer } from 'lucide-react';
+import { LogOut, Clock, PhoneIncoming, Printer, BarChart3 } from 'lucide-react';
 import PrinterConfigModal from './PrinterConfigModal';
 
 const POSLayout: React.FC = () => {
@@ -97,6 +97,15 @@ const POSLayout: React.FC = () => {
                         title="Kitchen Display"
                     >
                         <span className="font-bold text-lg">KDS</span>
+                    </NavLink>
+
+                    <NavLink
+                        to="/pos/reports"
+                        style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
+                        className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                        title="Reports & History"
+                    >
+                        <BarChart3 size={24} />
                     </NavLink>
 
                     <NavLink

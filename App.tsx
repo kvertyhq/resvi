@@ -45,6 +45,7 @@ import KDSPage from './pages/pos/KDSPage';
 import POSPaymentPage from './pages/pos/POSPaymentPage';
 import POSCallHistoryPage from './pages/pos/POSCallHistoryPage';
 import POSHistoryPage from './pages/pos/POSHistoryPage';
+import POSReportsPage from './pages/pos/POSReportsPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
 
@@ -173,6 +174,7 @@ function App() {
                     <Route path="kds" element={<KDSPage />} />
                     <Route path="calls" element={<POSCallHistoryPage />} />
                     <Route path="history" element={<POSHistoryPage />} />
+                    <Route path="reports" element={<POSReportsPage />} />
                     <Route path="order/:tableId" element={<POSOrderPage />} />
                     <Route path="payment/:orderId" element={<POSPaymentPage />} />
                   </Route>

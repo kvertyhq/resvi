@@ -18,7 +18,7 @@ interface OrderItem {
 
 interface Order {
     id: string;
-    readable_id: number;
+    readable_id: string; // Changed to string for alphanumeric IDs
     daily_order_number?: number;
     user_id: string;
     created_at: string;
@@ -369,7 +369,13 @@ const OrderManagementPage: React.FC = () => {
                             <div key={order.id} className="bg-white p-4 md:p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between">
                                 <div className="flex-1">
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <span className="font-bold text-lg text-gray-900">#{order.daily_order_number || order.readable_id}</span>
+                                        <span className="font-bold text-lg text-gray-900">#{order.readable_id}</span>
+                                        {/* Show daily number as secondary */}
+                                        {order.daily_order_number && (
+                                            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                                #{order.daily_order_number}
+                                            </span>
+                                        )}
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${getStatusColor(order.status)}`}>
                                             {formatStatus(order.status)}
                                         </span>

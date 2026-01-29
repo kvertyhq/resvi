@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Printer } from 'lucide-react';
+import { receiptService } from '../../services/ReceiptService';
 
 interface OrderSuccessModalProps {
     isOpen: boolean;
@@ -44,12 +45,21 @@ const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 {/* Action Button */}
-                <button
-                    onClick={onClose}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-colors shadow-lg"
-                >
-                    Done
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => receiptService.printOrder(orderId)}
+                        className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl font-bold transition-colors shadow-lg flex items-center justify-center gap-2"
+                    >
+                        <Printer className="w-5 h-5" />
+                        Print
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-colors shadow-lg"
+                    >
+                        Done
+                    </button>
+                </div>
             </div>
         </div>
     );

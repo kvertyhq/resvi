@@ -354,7 +354,7 @@ const POSOrderPage: React.FC = () => {
             }
 
             // Success - show modal
-            setCreatedOrderId(result.order_id);
+            setCreatedOrderId(result.order_uuid || result.order_id); // Prefer explicit UUID
             setCreatedDailyOrderNumber(result.daily_order_number);
             setShowSuccessModal(true);
             setCartItems([]);
@@ -472,7 +472,6 @@ const POSOrderPage: React.FC = () => {
                 quantity: item.quantity,
                 price_snapshot: item.price,
                 selected_modifiers: item.modifiers,
-                notes: item.notes,
                 notes: item.notes,
                 course_name: item.course,
                 round_number: currentRound

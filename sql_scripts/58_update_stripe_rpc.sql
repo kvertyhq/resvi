@@ -25,7 +25,7 @@ BEGIN
     -- 2. Get Settings for specific restaurant
     SELECT id, payment_settings INTO v_restaurant_id, v_payment_settings 
     FROM restaurant_settings 
-    WHERE restaurant_id = p_restaurant_id
+    WHERE id = p_restaurant_id
     LIMIT 1;
 
     IF v_payment_settings IS NULL THEN

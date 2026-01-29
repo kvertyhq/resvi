@@ -127,6 +127,8 @@ BEGIN
     v_result := json_build_object(
         'success', true,
         'order_id', v_readable_order_id,
+        'order_uuid', v_order_id, -- Explicit UUID field
+        'readable_id', v_readable_order_id,
         'daily_order_number', v_daily_order_number,
         'message', 'Walk-in order created successfully'
     );

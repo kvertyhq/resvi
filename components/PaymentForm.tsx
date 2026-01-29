@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '../supabaseClient';
+import { useSettings } from '../context/SettingsContext';
 
 interface PaymentFormProps {
     onSuccess: (paymentIntentId: string) => void;
@@ -12,6 +13,7 @@ interface PaymentFormProps {
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, onError, amount, processing, setProcessing, onBeforePayment }) => {
+    const { settings } = useSettings();
     const stripe = useStripe();
     const elements = useElements();
     const [cardError, setCardError] = useState<string | null>(null);
@@ -88,7 +90,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, onError, amount, p
         try {
             const { data, error } = await supabase.rpc('create_stripe_payment_intent', {
                 p_amount: amount,
-                p_currency: 'gbp'
+                p_currency: 'gbp',
+                p_restaurant_id: settings?.id
             });
 
             if (error) {

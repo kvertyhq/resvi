@@ -60,6 +60,7 @@ const POSOrderPage: React.FC = () => {
     // Cart State
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [currentOrder, setCurrentOrder] = useState<any>(null);
+    const [currentMaxRound, setCurrentMaxRound] = useState(0);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -218,6 +219,10 @@ const POSOrderPage: React.FC = () => {
             setCurrentOrder(data);
             if (data.order_items) {
                 setSubmittedItems(data.order_items);
+                // Calculate Max Round
+                const rounds = data.order_items.map((i: any) => i.round_number || 1);
+                const maxRound = Math.max(0, ...rounds);
+                setCurrentMaxRound(maxRound);
             }
         }
     };
@@ -398,6 +403,7 @@ const POSOrderPage: React.FC = () => {
             const canUpdate = currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new';
 
             let orderId = canUpdate ? currentOrder.id : null;
+            let currentRound = 1;
 
             if (!orderId) {
                 // 1. Create New Order
@@ -428,7 +434,8 @@ const POSOrderPage: React.FC = () => {
                     setUpdateModalTitle('Order Created Successfully!');
                 }
             } else {
-                setUpdateModalTitle('Order Updated Successfully!');
+                currentRound = currentMaxRound + 1;
+                setUpdateModalTitle(`Order Updated! (Round ${currentRound} sent)`);
                 // 2. Update Existing Order Total
                 // Calculate new items total (with tax logic matching main render)
                 const cartSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -466,7 +473,9 @@ const POSOrderPage: React.FC = () => {
                 price_snapshot: item.price,
                 selected_modifiers: item.modifiers,
                 notes: item.notes,
-                course_name: item.course
+                notes: item.notes,
+                course_name: item.course,
+                round_number: currentRound
             }));
 
             const { error: itemsError } = await supabase

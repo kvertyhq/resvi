@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { formatOpeningHours } from '../utils/formatOpeningHours';
 import { supabase } from '../supabaseClient';
+import MessageModal from '../components/MessageModal';
 
 const ReservationIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
@@ -25,12 +26,28 @@ const DecorativeElement = () => (
 
 const ContactPage: React.FC = () => {
   const { settings } = useSettings();
+  const [captcha, setCaptcha] = useState({ num1: 0, num2: 0 });
+  const [modalState, setModalState] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success'
+  });
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     message: '',
     humanCheck: '',
   });
+
+  useEffect(() => {
+    // Generate random numbers between 1 and 10
+    setCaptcha({
+      num1: Math.floor(Math.random() * 10) + 1,
+      num2: Math.floor(Math.random() * 10) + 1
+    });
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -41,8 +58,13 @@ const ContactPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (formData.humanCheck !== '4') {
-      alert('Incorrect answer to the human check question.');
+    if (parseInt(formData.humanCheck) !== captcha.num1 + captcha.num2) {
+      setModalState({
+        isOpen: true,
+        title: 'Incorrect Verification',
+        message: 'The answer to the math question was incorrect. Please try again.',
+        type: 'error'
+      });
       return;
     }
 
@@ -63,16 +85,34 @@ const ContactPage: React.FC = () => {
 
       if (error) throw error;
 
-      alert('Thank you for your message! We will be in touch soon.');
+      setModalState({
+        isOpen: true,
+        title: 'Message Sent',
+        message: 'Thank you for your message! We will be in touch soon.',
+        type: 'success'
+      });
+
       setFormData({
         name: '',
         email: '',
         message: '',
         humanCheck: '',
       });
+
+      // Reset Captcha
+      setCaptcha({
+        num1: Math.floor(Math.random() * 10) + 1,
+        num2: Math.floor(Math.random() * 10) + 1
+      });
+
     } catch (error) {
       console.error('Error submitting message:', error);
-      alert('Failed to send message. Please try again.');
+      setModalState({
+        isOpen: true,
+        title: 'Submission Failed',
+        message: 'Failed to send message. Please try again later.',
+        type: 'error'
+      });
     }
   };
 
@@ -139,7 +179,7 @@ const ContactPage: React.FC = () => {
                   <textarea id="message" name="message" rows={5} value={formData.message} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold"></textarea>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <label htmlFor="human-check" className="whitespace-nowrap text-sm text-gray-700">Are you human? 3 + 1 =</label>
+                  <label htmlFor="human-check" className="whitespace-nowrap text-sm text-gray-700">Are you human? {captcha.num1} + {captcha.num2} =</label>
                   <input type="text" id="human-check" name="humanCheck" value={formData.humanCheck} onChange={handleChange} required className="w-24 px-4 py-3 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
                 <div>
@@ -165,7 +205,16 @@ const ContactPage: React.FC = () => {
         </div>
       </section>
 
-    </div>
+
+      <MessageModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+      />
+
+    </div >
   );
 };
 

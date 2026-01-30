@@ -9,11 +9,13 @@ import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
 import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
 import MiscItemModal from '../../components/pos/MiscItemModal';
+import HeldOrdersModal from '../../components/pos/HeldOrdersModal';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { receiptService } from '../../services/ReceiptService';
+import { Pause, X } from 'lucide-react';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -90,6 +92,11 @@ const POSOrderPage: React.FC = () => {
 
     // Misc Item Modal
     const [showMiscItemModal, setShowMiscItemModal] = useState(false);
+
+    // Held Orders
+    const [heldOrders, setHeldOrders] = useState<any[]>([]);
+    const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
+    const [isHoldingOrder, setIsHoldingOrder] = useState(false);
 
     useEffect(() => {
         if (settings?.id) {
@@ -358,6 +365,101 @@ const POSOrderPage: React.FC = () => {
 
     const handleOpenCashDrawer = async () => {
         await receiptService.openCashDrawer();
+    };
+
+    // Fetch held orders
+    const fetchHeldOrders = async () => {
+        if (!settings?.id) return;
+
+        try {
+            const { data, error } = await supabase.rpc('get_held_orders', {
+                p_restaurant_id: settings.id
+            });
+
+            if (error) throw error;
+            setHeldOrders(data || []);
+        } catch (error) {
+            console.error('Error fetching held orders:', error);
+        }
+    };
+
+    // Hold current order
+    const handleHoldOrder = async () => {
+        if (cartItems.length === 0) return;
+        if (!settings?.id) return;
+
+        setIsHoldingOrder(true);
+        try {
+            const { error } = await supabase.rpc('create_held_order', {
+                p_restaurant_id: settings.id,
+                p_staff_id: staff?.id || null,
+                p_customer_id: selectedCustomer?.id || null,
+                p_items: cartItems,
+                p_subtotal: subtotal,
+                p_discount_type: discountType,
+                p_discount_amount: discountAmount,
+                p_tax: tax,
+                p_total: total,
+                p_order_type: isWalkIn ? 'walkin' : 'table',
+                p_table_id: currentOrder?.table_id || null,
+                p_notes: null
+            });
+
+            if (error) throw error;
+
+            // Clear cart and reset state
+            setCartItems([]);
+            setSelectedCustomer(null);
+            setDiscountType(null);
+            setDiscountValue(0);
+
+            // Refresh held orders
+            fetchHeldOrders();
+
+            alert('Order held successfully!');
+        } catch (error) {
+            console.error('Error holding order:', error);
+            alert('Failed to hold order');
+        } finally {
+            setIsHoldingOrder(false);
+        }
+    };
+
+    // Retrieve held order
+    const handleRetrieveHeldOrder = async (heldOrder: any) => {
+        try {
+            // Populate cart with held order items
+            setCartItems(heldOrder.items);
+
+            // Set discount if any
+            if (heldOrder.discount_type) {
+                setDiscountType(heldOrder.discount_type);
+                // Calculate discount value for display
+                if (heldOrder.discount_type === 'flat') {
+                    setDiscountValue(heldOrder.discount_amount);
+                } else {
+                    // For percentage, we need to calculate from subtotal
+                    const subtotalFromItems = heldOrder.items.reduce((sum: number, item: any) =>
+                        sum + (item.price * item.quantity), 0);
+                    const percentageValue = (heldOrder.discount_amount / subtotalFromItems) * 100;
+                    setDiscountValue(percentageValue);
+                }
+            }
+
+            // Delete held order from database
+            await supabase.rpc('delete_held_order', {
+                p_held_order_id: heldOrder.id
+            });
+
+            // Close modal
+            setShowHeldOrdersModal(false);
+
+            // Refresh held orders list
+            fetchHeldOrders();
+        } catch (error) {
+            console.error('Error retrieving held order:', error);
+            alert('Failed to retrieve held order');
+        }
     };
 
     const handlePaymentSuccess = async (method: string, transactionId?: string) => {
@@ -728,6 +830,22 @@ const POSOrderPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
+                            onClick={() => {
+                                fetchHeldOrders();
+                                setShowHeldOrdersModal(true);
+                            }}
+                            className="relative text-xs bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"
+                            title="View Held Orders"
+                        >
+                            <Pause className="h-3 w-3" />
+                            Held
+                            {heldOrders.length > 0 && (
+                                <span className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                                    {heldOrders.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
                             onClick={() => setShowMiscItemModal(true)}
                             className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                             title="Add Custom Item"
@@ -922,6 +1040,13 @@ const POSOrderPage: React.FC = () => {
                             )
                         )}
                         <button
+                            onClick={handleHoldOrder}
+                            disabled={cartItems.length === 0 || isHoldingOrder}
+                            className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white py-4 rounded-xl font-bold shadow-lg text-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            {isHoldingOrder ? 'Holding...' : 'HOLD'}
+                        </button>
+                        <button
                             onClick={handlePlaceOrder}
                             disabled={cartItems.length === 0}
                             style={{ backgroundColor: 'var(--theme-color)' }}
@@ -1027,6 +1152,14 @@ const POSOrderPage: React.FC = () => {
                     onClose={() => setShowMiscItemModal(false)}
                     onAdd={handleAddMiscItem}
                     currency={settings?.currency || '£'}
+                />
+
+                {/* Held Orders Modal */}
+                <HeldOrdersModal
+                    isOpen={showHeldOrdersModal}
+                    onClose={() => setShowHeldOrdersModal(false)}
+                    heldOrders={heldOrders}
+                    onRetrieve={handleRetrieveHeldOrder}
                 />
             </div>
         </div>

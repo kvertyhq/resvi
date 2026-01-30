@@ -33,10 +33,31 @@ const POSPaymentPage: React.FC = () => {
         remaining: 0,
         isFullyPaid: false
     });
+    const [showCashDrawerButton, setShowCashDrawerButton] = useState(false);
 
     useEffect(() => {
         if (orderId) fetchOrderAndPayments();
     }, [orderId]);
+
+    // Fetch cash drawer button setting
+    useEffect(() => {
+        const fetchSetting = async () => {
+            if (!order?.restaurant_id) return;
+            try {
+                const { data } = await supabase.rpc('get_receipt_settings', {
+                    p_restaurant_id: order.restaurant_id
+                });
+                setShowCashDrawerButton(data?.show_cash_drawer_button ?? false);
+            } catch (error) {
+                console.error('Error fetching cash drawer setting:', error);
+            }
+        };
+        fetchSetting();
+    }, [order?.restaurant_id]);
+
+    const handleOpenCashDrawer = async () => {
+        await receiptService.openCashDrawer();
+    };
 
     const fetchOrderAndPayments = async () => {
         setLoading(true);
@@ -280,6 +301,16 @@ const POSPaymentPage: React.FC = () => {
                     >
                         {processing ? 'Processing...' : `Charge $${parseFloat(amountToPay || '0').toFixed(2)}`}
                     </button>
+
+                    {/* Cash Drawer Button */}
+                    {showCashDrawerButton && (
+                        <button
+                            onClick={handleOpenCashDrawer}
+                            className="col-span-2 bg-gray-600 hover:bg-gray-700 text-white py-4 rounded-xl font-medium shadow-md transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                            🔓 Open Cash Drawer
+                        </button>
+                    )}
                 </div>
 
             </div>

@@ -85,6 +85,7 @@ const POSOrderPage: React.FC = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
     const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
+    const [showCashDrawerButton, setShowCashDrawerButton] = useState(false);
     const [stripePromise, setStripePromise] = useState<any>(null);
 
     // Misc Item Modal
@@ -337,6 +338,26 @@ const POSOrderPage: React.FC = () => {
 
     const updateItemCourse = (tempId: string, course: string) => {
         setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, course } : i));
+    };
+
+    // Fetch cash drawer button setting
+    useEffect(() => {
+        const fetchSetting = async () => {
+            if (!settings?.id) return;
+            try {
+                const { data } = await supabase.rpc('get_receipt_settings', {
+                    p_restaurant_id: settings.id
+                });
+                setShowCashDrawerButton(data?.show_cash_drawer_button ?? false);
+            } catch (error) {
+                console.error('Error fetching cash drawer setting:', error);
+            }
+        };
+        fetchSetting();
+    }, [settings?.id]);
+
+    const handleOpenCashDrawer = async () => {
+        await receiptService.openCashDrawer();
     };
 
     const handlePaymentSuccess = async (method: string, transactionId?: string) => {
@@ -909,6 +930,16 @@ const POSOrderPage: React.FC = () => {
                             {currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new' ? 'Update Order' : 'Place Order'}
                         </button>
                     </div>
+
+                    {/* Cash Drawer Button - Walk-in Mode Only */}
+                    {isWalkIn && showCashDrawerButton && (
+                        <button
+                            onClick={handleOpenCashDrawer}
+                            className="w-full mt-2 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-xl font-medium shadow-md transition-all flex items-center justify-center gap-2"
+                        >
+                            🔓 Open Cash Drawer
+                        </button>
+                    )}
                 </div>
 
                 {/* Discount Modal */}

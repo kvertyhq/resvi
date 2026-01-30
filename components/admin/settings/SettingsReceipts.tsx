@@ -14,7 +14,8 @@ const SettingsReceipts: React.FC = () => {
         show_logo: true,
         logo_url: '',
         custom_css: '',
-        print_mode: 'manual' as 'auto_with_drawer' | 'auto_no_drawer' | 'manual'
+        print_mode: 'manual' as 'auto_with_drawer' | 'auto_no_drawer' | 'manual',
+        show_cash_drawer_button: false
     });
 
     useEffect(() => {
@@ -35,7 +36,8 @@ const SettingsReceipts: React.FC = () => {
                     show_logo: data.show_logo ?? true,
                     logo_url: data.logo_url || '',
                     custom_css: data.custom_css || '',
-                    print_mode: data.print_mode || 'manual'
+                    print_mode: data.print_mode || 'manual',
+                    show_cash_drawer_button: data.show_cash_drawer_button ?? false
                 });
             }
         } catch (err: any) {
@@ -69,7 +71,8 @@ const SettingsReceipts: React.FC = () => {
                 p_show_logo: formData.show_logo,
                 p_logo_url: formData.logo_url,
                 p_custom_css: formData.custom_css,
-                p_print_mode: formData.print_mode
+                p_print_mode: formData.print_mode,
+                p_show_cash_drawer_button: formData.show_cash_drawer_button
             });
 
             if (error) throw error;
@@ -225,6 +228,26 @@ const SettingsReceipts: React.FC = () => {
                                         <div className="text-xs text-gray-500 mt-0.5">Require manual click on print button (default)</div>
                                     </div>
                                 </label>
+                            </div>
+
+                            {/* Cash Drawer Button Setting */}
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="show_cash_drawer_button"
+                                        name="show_cash_drawer_button"
+                                        checked={formData.show_cash_drawer_button}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, show_cash_drawer_button: e.target.checked }))}
+                                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="show_cash_drawer_button" className="text-sm font-medium text-gray-700">
+                                        Show Cash Drawer Button in Payment Modals
+                                    </label>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1 ml-6">
+                                    When enabled, a manual cash drawer button will appear next to payment buttons in checkout
+                                </p>
                             </div>
                         </div>
                     </div>

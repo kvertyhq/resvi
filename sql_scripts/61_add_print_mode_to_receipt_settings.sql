@@ -12,6 +12,10 @@ END $$;
 ALTER TABLE receipt_settings 
 ADD COLUMN IF NOT EXISTS print_mode print_mode_enum DEFAULT 'manual';
 
+-- Add show_cash_drawer_button column to receipt_settings
+ALTER TABLE receipt_settings
+ADD COLUMN IF NOT EXISTS show_cash_drawer_button BOOLEAN DEFAULT false;
+
 -- Update get_receipt_settings RPC to include print_mode
 CREATE OR REPLACE FUNCTION get_receipt_settings(p_restaurant_id UUID)
 RETURNS JSON
@@ -27,7 +31,8 @@ BEGIN
     'show_logo', show_logo,
     'logo_url', logo_url,
     'custom_css', custom_css,
-    'print_mode', print_mode
+    'print_mode', print_mode,
+    'show_cash_drawer_button', show_cash_drawer_button
   ) INTO result
   FROM receipt_settings
   WHERE restaurant_id = p_restaurant_id;
@@ -44,7 +49,8 @@ CREATE OR REPLACE FUNCTION upsert_receipt_settings(
   p_show_logo BOOLEAN,
   p_logo_url TEXT,
   p_custom_css TEXT,
-  p_print_mode print_mode_enum DEFAULT 'manual'
+  p_print_mode print_mode_enum DEFAULT 'manual',
+  p_show_cash_drawer_button BOOLEAN DEFAULT false
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -59,6 +65,7 @@ BEGIN
     logo_url,
     custom_css,
     print_mode,
+    show_cash_drawer_button,
     updated_at
   )
   VALUES (
@@ -69,6 +76,7 @@ BEGIN
     p_logo_url,
     p_custom_css,
     p_print_mode,
+    p_show_cash_drawer_button,
     NOW()
   )
   ON CONFLICT (restaurant_id)
@@ -79,6 +87,7 @@ BEGIN
     logo_url = EXCLUDED.logo_url,
     custom_css = EXCLUDED.custom_css,
     print_mode = EXCLUDED.print_mode,
+    show_cash_drawer_button = EXCLUDED.show_cash_drawer_button,
     updated_at = NOW();
 END;
 $$;

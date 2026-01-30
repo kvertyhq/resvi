@@ -103,8 +103,8 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
                     <button
                         onClick={() => setPaymentMethod('cash')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${paymentMethod === 'cash'
-                                ? 'bg-green-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
                     >
                         <Banknote className="h-5 w-5" />
@@ -113,8 +113,8 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
                     <button
                         onClick={() => setPaymentMethod('card')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${paymentMethod === 'card'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                             }`}
                     >
                         <CreditCard className="h-5 w-5" />

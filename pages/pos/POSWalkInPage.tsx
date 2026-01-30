@@ -87,7 +87,7 @@ const POSWalkInPage: React.FC = () => {
                 .select(`
                     *,
                     profiles!orders_user_id_fkey ( full_name, phone ),
-                    order_items ( id, quantity, price_snapshot ),
+                    order_items ( id, quantity, price_snapshot, name_snapshot ),
                     payments ( payment_method )
                 `)
                 .eq('restaurant_id', settings?.id)
@@ -158,6 +158,7 @@ const POSWalkInPage: React.FC = () => {
                         id,
                         quantity,
                         price_snapshot,
+                        name_snapshot,
                         selected_modifiers,
                         notes,
                         menu_item:menu_items ( name )

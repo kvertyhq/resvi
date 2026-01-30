@@ -8,6 +8,7 @@ import POSModifierModal from '../../components/pos/POSModifierModal';
 import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
 import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
+import MiscItemModal from '../../components/pos/MiscItemModal';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { loadStripe } from '@stripe/stripe-js';
@@ -15,7 +16,7 @@ import { Elements } from '@stripe/react-stripe-js';
 
 interface CartItem {
     tempId: string; // unique for cart
-    id: string; // menu item id
+    id: string | null; // menu item id (null for misc items)
     name: string;
     price: number;
     basePrice: number;
@@ -23,6 +24,7 @@ interface CartItem {
     modifiers: any[];
     notes?: string;
     course: string; // 'Starter', 'Main', 'Dessert', 'Drink'
+    isMiscellaneous?: boolean; // Flag for custom items
 }
 
 const COURSES = ['Starter', 'Main', 'Dessert', 'Drink'];
@@ -83,6 +85,9 @@ const POSOrderPage: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
     const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
     const [stripePromise, setStripePromise] = useState<any>(null);
+
+    // Misc Item Modal
+    const [showMiscItemModal, setShowMiscItemModal] = useState(false);
 
     useEffect(() => {
         if (settings?.id) {
@@ -313,6 +318,22 @@ const POSOrderPage: React.FC = () => {
         setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, notes: note } : i));
     };
 
+    const handleAddMiscItem = (name: string, price: number, notes?: string) => {
+        const miscItem: CartItem = {
+            tempId: `misc-${Date.now()}-${Math.random()}`,
+            id: null, // No menu item ID for misc items
+            name: name,
+            price: price,
+            basePrice: price,
+            quantity: 1,
+            modifiers: [],
+            course: 'Main',
+            isMiscellaneous: true,
+            notes: notes
+        };
+        setCartItems(prev => [...prev, miscItem]);
+    };
+
     const updateItemCourse = (tempId: string, course: string) => {
         setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, course } : i));
     };
@@ -326,12 +347,15 @@ const POSOrderPage: React.FC = () => {
         setLoading(true);
         try {
             const orderItems = cartItems.map(item => ({
-                menu_item_id: item.id,
+                menu_item_id: item.isMiscellaneous ? null : item.id,
                 quantity: item.quantity,
                 price: item.price,
                 modifiers: item.modifiers,
                 notes: item.notes || null,
-                course: item.course
+                course: item.course,
+                is_miscellaneous: item.isMiscellaneous || false,
+                custom_item_name: item.isMiscellaneous ? item.name : null,
+                name: item.name
             }));
 
             const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
@@ -468,13 +492,16 @@ const POSOrderPage: React.FC = () => {
             // 3. Create Order Items (New Items Only) - Only for table orders
             const orderItems = cartItems.map(item => ({
                 order_id: orderId,
-                menu_item_id: item.id,
+                menu_item_id: item.isMiscellaneous ? null : item.id,
                 quantity: item.quantity,
                 price_snapshot: item.price,
                 selected_modifiers: item.modifiers,
                 notes: item.notes,
                 course_name: item.course,
-                round_number: currentRound
+                round_number: currentRound,
+                is_miscellaneous: item.isMiscellaneous || false,
+                custom_item_name: item.isMiscellaneous ? item.name : null,
+                name_snapshot: item.name // Always store the name
             }));
 
             const { error: itemsError } = await supabase
@@ -666,12 +693,21 @@ const POSOrderPage: React.FC = () => {
                             {cartItems.length} New Items
                         </div>
                     </div>
-                    <button
-                        onClick={() => setMobileTab('menu')}
-                        className="md:hidden text-gray-500 hover:text-gray-900"
-                    >
-                        Back to Menu
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowMiscItemModal(true)}
+                            className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            title="Add Custom Item"
+                        >
+                            + Misc
+                        </button>
+                        <button
+                            onClick={() => setMobileTab('menu')}
+                            className="md:hidden text-gray-500 hover:text-gray-900"
+                        >
+                            Back to Menu
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -940,6 +976,14 @@ const POSOrderPage: React.FC = () => {
                     orderId={createdOrderId}
                     dailyOrderNumber={createdDailyOrderNumber}
                     orderType="walkin"
+                />
+
+                {/* Misc Item Modal */}
+                <MiscItemModal
+                    isOpen={showMiscItemModal}
+                    onClose={() => setShowMiscItemModal(false)}
+                    onAdd={handleAddMiscItem}
+                    currency={settings?.currency || '£'}
                 />
             </div>
         </div>

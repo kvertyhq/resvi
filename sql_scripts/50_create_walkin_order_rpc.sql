@@ -92,15 +92,24 @@ BEGIN
             price_snapshot,
             selected_modifiers,
             notes,
-            course
+            course,
+            is_miscellaneous,
+            custom_item_name,
+            name_snapshot
         ) VALUES (
             v_order_id,
-            (v_item->>'menu_item_id')::UUID,
+            CASE 
+                WHEN COALESCE((v_item->>'is_miscellaneous')::BOOLEAN, false) = true THEN NULL
+                ELSE (v_item->>'menu_item_id')::UUID
+            END,
             (v_item->>'quantity')::INTEGER,
             (v_item->>'price')::DECIMAL(10,2),
             COALESCE(v_item->'modifiers', '[]'::jsonb),
             v_item->>'notes',
-            COALESCE(v_item->>'course', 'Main')
+            COALESCE(v_item->>'course', 'Main'),
+            COALESCE((v_item->>'is_miscellaneous')::BOOLEAN, false),
+            v_item->>'custom_item_name',
+            v_item->>'name'
         );
     END LOOP;
 

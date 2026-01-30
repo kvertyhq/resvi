@@ -32,6 +32,7 @@ BEGIN
             'notes', oi.notes,
             'course_name', oi.course_name,
             'selected_modifiers', oi.selected_modifiers,
+            'name_snapshot', oi.name_snapshot,
             'menu_items', (
                SELECT json_build_object(
                  'name', mi.name,

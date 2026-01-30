@@ -20,6 +20,7 @@ interface KDSOrderItem {
     notes?: string;
     course_name: string;
     selected_modifiers: any[];
+    name_snapshot?: string; // For misc items and snapshots
     menu_items: KDSMenuItem;
     status: string;
 }
@@ -246,7 +247,7 @@ const KDSPage: React.FC = () => {
                                             {courseItems.map(item => (
                                                 <div key={item.id} className="mb-2">
                                                     <div className="flex justify-between items-start">
-                                                        <span className="font-bold text-lg text-gray-900 dark:text-white">{item.quantity}x {item.menu_items?.name}</span>
+                                                        <span className="font-bold text-lg text-gray-900 dark:text-white">{item.quantity}x {item.name_snapshot || item.menu_items?.name}</span>
                                                     </div>
                                                     {item.selected_modifiers && Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
                                                         <div className="text-sm text-gray-500 dark:text-gray-400 pl-4 mt-1">

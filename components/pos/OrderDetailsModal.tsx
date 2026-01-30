@@ -6,6 +6,7 @@ interface OrderItem {
     menu_item?: {
         name: string;
     };
+    name_snapshot?: string;
     quantity: number;
     price_snapshot: number;
     selected_modifiers?: any[];
@@ -104,7 +105,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                                             <div className="flex-1">
                                                 <div className="font-medium text-gray-900 dark:text-white">
                                                     <span className="font-bold mr-2">{item.quantity}x</span>
-                                                    {item.menu_item?.name || 'Item'}
+                                                    {item.menu_item?.name || item.name_snapshot || 'Item'}
                                                 </div>
                                                 {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                                     <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 pl-6">

@@ -13,6 +13,7 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { receiptService } from '../../services/ReceiptService';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -382,6 +383,12 @@ const POSOrderPage: React.FC = () => {
             setCreatedDailyOrderNumber(result.daily_order_number);
             setShowSuccessModal(true);
             setCartItems([]);
+
+            // Auto-print receipt if enabled
+            const orderId = result.order_uuid || result.order_id;
+            if (orderId && settings?.id) {
+                await receiptService.printOrder(orderId, settings.id);
+            }
         } catch (error) {
             console.error('Order failed:', error);
             alert('Failed to create order. Please try again.');
@@ -514,6 +521,11 @@ const POSOrderPage: React.FC = () => {
             setCreatedOrderId(orderId);
             setShowUpdateModal(true);
             setCartItems([]);
+
+            // Auto-print receipt if enabled (for new orders or updates)
+            if (orderId && settings?.id) {
+                await receiptService.printOrder(orderId, settings.id);
+            }
             // navigate('/pos'); // Handled by modal close
         } catch (error) {
             console.error('Order failed:', error);

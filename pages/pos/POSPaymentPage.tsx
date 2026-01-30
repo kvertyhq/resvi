@@ -136,6 +136,11 @@ const POSPaymentPage: React.FC = () => {
                 isFullyPaid: result.fully_paid
             });
 
+            // Auto-print receipt if enabled (only for full payment)
+            if (result.fully_paid && orderId && order?.restaurant_id) {
+                await receiptService.printOrder(orderId, order.restaurant_id);
+            }
+
             if (!result.fully_paid) {
                 fetchOrderAndPayments(); // Refresh to show new balance
             }

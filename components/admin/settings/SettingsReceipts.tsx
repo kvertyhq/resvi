@@ -13,7 +13,8 @@ const SettingsReceipts: React.FC = () => {
         footer_text: '',
         show_logo: true,
         logo_url: '',
-        custom_css: ''
+        custom_css: '',
+        print_mode: 'manual' as 'auto_with_drawer' | 'auto_no_drawer' | 'manual'
     });
 
     useEffect(() => {
@@ -33,7 +34,8 @@ const SettingsReceipts: React.FC = () => {
                     footer_text: data.footer_text || '',
                     show_logo: data.show_logo ?? true,
                     logo_url: data.logo_url || '',
-                    custom_css: data.custom_css || ''
+                    custom_css: data.custom_css || '',
+                    print_mode: data.print_mode || 'manual'
                 });
             }
         } catch (err: any) {
@@ -66,7 +68,8 @@ const SettingsReceipts: React.FC = () => {
                 p_footer_text: formData.footer_text,
                 p_show_logo: formData.show_logo,
                 p_logo_url: formData.logo_url,
-                p_custom_css: formData.custom_css
+                p_custom_css: formData.custom_css,
+                p_print_mode: formData.print_mode
             });
 
             if (error) throw error;
@@ -165,6 +168,64 @@ const SettingsReceipts: React.FC = () => {
                                 placeholder="https://..."
                             />
                             <p className="mt-1 text-xs text-gray-500">Leave blank to use the main restaurant logo settings.</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-4 border border-gray-200">
+                        <h4 className="font-medium text-gray-900 border-b pb-2 flex items-center gap-2">
+                            <Printer className="h-4 w-4" />
+                            Print Behavior
+                        </h4>
+
+                        <div className="space-y-3">
+                            <p className="text-sm text-gray-600">Choose when receipts should be printed automatically:</p>
+
+                            <div className="space-y-2">
+                                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="print_mode"
+                                        value="auto_with_drawer"
+                                        checked={formData.print_mode === 'auto_with_drawer'}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, print_mode: e.target.value as any }))}
+                                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-gray-900">Auto Print + Open Drawer</div>
+                                        <div className="text-xs text-gray-500 mt-0.5">Automatically print receipt and open cash drawer after order placement</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="print_mode"
+                                        value="auto_no_drawer"
+                                        checked={formData.print_mode === 'auto_no_drawer'}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, print_mode: e.target.value as any }))}
+                                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-gray-900">Auto Print (No Drawer)</div>
+                                        <div className="text-xs text-gray-500 mt-0.5">Automatically print receipt without opening cash drawer</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="print_mode"
+                                        value="manual"
+                                        checked={formData.print_mode === 'manual'}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, print_mode: e.target.value as any }))}
+                                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-gray-900">Manual Print</div>
+                                        <div className="text-xs text-gray-500 mt-0.5">Require manual click on print button (default)</div>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

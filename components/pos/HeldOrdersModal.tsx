@@ -84,7 +84,7 @@ const HeldOrdersModal: React.FC<HeldOrdersModalProps> = ({ isOpen, onClose, held
                                     </div>
                                     <div className="text-sm text-gray-600 dark:text-gray-400">
                                         {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                                        {order.discount_type && (
+                                        {order.discount_type && order.discount_amount > 0 && (
                                             <span className="ml-2 text-green-600 dark:text-green-400">
                                                 • Discount applied
                                             </span>

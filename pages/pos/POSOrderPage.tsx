@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
@@ -10,6 +10,7 @@ import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
 import MiscItemModal from '../../components/pos/MiscItemModal';
 import HeldOrdersModal from '../../components/pos/HeldOrdersModal';
+import NotificationModal from '../../components/pos/NotificationModal';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { loadStripe } from '@stripe/stripe-js';
@@ -35,6 +36,7 @@ const COURSES = ['Starter', 'Main', 'Dessert', 'Drink'];
 const POSOrderPage: React.FC = () => {
     const { tableId } = useParams<{ tableId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const mode = searchParams.get('mode');
     const specificOrderId = searchParams.get('orderId');
@@ -98,6 +100,12 @@ const POSOrderPage: React.FC = () => {
     const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
     const [isHoldingOrder, setIsHoldingOrder] = useState(false);
 
+    // Notification Modal
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('success');
+    const [notificationTitle, setNotificationTitle] = useState('');
+    const [notificationMessage, setNotificationMessage] = useState('');
+
     useEffect(() => {
         if (settings?.id) {
             fetchData();
@@ -116,6 +124,35 @@ const POSOrderPage: React.FC = () => {
                 });
         }
     }, [tableId, isWalkIn]);
+
+    // Check for held order data from navigation state
+    useEffect(() => {
+        const state = location.state as { heldOrder?: any };
+        if (state?.heldOrder) {
+            const heldOrder = state.heldOrder;
+
+            // Populate cart with held order items
+            setCartItems(heldOrder.items);
+
+            // Set discount if any
+            if (heldOrder.discount_type) {
+                setDiscountType(heldOrder.discount_type);
+                // Calculate discount value for display
+                if (heldOrder.discount_type === 'flat') {
+                    setDiscountValue(heldOrder.discount_amount);
+                } else {
+                    // For percentage, calculate from subtotal
+                    const subtotalFromItems = heldOrder.items.reduce((sum: number, item: any) =>
+                        sum + (item.price * item.quantity), 0);
+                    const percentageValue = (heldOrder.discount_amount / subtotalFromItems) * 100;
+                    setDiscountValue(percentageValue);
+                }
+            }
+
+            // Clear the navigation state to prevent re-loading on refresh
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -347,7 +384,7 @@ const POSOrderPage: React.FC = () => {
         setCartItems(prev => prev.map(i => i.tempId === tempId ? { ...i, course } : i));
     };
 
-    // Fetch cash drawer button setting
+    // Fetch cash drawer button setting and held orders
     useEffect(() => {
         const fetchSetting = async () => {
             if (!settings?.id) return;
@@ -361,6 +398,7 @@ const POSOrderPage: React.FC = () => {
             }
         };
         fetchSetting();
+        fetchHeldOrders();
     }, [settings?.id]);
 
     const handleOpenCashDrawer = async () => {
@@ -416,10 +454,17 @@ const POSOrderPage: React.FC = () => {
             // Refresh held orders
             fetchHeldOrders();
 
-            alert('Order held successfully!');
+            // Show success notification
+            setNotificationType('success');
+            setNotificationTitle('Order Held Successfully!');
+            setNotificationMessage('The order has been saved and you can retrieve it later.');
+            setShowNotification(true);
         } catch (error) {
             console.error('Error holding order:', error);
-            alert('Failed to hold order');
+            setNotificationType('error');
+            setNotificationTitle('Failed to Hold Order');
+            setNotificationMessage('Please try again.');
+            setShowNotification(true);
         } finally {
             setIsHoldingOrder(false);
         }
@@ -458,7 +503,10 @@ const POSOrderPage: React.FC = () => {
             fetchHeldOrders();
         } catch (error) {
             console.error('Error retrieving held order:', error);
-            alert('Failed to retrieve held order');
+            setNotificationType('error');
+            setNotificationTitle('Failed to Retrieve Order');
+            setNotificationMessage('Please try again.');
+            setShowNotification(true);
         }
     };
 
@@ -1160,6 +1208,15 @@ const POSOrderPage: React.FC = () => {
                     onClose={() => setShowHeldOrdersModal(false)}
                     heldOrders={heldOrders}
                     onRetrieve={handleRetrieveHeldOrder}
+                />
+
+                {/* Notification Modal */}
+                <NotificationModal
+                    isOpen={showNotification}
+                    onClose={() => setShowNotification(false)}
+                    type={notificationType}
+                    title={notificationTitle}
+                    message={notificationMessage}
                 />
             </div>
         </div>

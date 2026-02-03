@@ -3,8 +3,10 @@ import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { usePOS } from '../../context/POSContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, CreditCard, Trash2, Printer } from 'lucide-react';
+import { Plus, Eye, CreditCard, Trash2, Printer, Pause } from 'lucide-react';
 import OrderDetailsModal from '../../components/pos/OrderDetailsModal';
+import HeldOrdersModal from '../../components/pos/HeldOrdersModal';
+import NotificationModal from '../../components/pos/NotificationModal';
 import { receiptService } from '../../services/ReceiptService';
 
 interface WalkInOrder {
@@ -39,9 +41,32 @@ const POSWalkInPage: React.FC = () => {
     const [showOrderModal, setShowOrderModal] = useState(false);
     const [countdown, setCountdown] = useState(10);
 
+    // Held Orders
+    const [heldOrders, setHeldOrders] = useState<any[]>([]);
+    const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
+
+    // Notification Modal
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('success');
+    const [notificationTitle, setNotificationTitle] = useState('');
+    const [notificationMessage, setNotificationMessage] = useState('');
+
+    const fetchHeldOrders = async () => {
+        if (!settings?.id) return;
+        try {
+            const { data } = await supabase.rpc('get_held_orders', {
+                p_restaurant_id: settings.id
+            });
+            setHeldOrders(data || []);
+        } catch (error) {
+            console.error('Error fetching held orders:', error);
+        }
+    };
+
     useEffect(() => {
         if (settings?.id) {
             fetchOrders();
+            fetchHeldOrders();
 
             // Subscribe to changes
             const subscription = supabase
@@ -206,7 +231,22 @@ const POSWalkInPage: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="flex gap-2 w-full md:w-auto pt-3">
+                    <button
+                        onClick={async () => {
+                            await fetchHeldOrders();
+                            setShowHeldOrdersModal(true);
+                        }}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors font-medium shadow-md relative"
+                    >
+                        <Pause className="h-5 w-5" />
+                        <span>Held Orders</span>
+                        {heldOrders.length > 0 && (
+                            <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
+                                {heldOrders.length}
+                            </span>
+                        )}
+                    </button>
                     <button
                         onClick={() => navigate('/pos/order/walk-in')}
                         className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium shadow-md"
@@ -401,6 +441,41 @@ const POSWalkInPage: React.FC = () => {
                     setSelectedOrder(null);
                 }}
                 order={selectedOrder}
+            />
+
+            {/* Held Orders Modal */}
+            <HeldOrdersModal
+                isOpen={showHeldOrdersModal}
+                onClose={() => setShowHeldOrdersModal(false)}
+                heldOrders={heldOrders}
+                onRetrieve={async (heldOrder) => {
+                    try {
+                        // Delete held order from database
+                        await supabase.rpc('delete_held_order', {
+                            p_held_order_id: heldOrder.id
+                        });
+
+                        // Navigate to walk-in order page with held order data
+                        navigate('/pos/order/walk-in', {
+                            state: { heldOrder }
+                        });
+                    } catch (error) {
+                        console.error('Error retrieving held order:', error);
+                        setNotificationType('error');
+                        setNotificationTitle('Failed to Retrieve Order');
+                        setNotificationMessage('Please try again.');
+                        setShowNotification(true);
+                    }
+                }}
+            />
+
+            {/* Notification Modal */}
+            <NotificationModal
+                isOpen={showNotification}
+                onClose={() => setShowNotification(false)}
+                type={notificationType}
+                title={notificationTitle}
+                message={notificationMessage}
             />
         </div>
     );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ReservationPage } from './ReservationPage';
+import ReservationPage from './ReservationPage';
 import { supabase } from '../supabaseClient';
 
 // Mock the supabase client

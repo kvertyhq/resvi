@@ -29,6 +29,7 @@ interface CartItem {
     notes?: string;
     course: string; // 'Starter', 'Main', 'Dessert', 'Drink'
     isMiscellaneous?: boolean; // Flag for custom items
+    station_id?: string; // Target station for this item
 }
 
 const COURSES = ['Starter', 'Main', 'Dessert', 'Drink'];
@@ -326,7 +327,8 @@ const POSOrderPage: React.FC = () => {
                 price: finalPrice,
                 quantity: 1,
                 modifiers: modifiers,
-                course: 'Main' // Default
+                course: 'Main', // Default
+                station_id: item.station_id
             };
             setCartItems(prev => [...prev, newItem]);
         }
@@ -527,7 +529,8 @@ const POSOrderPage: React.FC = () => {
                 course: item.course,
                 is_miscellaneous: item.isMiscellaneous || false,
                 custom_item_name: item.isMiscellaneous ? item.name : null,
-                name: item.name
+                name: item.name,
+                station_id: item.station_id
             }));
 
             const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
@@ -679,7 +682,8 @@ const POSOrderPage: React.FC = () => {
                 round_number: currentRound,
                 is_miscellaneous: item.isMiscellaneous || false,
                 custom_item_name: item.isMiscellaneous ? item.name : null,
-                name_snapshot: item.name // Always store the name
+                name_snapshot: item.name, // Always store the name
+                station_id: item.station_id
             }));
 
             const { error: itemsError } = await supabase

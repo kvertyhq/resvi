@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+android-admin
+android-pos
+ios-admin
+ios-pos
+

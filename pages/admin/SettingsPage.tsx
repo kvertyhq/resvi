@@ -10,6 +10,7 @@ import SettingsOpeningHours from '../../components/admin/settings/SettingsOpenin
 import SettingsClosureDates from '../../components/admin/settings/SettingsClosureDates';
 import SettingsTimeslots from '../../components/admin/settings/SettingsTimeslots';
 import SettingsBookingPreorder from '../../components/admin/settings/SettingsBookingPreorder';
+import SettingsBookingGeneral from '../../components/admin/settings/SettingsBookingGeneral';
 import SettingsDeliveryZones from '../../components/admin/settings/SettingsDeliveryZones';
 import SettingsPayment from '../../components/admin/settings/SettingsPayment';
 import SettingsTableManagement from '../../components/admin/settings/SettingsTableManagement';
@@ -84,7 +85,8 @@ const SettingsPage: React.FC = () => {
             booking_cancelled: true,
             table_assigned: true
         },
-        google_analytics_id: ''
+        google_analytics_id: '',
+        bookings_enabled: true
     });
 
     // New states for advanced settings
@@ -153,7 +155,8 @@ const SettingsPage: React.FC = () => {
                             booking_cancelled: true,
                             table_assigned: true
                         },
-                        google_analytics_id: settings.google_analytics_id || ''
+                        google_analytics_id: settings.google_analytics_id || '',
+                        bookings_enabled: settings.bookings_enabled !== false // Default to true if undefined
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});
@@ -358,6 +361,10 @@ const SettingsPage: React.FC = () => {
 
                                 {activeTab === 'bookings' && (
                                     <div className="space-y-8 animate-fadeIn">
+                                        <SettingsBookingGeneral
+                                            bookingsEnabled={formData.bookings_enabled}
+                                            setBookingsEnabled={(enabled) => setFormData(prev => ({ ...prev, bookings_enabled: enabled }))}
+                                        />
                                         <SettingsTableManagement />
                                         <SettingsBookingPreorder preorderRequiredDays={preorderRequiredDays} setPreorderRequiredDays={setPreorderRequiredDays} />
                                     </div>

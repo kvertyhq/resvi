@@ -3,14 +3,12 @@ import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { format } from 'date-fns';
 import KDSTimer from '../../components/pos/KDSTimer';
+import { StationService, Station } from '../../services/StationService';
 
 // --- Types ---
 interface KDSMenuItem {
     name: string;
     category_id: string;
-    menu_categories: {
-        station: string;
-    };
 }
 
 interface KDSOrderItem {
@@ -22,6 +20,7 @@ interface KDSOrderItem {
     selected_modifiers: any[];
     name_snapshot?: string; // For misc items and snapshots
     menu_items: KDSMenuItem;
+    station_id?: string; // Added
     status: string;
 }
 
@@ -41,27 +40,43 @@ interface KDSOrder {
     order_type?: string;
 }
 
-// Simple beep sound (Base64)
-const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"; // Very short clip, usually needs a real file for good UX, using a placeholder logic for now or expecting a file. 
-// Actually, let's use a cleaner standard beep approach or just a simple log if file missing.
-// Better: Browser 'beep' is not standard. I will assume a file 'notification.mp3' exists or fail gracefully.
-// Reverting to a safely playable empty sound or valid base64 if possible. 
-// Let's use a real base64 for a "ding" if possible, but for brevity I will omit the huge string and use a ref logic to play if available.
-
 const KDSPage: React.FC = () => {
     const { settings } = useSettings();
     const [orders, setOrders] = useState<KDSOrder[]>([]);
+    const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeStation, setActiveStation] = useState<'kitchen' | 'bar'>('kitchen');
+    const [activeStationId, setActiveStationId] = useState<string | null>(null);
     const previousOrderCount = useRef(0);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         // Initialize audio
-        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Public domain ding
+        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audioRef.current.volume = 0.5;
     }, []);
 
+    // 1. Fetch Stations on Mount
+    useEffect(() => {
+        if (settings?.id) {
+            const loadStations = async () => {
+                try {
+                    const data = await StationService.getStations(settings.id);
+                    setStations(data);
+
+                    // Set default station
+                    if (data.length > 0) {
+                        const defaultStation = data.find(s => s.is_default && s.type === 'kitchen') || data[0];
+                        setActiveStationId(defaultStation.id);
+                    }
+                } catch (error) {
+                    console.error("Failed to load stations for KDS", error);
+                }
+            };
+            loadStations();
+        }
+    }, [settings?.id]);
+
+    // 2. Fetch Orders & Subscribe
     useEffect(() => {
         if (settings?.id) {
             fetchOrders();
@@ -75,24 +90,19 @@ const KDSPage: React.FC = () => {
     }, [settings?.id]);
 
     const fetchOrders = async () => {
-        setLoading(true);
+        if (!settings?.id) return;
+        setLoading(true); // Maybe debounced or just initial load? Keeping for now.
         try {
             const { data, error } = await supabase
-                .rpc('get_pos_kds_orders', { p_restaurant_id: settings?.id });
+                .rpc('get_pos_kds_orders', { p_restaurant_id: settings.id });
 
             if (error) throw error;
 
-            // Cast strictly now that we defined it, but ideally Supabase types should be generated.
-            // For now, runtime validation is minimal, we rely on the query matching the interface.
             const typedData = (data || []) as unknown as KDSOrder[];
 
             // Check for new orders to play sound
-            if (typedData.length > previousOrderCount.current) {
-                // Only play if we aren't in the initial load (optional improvement)
-                // But generally, more orders = ding
-                if (previousOrderCount.current !== 0) {
-                    audioRef.current?.play().catch(e => console.log('Audio play failed', e));
-                }
+            if (typedData.length > previousOrderCount.current && previousOrderCount.current !== 0) {
+                audioRef.current?.play().catch(e => console.log('Audio play failed', e));
             }
             previousOrderCount.current = typedData.length;
 
@@ -135,53 +145,59 @@ const KDSPage: React.FC = () => {
 
     // Filter orders to only show items for the current station
     const getFilteredOrders = () => {
+        if (!activeStationId) return [];
+
         return orders.map(order => {
             // Filter items that match the active station
             const stationItems = order.order_items.filter(item => {
-                const itemStation = item.menu_items?.menu_categories?.station || 'kitchen'; // Default to kitchen
-                return itemStation === activeStation;
+                // Logic: Match item.station_id. 
+                // Fallback: If item.station_id is missing (legacy data), maybe check default kitchen?
+                // For stricter logic: only show matches.
+                return item.station_id === activeStationId;
             });
 
-            // Return order with filtered items. If no items for this station, filtering happens in render
+            // Return order with filtered items.
             return {
                 ...order,
                 order_items: stationItems
             };
-        }).filter(order => order.order_items.length > 0); // Only show orders that have items for this station
+        }).filter(order => order.order_items.length > 0); // Only show orders with items for filtering
     };
 
     const filteredOrders = getFilteredOrders();
+    const activeStationName = stations.find(s => s.id === activeStationId)?.name || 'Loading...';
 
-    if (loading && orders.length === 0) return <div className="text-gray-900 dark:text-white p-8">Loading KDS...</div>;
+    if (loading && orders.length === 0 && stations.length === 0) return <div className="text-gray-900 dark:text-white p-8">Loading KDS...</div>;
+
+    // Helper: calculate count for badges
+    const getCountForStation = (stationId: string) => {
+        return orders.filter(o => o.order_items.some(i => i.station_id === stationId)).length;
+    };
 
     return (
         <div className="flex flex-col h-full w-full bg-white dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden transition-colors duration-300">
             {/* Station Selector Header */}
             <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 transition-colors duration-300">
                 <div className="flex gap-4 w-full md:w-auto overflow-x-auto p-1 justify-center md:justify-start md:ml-12">
-                    <button
-                        onClick={() => setActiveStation('kitchen')}
-                        style={activeStation === 'kitchen' ? { backgroundColor: 'var(--theme-color)' } : {}}
-                        className={`px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeStation === 'kitchen' ? 'text-white scale-105 shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}
-                    >
-                        <span>👨‍🍳 Kitchen</span>
-                        <span className="bg-black bg-opacity-30 px-2 rounded-full text-sm">
-                            {orders.filter(o => o.order_items.some(i => (i.menu_items?.menu_categories?.station || 'kitchen') === 'kitchen')).length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setActiveStation('bar')}
-                        style={activeStation === 'bar' ? { backgroundColor: 'var(--theme-color)' } : {}}
-                        className={`px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeStation === 'bar' ? 'text-white scale-105 shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}
-                    >
-                        <span>🍹 Bar</span>
-                        <span className="bg-black bg-opacity-30 px-2 rounded-full text-sm">
-                            {orders.filter(o => o.order_items.some(i => i.menu_items?.menu_categories?.station === 'bar')).length}
-                        </span>
-                    </button>
+                    {stations.map(station => (
+                        <button
+                            key={station.id}
+                            onClick={() => setActiveStationId(station.id)}
+                            style={activeStationId === station.id ? { backgroundColor: 'var(--theme-color)' } : {}}
+                            className={`px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeStationId === station.id ? 'text-white scale-105 shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700'}`}
+                        >
+                            <span>{station.type === 'bar' ? '🍹' : '👨‍🍳'} {station.name}</span>
+                            <span className="bg-black bg-opacity-30 px-2 rounded-full text-sm">
+                                {getCountForStation(station.id)}
+                            </span>
+                        </button>
+                    ))}
+                    {stations.length === 0 && !loading && (
+                        <div className="text-red-500">No Stations Configured</div>
+                    )}
                 </div>
                 <div className="text-gray-500 dark:text-gray-400 font-mono text-sm uppercase tracking-wide">
-                    {activeStation} DISPLAY • {filteredOrders.length} ACTIVE
+                    {activeStationName} DISPLAY • {filteredOrders.length} ACTIVE
                 </div>
             </div>
 
@@ -205,7 +221,7 @@ const KDSPage: React.FC = () => {
             <div className="flex-1 p-4 gap-4 overflow-x-auto flex flex-nowrap items-start w-full">
                 {filteredOrders.length === 0 ? (
                     <div className="w-full flex items-center justify-center h-64 text-gray-500 text-2xl">
-                        No Active {activeStation === 'kitchen' ? 'Kitchen' : 'Bar'} Orders
+                        No Active Orders for {activeStationName}
                     </div>
                 ) : (
                     filteredOrders.map(order => (

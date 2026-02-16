@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabaseClient';
 import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils } from 'lucide-react';
+import { Station, StationService } from '../../services/StationService'; // Added import
 
 // Interfaces based on user schema
 interface MenuCategory {
@@ -9,6 +10,7 @@ interface MenuCategory {
     name: string;
     description: string;
     order_index: number;
+    station_id?: string; // Added station_id
     created_at?: string;
     updated_at?: string;
 }
@@ -24,6 +26,7 @@ interface MenuItem {
     tags: string[];
     vegetarian: boolean;
     spicy_level: number;
+    station_id?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -61,6 +64,7 @@ const MenuManagementPage: React.FC = () => {
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
     const [addons, setAddons] = useState<Addon[]>([]);
+    const [stations, setStations] = useState<Station[]>([]); // Added stations state
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,7 +77,8 @@ const MenuManagementPage: React.FC = () => {
     const [categoryForm, setCategoryForm] = useState<Partial<MenuCategory>>({
         name: '',
         description: '',
-        order_index: 0
+        order_index: 0,
+        station_id: '' // Added station_id
     });
 
     const [itemForm, setItemForm] = useState<Partial<MenuItem>>({
@@ -85,7 +90,8 @@ const MenuManagementPage: React.FC = () => {
         image_url: '',
         tags: [],
         vegetarian: false,
-        spicy_level: 0
+        spicy_level: 0,
+        station_id: ''
     });
 
     const [addonForm, setAddonForm] = useState<Partial<Addon>>({
@@ -135,8 +141,18 @@ const MenuManagementPage: React.FC = () => {
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchItems(), fetchAddons()]);
+        await Promise.all([fetchCategories(), fetchItems(), fetchAddons(), fetchStations()]); // Added fetchStations
         setLoading(false);
+    };
+
+    const fetchStations = async () => {
+        if (!selectedRestaurantId) return;
+        try {
+            const data = await StationService.getStations(selectedRestaurantId);
+            setStations(data);
+        } catch (error) {
+            console.error('Error fetching stations:', error);
+        }
     };
 
     const fetchCategories = async () => {
@@ -206,7 +222,7 @@ const MenuManagementPage: React.FC = () => {
             setCategoryForm(category);
         } else {
             setEditingCategory(null);
-            setCategoryForm({ name: '', description: '', order_index: categories.length });
+            setCategoryForm({ name: '', description: '', order_index: categories.length, station_id: '' }); // Added station_id
         }
         setIsModalOpen(true);
     };
@@ -214,7 +230,11 @@ const MenuManagementPage: React.FC = () => {
     const handleCategorySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRestaurantId) return;
-        const payload = { ...categoryForm, restaurant_id: selectedRestaurantId };
+        const payload = {
+            ...categoryForm,
+            restaurant_id: selectedRestaurantId,
+            station_id: categoryForm.station_id === '' ? null : categoryForm.station_id // Handle empty string
+        };
 
         if (editingCategory) {
             await supabase.from('menu_categories').update(payload).eq('id', editingCategory.id);
@@ -310,7 +330,8 @@ const MenuManagementPage: React.FC = () => {
                 image_url: '',
                 tags: [],
                 vegetarian: false,
-                spicy_level: 0
+                spicy_level: 0,
+                station_id: ''
             });
             setImagePreview('');
         }
@@ -339,7 +360,12 @@ const MenuManagementPage: React.FC = () => {
             }
         }
 
-        const payload = { ...itemForm, image_url: imageUrl, restaurant_id: selectedRestaurantId };
+        const payload = {
+            ...itemForm,
+            image_url: imageUrl,
+            restaurant_id: selectedRestaurantId,
+            station_id: itemForm.station_id === '' ? null : itemForm.station_id // Handle empty string
+        };
 
         let itemId = editingItem?.id;
 
@@ -819,6 +845,21 @@ const MenuManagementPage: React.FC = () => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Order Index</label>
                                                 <input type="number" name="order_index" value={categoryForm.order_index} onChange={handleCategoryInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                                             </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Station</label>
+                                                <select
+                                                    name="station_id"
+                                                    value={categoryForm.station_id || ''}
+                                                    onChange={handleCategoryInputChange as any}
+                                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                                >
+                                                    <option value="">Default (Inherit)</option>
+                                                    {stations.map(s => (
+                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 mt-1">Items in this category will be sent to this station by default.</p>
+                                            </div>
                                             <div className="flex justify-end space-x-3 pt-4">
                                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                                                 <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Category</button>
@@ -868,6 +909,20 @@ const MenuManagementPage: React.FC = () => {
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Spicy Level (0-5)</label>
                                                     <input type="number" name="spicy_level" min="0" max="5" value={itemForm.spicy_level} onChange={handleItemInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Station Override</label>
+                                                    <select
+                                                        name="station_id"
+                                                        value={itemForm.station_id || ''}
+                                                        onChange={handleItemInputChange as any}
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                                    >
+                                                        <option value="">Use Category Default</option>
+                                                        {stations.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             </div>
 

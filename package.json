@@ -6,9 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:mobile:pos": "node scripts/mobile-env.js pos && VITE_APP_MODE=pos tsc -b && vite build && npx cap sync",
+    "build:mobile:admin": "node scripts/mobile-env.js admin && VITE_APP_MODE=admin tsc -b && vite build && npx cap sync",
+    "build:mobile:default": "tsc -b && vite build && npx cap sync",
+    "save:mobile:admin": "rm -rf ios-admin && cp -R ios ios-admin && rm -rf android-admin && cp -R android android-admin",
+    "save:mobile:pos": "rm -rf ios-pos && cp -R ios ios-pos && rm -rf android-pos && cp -R android android-pos",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -25,6 +33,8 @@
     "react-router-dom": "^7.9.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",

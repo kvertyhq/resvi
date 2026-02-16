@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import React, { useEffect } from 'react';
 // Context
 import { OrderProvider } from './context/OrderContext';
@@ -31,6 +31,7 @@ import ContactMessagesPage from './pages/admin/ContactMessagesPage';
 import SMSCreditsPage from './pages/admin/SMSCreditsPage';
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
 import { Navigate } from 'react-router-dom';
+import StationManagementPage from './pages/admin/StationManagementPage'; // Correctly placed import
 
 // POS Pages
 import POSLayout from './components/pos/POSLayout';
@@ -61,6 +62,19 @@ const RequirePOSAuth = ({ children }: { children: React.ReactElement }) => {
   return isAuthenticated ? children : <Navigate to="/pos/login" replace />;
 };
 
+const RedirectHandler = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const mode = import.meta.env.VITE_APP_MODE;
+    if (mode === 'pos') {
+      navigate('/pos/login', { replace: true });
+    } else if (mode === 'admin') {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [navigate]);
+  return null;
+};
+
 function App() {
   const { settings } = useSettings();
   useEffect(() => {
@@ -68,6 +82,7 @@ function App() {
   }, [settings]);
   return (
     <HashRouter>
+      <RedirectHandler />
       <AuthCallbackHandler />
       <AdminProvider>
         <OrderProvider>
@@ -156,6 +171,7 @@ function App() {
                     <Route path="messages" element={<ContactMessagesPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="settings/receipts" element={<ReceiptSettingsPage />} />
+                    <Route path="stations" element={<StationManagementPage />} />
                     <Route path="credits" element={<SMSCreditsPage />} />
                     <Route path="super" element={<SuperAdminDashboard />} />
                   </Route>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Resvi POS</string>
+    <string name="title_activity_main">Resvi POS</string>
+    <string name="package_name">com.kverty.resvi</string>
+    <string name="custom_url_scheme">com.kverty.resvi</string>
+</resources>

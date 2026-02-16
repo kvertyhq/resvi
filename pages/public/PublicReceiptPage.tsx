@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { Printer } from 'lucide-react';
 
 const PublicReceiptPage: React.FC = () => {
     const { orderId } = useParams<{ orderId: string }>();
+    const [searchParams] = useSearchParams();
+    const stationId = searchParams.get('station_id');
+
     const [order, setOrder] = useState<any>(null);
     const [settings, setSettings] = useState<any>(null);
     const [receiptSettings, setReceiptSettings] = useState<any>(null);
+    const [stationName, setStationName] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -16,12 +20,23 @@ const PublicReceiptPage: React.FC = () => {
         }
     }, [orderId]);
 
+    useEffect(() => {
+        if (stationId && order?.restaurant_id) {
+            // Fetch station name for display
+            supabase
+                .from('stations')
+                .select('name')
+                .eq('id', stationId)
+                .single()
+                .then(({ data }) => {
+                    if (data) setStationName(data.name);
+                });
+        }
+    }, [stationId, order]);
+
     const fetchOrderData = async () => {
         try {
-            // Fetch Order (Using single for simplicity - secure RLS should allow reading own order if we had auth, 
-            // but for PUBLIC receipt, we need a way to read it. 
-            // Usually this requires a signed URL or RLS policy allowing anon read by ID if simplistic.
-            // For now, assuming anon read is allowed or using a secure RPC if basic select fails.)
+            // Fetch Order
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .select(`
@@ -31,7 +46,8 @@ const PublicReceiptPage: React.FC = () => {
                         quantity,
                         name_snapshot,
                         price_snapshot,
-                        selected_addons
+                        selected_addons,
+                        station_id
                     )
                 `)
                 .eq('id', orderId)
@@ -45,7 +61,7 @@ const PublicReceiptPage: React.FC = () => {
                 const { data: restData } = await supabase
                     .rpc('get_restaurant_settings', { p_id: orderData.restaurant_id });
 
-                const rData = Array.isArray(restData?.data) ? restData.data[0] : restData?.data || restData; // Handle potential wrapper
+                const rData = Array.isArray(restData?.data) ? restData.data[0] : restData?.data || restData;
                 setSettings(rData);
 
                 // Fetch Receipt Settings
@@ -63,6 +79,15 @@ const PublicReceiptPage: React.FC = () => {
 
     if (loading) return <div className="flex justify-center p-10">Loading Receipt...</div>;
     if (!order) return <div className="flex justify-center p-10 text-red-500">Receipt not found.</div>;
+
+    // Filter items if stationId is present
+    const displayedItems = stationId
+        ? order.order_items.filter((item: any) => item.station_id === stationId)
+        : order.order_items;
+
+    if (stationId && displayedItems.length === 0) {
+        return <div className="flex justify-center p-10 text-gray-500">No items for this station.</div>;
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 py-10 px-4">
@@ -82,6 +107,7 @@ const PublicReceiptPage: React.FC = () => {
                             />
                         )}
                         <h1 className="text-xl font-bold uppercase">{settings?.name || 'Restaurant'}</h1>
+                        {stationName && <h2 className="text-lg font-bold mt-1 border-b inline-block">{stationName} Ticket</h2>}
                         <p className="text-gray-500">{settings?.address_line1}</p>
                         <p className="text-gray-500">{settings?.phone}</p>
 
@@ -100,16 +126,16 @@ const PublicReceiptPage: React.FC = () => {
 
                     {/* Items */}
                     <div className="space-y-2 mb-6">
-                        {order.order_items.map((item: any, i: number) => (
+                        {displayedItems.map((item: any, i: number) => (
                             <div key={i}>
                                 <div className="flex justify-between font-bold">
                                     <span>{item.quantity}x {item.name_snapshot}</span>
-                                    <span>£{(item.price_snapshot * item.quantity).toFixed(2)}</span>
+                                    <span>{stationId ? '' : `£${(item.price_snapshot * item.quantity).toFixed(2)}`}</span>
                                 </div>
                                 {item.selected_addons?.map((addon: any, j: number) => (
                                     <div key={j} className="flex justify-between text-xs text-gray-500 pl-4">
                                         <span>+ {addon.name}</span>
-                                        <span>£{addon.price.toFixed(2)}</span>
+                                        <span>{stationId ? '' : `£${addon.price.toFixed(2)}`}</span>
                                     </div>
                                 ))}
                             </div>

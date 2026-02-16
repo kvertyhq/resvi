@@ -280,6 +280,27 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading, stepN
 const BookingPage: React.FC = () => {
     const { settings } = useSettings();
     const [step, setStep] = useState(1);
+
+    if (settings?.bookings_enabled === false) {
+        return (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50 px-4">
+                <div className="text-center max-w-md">
+                    <h1 className="text-3xl font-serif text-brand-dark-gray mb-4">Bookings Currently Unavailable</h1>
+                    <p className="text-gray-600 mb-8">
+                        We are not accepting online table reservations at the moment. Please contact us directly or order online.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <a href="/#/order" className="px-6 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider hover:opacity-90 transition-opacity rounded-sm">
+                            Order Online
+                        </a>
+                        <a href="/#/contact" className="px-6 py-3 border border-gray-300 text-gray-700 font-bold uppercase text-sm tracking-wider hover:bg-gray-100 transition-colors rounded-sm">
+                            Contact Us
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     const [isLoading, setIsLoading] = useState(false);
     const [bookingData, setBookingData] = useState({
         date: null,

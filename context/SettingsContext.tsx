@@ -38,6 +38,7 @@ type Settings = {
   };
   google_analytics_id?: string;
   currency?: string;
+  bookings_enabled?: boolean;
 };
 
 interface SettingsContextType {

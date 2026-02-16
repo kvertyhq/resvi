@@ -18,6 +18,7 @@ import {
     Coins,
     Phone
 } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
 
 const AdminLayout: React.FC = () => {
     const { session, loading, logout, selectedRestaurantId, setSelectedRestaurantId, restaurants, role } = useAdmin();
@@ -30,9 +31,11 @@ const AdminLayout: React.FC = () => {
     React.useEffect(() => {
         const fetchCredits = async () => {
             if (!selectedRestaurantId) return;
-            const { data } = await import('../../supabaseClient').then(mod =>
-                mod.supabase.from('restaurant_credits').select('balance').eq('restaurant_id', selectedRestaurantId).maybeSingle()
-            );
+            const { data } = await supabase
+                .from('restaurant_credits')
+                .select('balance')
+                .eq('restaurant_id', selectedRestaurantId)
+                .maybeSingle();
 
             if (data) {
                 setSmsBalance(data.balance);
@@ -202,6 +205,15 @@ const AdminLayout: React.FC = () => {
                             >
                                 <Coins className="h-5 w-5 mr-3" />
                                 SMS Credits
+                            </NavLink>
+                        </li>
+                        <li>
+                            <NavLink
+                                to="/admin/stations"
+                                className={({ isActive }) => `flex items-center px-3 py-2 rounded-md transition-colors ${isActive ? 'bg-brand-gold text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}
+                            >
+                                <Store className="h-5 w-5 mr-3" />
+                                Stations
                             </NavLink>
                         </li>
                         <li>

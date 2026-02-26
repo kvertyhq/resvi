@@ -1,6 +1,19 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
-import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, GETADDRESS_API_BASE } from '../constants/delivery';
+import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, IDEAL_POSTCODES_API_BASE } from '../constants/delivery';
 import { supabase } from '../supabaseClient';
+
+// Haversine formula to calculate the distance between two coordinates in km
+function calculateDistanceKM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 // Types
 export interface Addon {
@@ -170,7 +183,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const checkPostcode = async (postcode: string) => {
-    const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
+    const apiKey = import.meta.env.VITE_IDEAL_POSTCODES_API_KEY || import.meta.env.VITE_GETADDRESS_API_KEY;
     const cleanPostcode = postcode.trim().replace(/\s+/g, '').toUpperCase();
     console.log("Checking postcode:", cleanPostcode);
 
@@ -242,7 +255,26 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      const url = `${GETADDRESS_API_BASE}/distance/${encodeURIComponent(RESTAURANT_POSTCODE)}/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}`;
+      // 1. Get restaurant coordinates (using fixed coordinates if fetch fails, Yeovil approx)
+      let restaurantLat = 50.9416;
+      let restaurantLng = -2.6322;
+
+      const resUrl = `${IDEAL_POSTCODES_API_BASE}/postcodes/${encodeURIComponent(RESTAURANT_POSTCODE)}?api_key=${apiKey}`;
+      try {
+        const resResponse = await fetch(resUrl);
+        if (resResponse.ok) {
+          const resData = await resResponse.json();
+          if (resData.result && resData.result.length > 0) {
+            restaurantLat = resData.result[0].latitude;
+            restaurantLng = resData.result[0].longitude;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch restaurant exact coordinates, using fallback');
+      }
+
+      // 2. Get target postcode coordinates
+      const url = `${IDEAL_POSTCODES_API_BASE}/postcodes/${encodeURIComponent(cleanPostcode)}?api_key=${apiKey}`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -274,8 +306,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       const data = await response.json();
-      const distanceMetres = data.metres;
-      const distanceKm = distanceMetres / 1000;
+
+      if (!data.result || data.result.length === 0) {
+        throw new Error("No properties found for this postcode");
+      }
+
+      // Calculate distance based on the coordinates of the first property
+      const targetLat = data.result[0].latitude;
+      const targetLng = data.result[0].longitude;
+
+      const distanceKm = calculateDistanceKM(restaurantLat, restaurantLng, targetLat, targetLng);
 
       // Use dynamic radius directly (converted to km) or fallback to 5 miles
       // 1 mile = 1.60934 km
@@ -309,24 +349,27 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const getAddressList = async (postcode: string): Promise<string[]> => {
-    const apiKey = import.meta.env.VITE_GETADDRESS_API_KEY;
+    const apiKey = import.meta.env.VITE_IDEAL_POSTCODES_API_KEY || import.meta.env.VITE_GETADDRESS_API_KEY;
     if (!apiKey || !postcode) return [];
 
     try {
-      const url = `${GETADDRESS_API_BASE}/find/${encodeURIComponent(postcode)}?api-key=${apiKey}&expand=true`;
+      const url = `${IDEAL_POSTCODES_API_BASE}/postcodes/${encodeURIComponent(postcode)}?api_key=${apiKey}`;
       const response = await fetch(url);
 
       if (!response.ok) return [];
 
       const data = await response.json();
-      if (data.addresses && Array.isArray(data.addresses)) {
-        return data.addresses.map((addr: any) => {
-          if (typeof addr === 'string') return addr;
-          if (Array.isArray(addr.formatted_address)) {
-            return addr.formatted_address.filter((line: string) => line).join(', ');
-          }
-          return '';
-        }).filter((a: string) => a !== '');
+      if (data.result && Array.isArray(data.result)) {
+        return data.result.map((addr: any) => {
+          const lines = [
+            addr.line_1,
+            addr.line_2,
+            addr.line_3,
+            addr.post_town,
+            addr.postcode
+          ].filter(Boolean);
+          return lines.join(', ');
+        });
       }
       return [];
     } catch (error) {

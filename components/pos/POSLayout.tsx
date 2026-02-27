@@ -4,9 +4,9 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
 import { useSettings } from '../../context/SettingsContext';
-import { LogOut, Clock, PhoneIncoming, Printer, BarChart3 } from 'lucide-react';
+import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User } from 'lucide-react';
 import PrinterConfigModal from './PrinterConfigModal';
-
+import { IncomingCallModal } from './IncomingCallModal';
 const POSLayout: React.FC = () => {
     const { user, loading: adminLoading } = useAdmin();
     const { staff, logout, loading: posLoading, clockIn, clockOut, activeShift } = usePOS();
@@ -15,6 +15,7 @@ const POSLayout: React.FC = () => {
     const navigate = useNavigate();
 
     const [showPrinterModal, setShowPrinterModal] = React.useState(false);
+    const [showMobileMenu, setShowMobileMenu] = React.useState(false);
 
     // Default to orange if no theme color set
     const themeColor = settings?.theme_color || '#f97316';
@@ -191,28 +192,109 @@ const POSLayout: React.FC = () => {
             </aside>
 
             {/* Mobile Bottom Nav */}
-            <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center p-2 z-50">
-                <NavLink to="/pos" end style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-2 rounded-lg ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                    <span className="text-[10px] mt-1 font-bold">Tables</span>
+            <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center p-1 sm:p-2 z-50 overflow-x-auto hide-scrollbar">
+                <NavLink to="/pos" end style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Tables</span>
                 </NavLink>
 
-                <NavLink to="/pos/kds" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-2 rounded-lg ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <span className="font-bold text-xl leading-none">KDS</span>
-                    <span className="text-[10px] mt-1 font-bold">Kitchen</span>
+                <NavLink to="/pos/walk-in" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Walk-In</span>
                 </NavLink>
 
-                <NavLink to="/pos/calls" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-2 rounded-lg ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <PhoneIncoming size={24} />
-                    <span className="text-[10px] mt-1 font-bold">Calls</span>
+                <NavLink to="/pos/kds" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <span className="font-bold text-lg sm:text-xl leading-none">KDS</span>
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Kitchen</span>
                 </NavLink>
 
-                {/* Mobile Menu/Profile Trigger (Simplified: Just Logout for now or could be a modal) */}
-                <button onClick={handleLogout} className="flex flex-col items-center p-2 text-gray-500 dark:text-gray-400 hover:text-red-500">
-                    <LogOut size={24} />
-                    <span className="text-[10px] mt-1 font-bold">Logout</span>
+                <NavLink to="/pos/reports" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Reports</span>
+                </NavLink>
+
+                <NavLink to="/pos/calls" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <PhoneIncoming className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Calls</span>
+                </NavLink>
+
+                {/* Mobile Menu/Profile Trigger */}
+                <button onClick={() => setShowMobileMenu(true)} className="flex flex-col items-center p-1 sm:p-2 text-gray-500 dark:text-gray-400 hover:text-[var(--theme-color)] flex-shrink-0 min-w-[3.5rem]">
+                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">More</span>
                 </button>
             </nav>
+
+            {/* Mobile More Options Menu */}
+            {showMobileMenu && (
+                <div className="md:hidden fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm animate-fadeIn" onClick={() => setShowMobileMenu(false)}>
+                    <div
+                        className="bg-white dark:bg-gray-800 w-full rounded-t-3xl p-6 shadow-2xl transform transition-transform duration-300 translate-y-0"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-bold text-[var(--theme-color)] shadow-sm">
+                                    {staff?.full_name.charAt(0) || <User size={20} />}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900 dark:text-white">{staff?.full_name}</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{staff?.role}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowMobileMenu(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-gray-100 dark:bg-gray-700/50 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <button
+                                onClick={() => {
+                                    activeShift ? clockOut() : clockIn();
+                                    setShowMobileMenu(false);
+                                }}
+                                className={`flex flex-col items-center justify-center p-4 rounded-2xl transition-all shadow-sm border border-gray-100 dark:border-gray-700/50 ${activeShift ? 'bg-green-50 dark:bg-green-900/20 text-green-600' : 'bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 hover:bg-green-50 hover:text-green-600'}`}
+                            >
+                                <Clock size={28} className="mb-2" />
+                                <span className="font-bold text-sm">{activeShift ? "Clock Out" : "Clock In"}</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    toggleTheme();
+                                    setShowMobileMenu(false);
+                                }}
+                                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all shadow-sm border border-gray-100 dark:border-gray-700/50"
+                            >
+                                {isDarkMode ? <svg className="w-7 h-7 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg> : <svg className="w-7 h-7 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>}
+                                <span className="font-bold text-sm">{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setShowPrinterModal(true);
+                                    setShowMobileMenu(false);
+                                }}
+                                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all shadow-sm border border-gray-100 dark:border-gray-700/50"
+                            >
+                                <Printer size={28} className="mb-2" />
+                                <span className="font-bold text-sm">Printers</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    handleLogout();
+                                    setShowMobileMenu(false);
+                                }}
+                                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 transition-all shadow-sm border border-red-100 dark:border-red-900/30"
+                            >
+                                <LogOut size={28} className="mb-2" />
+                                <span className="font-bold text-sm">Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Area */}
             <main className="flex-1 flex overflow-hidden relative mb-16 md:mb-0">
@@ -220,6 +302,8 @@ const POSLayout: React.FC = () => {
             </main>
             {/* Printer Configuration Modal */}
             <PrinterConfigModal isOpen={showPrinterModal} onClose={() => setShowPrinterModal(false)} />
+            {/* Global Incoming Call Modal */}
+            <IncomingCallModal />
         </div >
     );
 };

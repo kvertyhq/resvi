@@ -128,7 +128,7 @@ const POSOrderPage: React.FC = () => {
 
     // Check for held order data from navigation state
     useEffect(() => {
-        const state = location.state as { heldOrder?: any };
+        const state = location.state as { heldOrder?: any; customer?: any };
         if (state?.heldOrder) {
             const heldOrder = state.heldOrder;
 
@@ -151,6 +151,11 @@ const POSOrderPage: React.FC = () => {
             }
 
             // Clear the navigation state to prevent re-loading on refresh
+            navigate(location.pathname, { replace: true, state: {} });
+        } else if (state?.customer) {
+            // Populate walk-in order customer from incoming call
+            setSelectedCustomer(state.customer);
+            // Clear the navigation state 
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state]);

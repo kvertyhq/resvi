@@ -49,6 +49,7 @@ import POSHistoryPage from './pages/pos/POSHistoryPage';
 import POSReportsPage from './pages/pos/POSReportsPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
+import { SipProvider } from './context/SipContext';
 
 // Components
 import Header from './components/Header';
@@ -89,120 +90,122 @@ function App() {
           <SettingsProvider>
             <GoogleAnalyticsTracker />
             <POSProvider>
-              <OfflineProvider>
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <HomePage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/contact" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <ContactPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/about" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <AboutPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/order" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <OrderPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/booking" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <BookingPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/menu" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <MenuPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
-                  <Route path="/terms" element={
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-grow">
-                        <TermsPage />
-                      </main>
-                      <Footer />
-                    </div>
-                  } />
+              <SipProvider>
+                <OfflineProvider>
+                  <Routes>
+                    {/* Public Routes */}
+                    <Route path="/" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <HomePage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/contact" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <ContactPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/about" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <AboutPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/order" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <OrderPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/booking" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <BookingPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/menu" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <MenuPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
+                    <Route path="/terms" element={
+                      <div className="flex flex-col min-h-screen">
+                        <Header />
+                        <main className="flex-grow">
+                          <TermsPage />
+                        </main>
+                        <Footer />
+                      </div>
+                    } />
 
-                  {/* Admin Routes */}
-                  <Route path="/admin/login" element={<LoginPage />} />
-                  <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="menu" element={<MenuManagementPage />} />
-                    <Route path="orders" element={<OrderManagementPage />} />
-                    <Route path="bookings" element={<BookingManagementPage />} />
-                    <Route path="customers" element={<CustomerManagementPage />} />
-                    <Route path="staff" element={<StaffManagementPage />} />
-                    <Route path="messages" element={<ContactMessagesPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route path="settings/receipts" element={<ReceiptSettingsPage />} />
-                    <Route path="stations" element={<StationManagementPage />} />
-                    <Route path="credits" element={<SMSCreditsPage />} />
-                    <Route path="super" element={<SuperAdminDashboard />} />
-                  </Route>
+                    {/* Admin Routes */}
+                    <Route path="/admin/login" element={<LoginPage />} />
+                    <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                      <Route path="dashboard" element={<DashboardPage />} />
+                      <Route path="menu" element={<MenuManagementPage />} />
+                      <Route path="orders" element={<OrderManagementPage />} />
+                      <Route path="bookings" element={<BookingManagementPage />} />
+                      <Route path="customers" element={<CustomerManagementPage />} />
+                      <Route path="staff" element={<StaffManagementPage />} />
+                      <Route path="messages" element={<ContactMessagesPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="settings/receipts" element={<ReceiptSettingsPage />} />
+                      <Route path="stations" element={<StationManagementPage />} />
+                      <Route path="credits" element={<SMSCreditsPage />} />
+                      <Route path="super" element={<SuperAdminDashboard />} />
+                    </Route>
 
-                  {/* POS Routes - Wrapped in POSProvider */}
-                  <Route path="/pos/login" element={<POSLoginPage />} />
+                    {/* POS Routes - Wrapped in POSProvider */}
+                    <Route path="/pos/login" element={<POSLoginPage />} />
 
-                  <Route path="/pos" element={
-                    <RequirePOSAuth>
-                      <POSLayout />
-                    </RequirePOSAuth>
-                  }>
-                    <Route index element={<POSTablesPage />} />
-                    <Route path="walk-in" element={<POSWalkInPage />} />
-                    <Route path="my-orders" element={<POSMyOrdersPage />} />
-                    <Route path="kds" element={<KDSPage />} />
-                    <Route path="calls" element={<POSCallHistoryPage />} />
-                    <Route path="history" element={<POSHistoryPage />} />
-                    <Route path="reports" element={<POSReportsPage />} />
-                    <Route path="order/:tableId" element={<POSOrderPage />} />
-                    <Route path="payment/:orderId" element={<POSPaymentPage />} />
-                  </Route>
+                    <Route path="/pos" element={
+                      <RequirePOSAuth>
+                        <POSLayout />
+                      </RequirePOSAuth>
+                    }>
+                      <Route index element={<POSTablesPage />} />
+                      <Route path="walk-in" element={<POSWalkInPage />} />
+                      <Route path="my-orders" element={<POSMyOrdersPage />} />
+                      <Route path="kds" element={<KDSPage />} />
+                      <Route path="calls" element={<POSCallHistoryPage />} />
+                      <Route path="history" element={<POSHistoryPage />} />
+                      <Route path="reports" element={<POSReportsPage />} />
+                      <Route path="order/:tableId" element={<POSOrderPage />} />
+                      <Route path="payment/:orderId" element={<POSPaymentPage />} />
+                    </Route>
 
-                  {/* Public Customer Routes */}
-                  <Route path="/menu/:tableId" element={<CustomerMenuPage />} />
-                  <Route path="/r/:orderId" element={<PublicReceiptPage />} />
+                    {/* Public Customer Routes */}
+                    <Route path="/menu/:tableId" element={<CustomerMenuPage />} />
+                    <Route path="/r/:orderId" element={<PublicReceiptPage />} />
 
-                  {/* Catch all - redirects to home for unknown routes (fixes Supabase hash routing issues) */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </OfflineProvider>
+                    {/* Catch all - redirects to home for unknown routes (fixes Supabase hash routing issues) */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </OfflineProvider>
+              </SipProvider>
             </POSProvider>
           </SettingsProvider>
         </OrderProvider>

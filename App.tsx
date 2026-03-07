@@ -46,6 +46,7 @@ import KDSPage from './pages/pos/KDSPage';
 import POSPaymentPage from './pages/pos/POSPaymentPage';
 import POSCallHistoryPage from './pages/pos/POSCallHistoryPage';
 import POSHistoryPage from './pages/pos/POSHistoryPage';
+import POSPhoneOrderSetupPage from './pages/pos/POSPhoneOrderSetupPage';
 import POSReportsPage from './pages/pos/POSReportsPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
@@ -188,6 +189,7 @@ function App() {
                     }>
                       <Route index element={<POSTablesPage />} />
                       <Route path="walk-in" element={<POSWalkInPage />} />
+                      <Route path="phone-setup" element={<POSPhoneOrderSetupPage />} />
                       <Route path="my-orders" element={<POSMyOrdersPage />} />
                       <Route path="kds" element={<KDSPage />} />
                       <Route path="calls" element={<POSCallHistoryPage />} />

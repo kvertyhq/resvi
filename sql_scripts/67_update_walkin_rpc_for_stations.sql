@@ -10,7 +10,13 @@ CREATE OR REPLACE FUNCTION create_walkin_order(
     p_discount_type TEXT DEFAULT NULL,
     p_discount_amount DECIMAL(10,2) DEFAULT 0,
     p_payment_method TEXT DEFAULT NULL,
-    p_payment_transaction_id TEXT DEFAULT NULL
+    p_payment_transaction_id TEXT DEFAULT NULL,
+    p_customer_name TEXT DEFAULT NULL,
+    p_customer_phone TEXT DEFAULT NULL,
+    p_customer_address TEXT DEFAULT NULL,
+    p_customer_postcode TEXT DEFAULT NULL,
+    p_order_type TEXT DEFAULT 'takeaway',
+    p_order_source source DEFAULT 'pos'
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -65,6 +71,7 @@ BEGIN
         is_pos,
         discount_type,
         discount_amount,
+        source,
         created_at
     ) VALUES (
         p_restaurant_id,
@@ -74,10 +81,11 @@ BEGIN
         p_total_amount,
         CASE WHEN p_payment_method IS NOT NULL THEN 'confirmed'::order_status ELSE 'pending'::order_status END,
         CASE WHEN p_payment_method IS NOT NULL THEN 'paid'::payment_status ELSE 'unpaid'::payment_status END,
-        'takeaway',
+        p_order_type,
         true,
         p_discount_type,
         p_discount_amount,
+        p_order_source,
         NOW()
     )
     RETURNING readable_id, id, daily_order_number INTO v_readable_order_id, v_order_id, v_daily_order_number;

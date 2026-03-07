@@ -56,11 +56,18 @@ const POSOrderPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [tableName, setTableName] = useState('');
 
-    // Walk-in customer selection
+    // Walk-in/Phone customer selection
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerResults, setCustomerResults] = useState<any[]>([]);
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+    // Additional Customer fields for Phone Orders
+    const [customerAddress, setCustomerAddress] = useState('');
+    const [customerPostcode, setCustomerPostcode] = useState('');
+    const [isPhoneOrder, setIsPhoneOrder] = useState(false);
+    const [phoneOrderType, setPhoneOrderType] = useState<'delivery' | 'collection' | null>(null);
+    const [phoneOrderTimeslot, setPhoneOrderTimeslot] = useState<{ date: string, time: string } | null>(null);
 
     // Mobile Responsive State
     const [mobileTab, setMobileTab] = useState<'menu' | 'cart'>('menu');
@@ -128,7 +135,7 @@ const POSOrderPage: React.FC = () => {
 
     // Check for held order data from navigation state
     useEffect(() => {
-        const state = location.state as { heldOrder?: any; customer?: any };
+        const state = location.state as { heldOrder?: any; customer?: any; isPhoneOrder?: boolean };
         if (state?.heldOrder) {
             const heldOrder = state.heldOrder;
 
@@ -155,6 +162,15 @@ const POSOrderPage: React.FC = () => {
         } else if (state?.customer) {
             // Populate walk-in order customer from incoming call
             setSelectedCustomer(state.customer);
+            if (state.customer.address) setCustomerAddress(state.customer.address);
+            if (state.customer.postcode) setCustomerPostcode(state.customer.postcode);
+
+            if (state.isPhoneOrder) {
+                setIsPhoneOrder(true);
+                const explicitState = state as any;
+                if (explicitState.orderType) setPhoneOrderType(explicitState.orderType);
+                if (explicitState.timeslot) setPhoneOrderTimeslot(explicitState.timeslot);
+            }
             // Clear the navigation state 
             navigate(location.pathname, { replace: true, state: {} });
         }
@@ -209,13 +225,10 @@ const POSOrderPage: React.FC = () => {
         }
 
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, full_name, phone')
-                .eq('restaurant_id', settings?.id)
-                .eq('role', 'customer')
-                .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
-                .limit(10);
+            const { data, error } = await supabase.rpc('get_pos_customers', {
+                p_restaurant_id: settings?.id,
+                p_search_query: query
+            });
 
             if (error) throw error;
             setCustomerResults(data || []);
@@ -538,16 +551,42 @@ const POSOrderPage: React.FC = () => {
                 station_id: item.station_id
             }));
 
+            // 1. If it's a Phone/Walk-in order and we have customer details, upsert the customer
+            let finalCustomerId = selectedCustomer?.id || null;
+            if (isWalkIn && (customerSearch || customerAddress || customerPostcode)) {
+                // If it's highly likely a phone number (just digits and +), use it as phone. Else as name.
+                const isPhone = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
+                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || 'Walk-in Customer');
+                const phone = isPhone ? customerSearch : (selectedCustomer?.phone || null);
+
+                // Assuming RPC handles user creation if user_id is null, BUT if we want to store address 
+                // we should either update the RPC, or just upsert the profile here first. Let's do it here for clarity.
+                if (finalCustomerId) {
+                    // Update existing
+                    await supabase.from('profiles').update({
+                        address: customerAddress || null,
+                        postcode: customerPostcode || null
+                    }).eq('id', finalCustomerId);
+                } else {
+                    // We don't have a reliable way to create a full auth user from POS without an RPC bypass.
+                    // The `create_walkin_order` RPC handles this.
+                }
+            }
+
             const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
                 p_restaurant_id: settings?.id,
                 p_staff_id: staff?.id,
                 p_order_items: orderItems,
                 p_total_amount: total,
-                p_user_id: selectedCustomer?.id || null,
+                p_user_id: finalCustomerId,
                 p_discount_type: discountType || null,
                 p_discount_amount: discountAmount || 0,
                 p_payment_method: method,
-                p_payment_transaction_id: transactionId || null
+                p_payment_transaction_id: transactionId || null,
+                p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
+                p_customer_postcode: customerPostcode || null,
+                p_order_type: isPhoneOrder ? (phoneOrderType || 'phone') : 'walkin',
+                p_order_source: isPhoneOrder ? 'phone' : 'pos'
             });
 
             if (rpcError) throw rpcError;
@@ -793,7 +832,12 @@ const POSOrderPage: React.FC = () => {
                                 </svg>
                             </button>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                {isWalkIn ? 'Walk-In Order' : (tableName || 'Unknown Table')}
+                                {isWalkIn ? (isPhoneOrder ? `Phone Order (${phoneOrderType || 'takeaway'})` : 'Walk-In Order') : (tableName || 'Unknown Table')}
+                                {phoneOrderTimeslot && (
+                                    <span className="text-xs font-normal bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                                        {phoneOrderTimeslot.date} {phoneOrderTimeslot.time}
+                                    </span>
+                                )}
                                 <span className="md:hidden text-xs font-normal text-gray-500">
                                     ({filteredItems.length} items)
                                 </span>
@@ -817,6 +861,8 @@ const POSOrderPage: React.FC = () => {
                                         onClick={() => {
                                             setSelectedCustomer(null);
                                             setCustomerSearch('');
+                                            setCustomerAddress('');
+                                            setCustomerPostcode('');
                                         }}
                                         className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
                                     >
@@ -831,7 +877,11 @@ const POSOrderPage: React.FC = () => {
                                             <button
                                                 key={customer.id}
                                                 onClick={() => {
-                                                    setSelectedCustomer(customer);
+                                                    const selected = customer;
+                                                    setSelectedCustomer(selected);
+                                                    setCustomerSearch(selected.full_name || selected.phone || '');
+                                                    setCustomerAddress(selected.address || '');
+                                                    setCustomerPostcode(selected.postcode || '');
                                                     setShowCustomerDropdown(false);
                                                 }}
                                                 className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-0"
@@ -846,6 +896,24 @@ const POSOrderPage: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+
+                                {/* Always show address and postcode fields if Walkin/Phone Order is active, to capture caller details */}
+                                <div className="flex gap-2 mt-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Address..."
+                                        value={customerAddress}
+                                        onChange={(e) => setCustomerAddress(e.target.value)}
+                                        className="w-2/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Postcode"
+                                        value={customerPostcode}
+                                        onChange={(e) => setCustomerPostcode(e.target.value)}
+                                        className="w-1/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>

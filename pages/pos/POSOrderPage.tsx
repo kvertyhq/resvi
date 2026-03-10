@@ -553,23 +553,52 @@ const POSOrderPage: React.FC = () => {
 
             // 1. If it's a Phone/Walk-in order and we have customer details, upsert the customer
             let finalCustomerId = selectedCustomer?.id || null;
-            if (isWalkIn && (customerSearch || customerAddress || customerPostcode)) {
-                // If it's highly likely a phone number (just digits and +), use it as phone. Else as name.
-                const isPhone = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
-                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || 'Walk-in Customer');
-                const phone = isPhone ? customerSearch : (selectedCustomer?.phone || null);
 
-                // Assuming RPC handles user creation if user_id is null, BUT if we want to store address 
-                // we should either update the RPC, or just upsert the profile here first. Let's do it here for clarity.
+            // For phone orders: ensure the caller's number is saved as a profile
+            const phoneCustomer = isPhoneOrder ? (location.state?.customer || null) : null;
+            const callerPhone = phoneCustomer?.phone || null;
+
+            if (isWalkIn && (customerSearch || customerAddress || customerPostcode || callerPhone)) {
+                const isPhone = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
+                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || phoneCustomer?.name || phoneCustomer?.full_name || null);
+                const phone = isPhone ? customerSearch : (selectedCustomer?.phone || callerPhone || null);
+
                 if (finalCustomerId) {
-                    // Update existing
+                    // Update existing profile with address/phone if needed
                     await supabase.from('profiles').update({
                         address: customerAddress || null,
-                        postcode: customerPostcode || null
+                        postcode: customerPostcode || null,
+                        ...(phone && !selectedCustomer?.phone ? { phone } : {})
                     }).eq('id', finalCustomerId);
-                } else {
-                    // We don't have a reliable way to create a full auth user from POS without an RPC bypass.
-                    // The `create_walkin_order` RPC handles this.
+                } else if (phone) {
+                    // Try to find an existing profile by phone number first
+                    const normalizedPhone = phone.replace(/\D/g, '');
+                    const { data: existingProfiles } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, phone')
+                        .filter('phone', 'ilike', `%${normalizedPhone.slice(-9)}%`)
+                        .limit(1);
+
+                    if (existingProfiles && existingProfiles.length > 0) {
+                        finalCustomerId = existingProfiles[0].id;
+                        // Update name if we now have one and they didn't before
+                        if (name && !existingProfiles[0].full_name) {
+                            await supabase.from('profiles').update({ full_name: name }).eq('id', finalCustomerId);
+                        }
+                    } else {
+                        // Create a new profile with at least the phone number
+                        const { data: newProfile } = await supabase
+                            .from('profiles')
+                            .insert({
+                                full_name: name || null,
+                                phone: phone,
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            })
+                            .select('id')
+                            .single();
+                        if (newProfile) finalCustomerId = newProfile.id;
+                    }
                 }
             }
 
@@ -588,6 +617,7 @@ const POSOrderPage: React.FC = () => {
                 p_order_type: isPhoneOrder ? (phoneOrderType || 'phone') : 'walkin',
                 p_order_source: isPhoneOrder ? 'phone' : 'pos'
             });
+
 
             if (rpcError) throw rpcError;
 
@@ -1264,7 +1294,7 @@ const POSOrderPage: React.FC = () => {
                     isOpen={showSuccessModal}
                     onClose={() => {
                         setShowSuccessModal(false);
-                        navigate('/pos/walk-in');
+                        navigate(isPhoneOrder ? '/pos/call-history' : '/pos/walk-in');
                     }}
                     orderId={createdOrderId}
                     dailyOrderNumber={createdDailyOrderNumber}

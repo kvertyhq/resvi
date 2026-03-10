@@ -537,7 +537,10 @@ Notes: ${orderDetails.notes}
         p_phone: orderDetails.phone,
         p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
         p_scheduled_time: scheduledTime,
-        p_transaction_id: orderDetails.paymentIntentId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        p_transaction_id: orderDetails.paymentIntentId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        p_order_source: 'online'
+
+
       });
 
       if (error) {

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { supabase } from '../../supabaseClient';
-import { Clock, Calendar, ArrowLeft } from 'lucide-react';
+import { Clock, ArrowLeft } from 'lucide-react';
+import DatePicker from '../../components/ui/DatePicker';
 
 const DeliveryIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -113,9 +114,10 @@ const POSPhoneOrderSetupPage: React.FC = () => {
         }
     };
 
-    const baseButtonClasses = "w-full text-center p-6 border rounded-xl cursor-pointer transition-all duration-300 shadow-sm";
-    const inactiveButtonClasses = "border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700";
-    const activeButtonClasses = "border-[var(--theme-color)] bg-[var(--theme-color)]/10 shadow-md text-[var(--theme-color)]";
+    const baseButtonClasses = "w-full text-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 shadow-sm";
+    const inactiveButtonClasses = "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-[var(--theme-color)]/40 text-gray-700 dark:text-gray-300";
+    const activeButtonClasses = "border-[var(--theme-color)] bg-[var(--theme-color)] shadow-lg text-white scale-[1.02]";
+
 
     const getFilteredSlots = (dateString: string) => {
         if (!dateString || !settings?.collection_time_slots) return [];
@@ -127,23 +129,38 @@ const POSPhoneOrderSetupPage: React.FC = () => {
     const availableSlots = orderType === 'delivery' ? getFilteredSlots(deliveryDate) : getFilteredSlots(localDate);
 
     return (
-        <div className="min-h-screen h-full bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-start md:justify-center p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-            <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl md:rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 my-4 md:my-auto flex-shrink-0">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => navigate(-1)}
+            />
+
+            {/* Modal Panel */}
+            <div className="relative w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col animate-fade-in">
                 {/* Header */}
-                <div className="bg-[var(--theme-color)] p-5 md:p-6 text-white flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
+                <div className="bg-[var(--theme-color)] p-5 text-white flex items-center gap-4 flex-shrink-0">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                        aria-label="Go back"
+                    >
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold">Phone Order Setup</h1>
-                        <p className="text-white/80 text-sm">Customer: {customer?.name || customer?.full_name || 'Guest'} {customer?.phone ? `(${customer.phone})` : ''}</p>
+                        <h1 className="text-xl font-bold">Phone Order Setup</h1>
+                        <p className="text-white/80 text-sm mt-0.5">
+                            {customer?.name || customer?.full_name || 'Guest'}
+                            {customer?.phone ? ` · ${customer.phone}` : ''}
+                        </p>
                     </div>
                 </div>
 
-                <div className="p-5 md:p-8">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Select Order Type</h2>
+                {/* Scrollable Body */}
+                <div className="overflow-y-auto flex-1 p-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">Select Order Type</h2>
 
-                    <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="grid grid-cols-2 gap-4 mb-6">
                         <button
                             onClick={() => settings?.delivery_available !== false && setOrderType('delivery')}
                             disabled={settings?.delivery_available === false}
@@ -163,18 +180,17 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                     </div>
 
                     {/* Order Details Form */}
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                         {capacityError && (
-                            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
+                            <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
                                 {capacityError}
                             </div>
                         )}
 
                         {orderType === 'delivery' && (
-                            <div className="animate-fade-in space-y-5 bg-gray-50 dark:bg-gray-800/50 p-5 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700">Delivery Details</h3>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="animate-fade-in space-y-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700 text-sm">Delivery Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Postcode <span className="text-red-500">*</span></label>
                                         <input
@@ -182,41 +198,33 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                             value={postcode}
                                             onChange={(e) => setPostcode(e.target.value.toUpperCase())}
                                             placeholder="e.g. NW10 1AA"
-                                            className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none"
+                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-sm"
                                         />
                                     </div>
-                                    <div className="md:col-span-2">
+                                    <div className="sm:col-span-2">
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Full Address <span className="text-red-500">*</span></label>
                                         <textarea
                                             value={address}
                                             onChange={(e) => setAddress(e.target.value)}
                                             placeholder="Enter delivery address"
                                             rows={2}
-                                            className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none resize-none"
+                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none resize-none text-sm"
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Delivery Date</label>
-                                        <div className="relative">
-                                            <Calendar className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                                            <input
-                                                type="date"
-                                                value={deliveryDate}
-                                                onChange={e => setDeliveryDate(e.target.value)}
-                                                min={new Date().toISOString().split('T')[0]}
-                                                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none"
-                                            />
-                                        </div>
+                                        <DatePicker
+                                            value={deliveryDate}
+                                            onChange={setDeliveryDate}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            placeholder="Select delivery date"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Time Slot</label>
                                         <div className="relative">
-                                            <Clock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                                            <select
-                                                value={deliveryTime}
-                                                onChange={e => setDeliveryTime(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none appearance-none"
-                                            >
+                                            <Clock className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                                            <select value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none appearance-none text-sm">
                                                 <option value="" disabled>Select a time</option>
                                                 {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                                             </select>
@@ -227,31 +235,23 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                         )}
 
                         {orderType === 'collection' && (
-                            <div className="animate-fade-in space-y-5 bg-gray-50 dark:bg-gray-800/50 p-5 md:p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700">Collection Details</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="animate-fade-in space-y-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700 text-sm">Collection Details</h3>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Collection Date</label>
-                                        <div className="relative">
-                                            <Calendar className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                                            <input
-                                                type="date"
-                                                value={localDate}
-                                                onChange={e => setLocalDate(e.target.value)}
-                                                min={new Date().toISOString().split('T')[0]}
-                                                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none"
-                                            />
-                                        </div>
+                                        <DatePicker
+                                            value={localDate}
+                                            onChange={setLocalDate}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            placeholder="Select collection date"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Time Slot</label>
                                         <div className="relative">
-                                            <Clock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                                            <select
-                                                value={localTime}
-                                                onChange={e => setLocalTime(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none appearance-none"
-                                            >
+                                            <Clock className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                                            <select value={localTime} onChange={e => setLocalTime(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none appearance-none text-sm">
                                                 <option value="" disabled>Select a time</option>
                                                 {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                                             </select>
@@ -260,18 +260,15 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
                     </div>
 
-                    <div className="mt-8">
-                        <button
-                            onClick={handleContinue}
-                            disabled={!canContinue || isCheckingCapacity}
-                            className="w-full bg-[var(--theme-color)] text-white py-4 rounded-xl font-bold text-lg uppercase tracking-wider transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
-                        >
-                            {isCheckingCapacity ? 'Validating...' : 'Continue to Order'}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleContinue}
+                        disabled={!canContinue || isCheckingCapacity}
+                        className="w-full mt-6 bg-[var(--theme-color)] text-white py-3.5 rounded-xl font-bold uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
+                    >
+                        {isCheckingCapacity ? 'Validating...' : 'Continue to Order'}
+                    </button>
                 </div>
             </div>
         </div>

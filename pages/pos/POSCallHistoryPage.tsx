@@ -1,32 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { format } from 'date-fns';
-import { Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, UserPlus, ShoppingCart, Search, Delete, User, Users, GripHorizontal, Clock } from 'lucide-react';
+import {
+    Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing,
+    ShoppingCart, Search, User, Users, Clock,
+    ChevronLeft, ChevronRight, CheckCircle2, ExternalLink
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
-import { useSip } from '../../context/SipContext';
 
-// Helper for formatting
-const formatPhoneNumber = (str: string) => {
-    // Simple mock formatting or return as is
-    return str;
-};
+const CALLS_PER_PAGE = 12;
 
 const POSCallHistoryPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
-    const { callState } = useSip();
-    const [calls, setCalls] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    // Contact & Mobile State
+    // Tab state — default to 'orders'
+    const [activeTab, setActiveTab] = useState<'orders' | 'calls'>('orders');
+
+    // Call logs state
+    const [calls, setCalls] = useState<any[]>([]);
+    const [callsLoading, setCallsLoading] = useState(false);
+    const [callPage, setCallPage] = useState(1);
+    const [callTotal, setCallTotal] = useState(0);
+    const [callSearch, setCallSearch] = useState('');
+
+    // Phone orders state
+    const [phoneOrders, setPhoneOrders] = useState<any[]>([]);
+    const [ordersLoading, setOrdersLoading] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+
+    // Map of phone number -> order (to link calls to orders)
+    const [phoneToOrder, setPhoneToOrder] = useState<Record<string, any>>({});
+
+    // Contacts
     const [customers, setCustomers] = useState<any[]>([]);
     const [customerSearch, setCustomerSearch] = useState('');
-    const [mobileView, setMobileView] = useState<'history' | 'contacts' | 'orders'>('history');
-    const [activeRightTab, setActiveRightTab] = useState<'calls' | 'orders'>('calls');
 
-    // Phone Orders State
-    const [phoneOrders, setPhoneOrders] = useState<any[]>([]);
+    // Mobile view
+    const [mobileView, setMobileView] = useState<'history' | 'contacts' | 'orders'>('orders');
 
     useEffect(() => {
         if (settings?.id) {
@@ -36,48 +49,54 @@ const POSCallHistoryPage: React.FC = () => {
         }
 
         const subscription = supabase
-            .channel('calls_channel')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_logs' }, (payload) => {
-                fetchCalls();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `source=eq.phone` }, () => {
-                fetchPhoneOrders();
-            })
+            .channel('callhistory_channel')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_logs' }, () => fetchCalls())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `source=eq.phone` }, () => fetchPhoneOrders())
             .subscribe();
 
         return () => { subscription.unsubscribe(); };
     }, [settings?.id]);
 
-    const fetchCalls = async () => {
+    // Refetch calls when page or search changes
+    useEffect(() => {
+        if (settings?.id) fetchCalls();
+    }, [callPage, callSearch]);
+
+    const fetchCalls = useCallback(async () => {
         if (!settings?.id) return;
-        setLoading(true);
-        const { data, error } = await supabase
+        setCallsLoading(true);
+
+        const from = (callPage - 1) * CALLS_PER_PAGE;
+        const to = from + CALLS_PER_PAGE - 1;
+
+        let query = supabase
             .from('call_logs')
-            .select(`
-                *,
-                profiles ( full_name, phone )
-            `)
+            .select('*, profiles ( id, full_name, phone )', { count: 'exact' })
             .eq('restaurant_id', settings.id)
             .order('created_at', { ascending: false })
-            .limit(50);
+            .range(from, to);
 
-        if (error) console.error(error);
-        else setCalls(data || []);
-        setLoading(false);
-    };
+        if (callSearch.trim()) {
+            query = query.ilike('caller_number', `%${callSearch.trim()}%`);
+        }
+
+        const { data, error, count } = await query;
+        if (!error) {
+            setCalls(data || []);
+            setCallTotal(count || 0);
+        }
+        setCallsLoading(false);
+    }, [settings?.id, callPage, callSearch]);
 
     const fetchCustomers = async () => {
         if (!settings?.id) return;
-        const { data } = await supabase.rpc('get_pos_customers', {
-            p_restaurant_id: settings.id
-        });
-
+        const { data } = await supabase.rpc('get_pos_customers', { p_restaurant_id: settings.id });
         if (data) setCustomers(data);
     };
 
     const fetchPhoneOrders = async () => {
         if (!settings?.id) return;
-        setLoading(true);
+        setOrdersLoading(true);
         const { data, error } = await supabase
             .from('orders')
             .select(`
@@ -90,264 +109,453 @@ const POSCallHistoryPage: React.FC = () => {
             .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
             .order('created_at', { ascending: false });
 
-        if (error) console.error(error);
-        else setPhoneOrders(data || []);
-        setLoading(false);
+        if (!error && data) {
+            setPhoneOrders(data);
+            // Build phone->order map for linking calls
+            const map: Record<string, any> = {};
+            data.forEach((order: any) => {
+                const phone = order.profiles?.phone || order.notes?.match(/\d{7,}/)?.[0];
+                if (phone) map[phone] = order;
+            });
+            setPhoneToOrder(map);
+        }
+        setOrdersLoading(false);
     };
 
     const getStatusColor = (status: string) => {
-        const colors = {
-            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
-            preparing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
-            ready: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+        const colors: Record<string, string> = {
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+            confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+            preparing: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+            ready: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
         };
-        return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+        return colors[status] || 'bg-gray-100 text-gray-800';
     };
 
-
-
-
     const handleCreateOrder = (callOrCustomer: any) => {
-        // Extract phone number from either call log or customer object
         const phone = callOrCustomer.caller_number || callOrCustomer.phone || '';
         const name = callOrCustomer.profiles?.full_name || callOrCustomer.full_name || '';
-
         navigate('/pos/phone-setup', {
             state: {
-                customer: {
-                    id: callOrCustomer.profiles?.id || callOrCustomer.id,
-                    name: name,
-                    phone: phone,
-                    full_name: name // for consistency
-                },
+                customer: { id: callOrCustomer.profiles?.id || callOrCustomer.id, name, phone, full_name: name },
                 isPhoneOrder: true
             }
         });
     };
 
+    const totalCallPages = Math.ceil(callTotal / CALLS_PER_PAGE);
     const filteredCustomers = customers.filter(c =>
         (c.full_name?.toLowerCase() || '').includes(customerSearch.toLowerCase()) ||
         (c.phone || '').includes(customerSearch)
     );
 
-    const DialerKey = () => null; // Kept to avoid syntax errors if missed anywhere
-
     return (
-        <div className="w-full h-full flex flex-col md:flex-row bg-white dark:bg-gray-900 transition-colors duration-300 overflow-hidden relative">
+        <div className="w-full h-full flex flex-col md:flex-row bg-white dark:bg-gray-900 overflow-hidden relative">
 
             {/* Mobile Tab Toggle */}
             <div className="md:hidden flex p-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 <button
-                    onClick={() => { setMobileView('history'); setActiveRightTab('calls'); }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'history' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    onClick={() => { setMobileView('orders'); setActiveTab('orders'); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'orders' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
                 >
-                    <Clock size={14} />
-                    Logs
+                    <ShoppingCart size={14} /> Phone Orders
                 </button>
                 <button
-                    onClick={() => { setMobileView('orders'); setActiveRightTab('orders'); }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'orders' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    onClick={() => { setMobileView('history'); setActiveTab('calls'); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'history' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
                 >
-                    <ShoppingCart size={14} />
-                    Orders
+                    <Clock size={14} /> Call Logs
                 </button>
                 <button
                     onClick={() => setMobileView('contacts')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'contacts' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'contacts' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
                 >
-                    <Users size={14} />
-                    Contacts
+                    <Users size={14} /> Contacts
                 </button>
             </div>
 
-            {/* Left Panel: Contacts Sidebar */}
-            <div className={`${mobileView === 'contacts' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 transition-colors duration-300 flex-shrink-0 h-full z-10`}>
-
-                {/* Header */}
-                <div className="p-5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
-                    <h2 className="font-bold text-xl text-gray-900 dark:text-white flex items-center gap-3">
-                        <Users size={24} className="text-[var(--theme-color)]" />
+            {/* Left Panel: Contacts */}
+            <div className={`${mobileView === 'contacts' ? 'flex' : 'hidden'} md:flex w-full md:w-72 flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 h-full`}>
+                <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
+                    <h2 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                        <Users size={20} className="text-[var(--theme-color)]" />
                         Contacts
                     </h2>
+                    <div className="relative mt-3">
+                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            className="w-full bg-gray-100 dark:bg-gray-900 border border-transparent focus:border-[var(--theme-color)] rounded-lg pl-9 pr-3 py-2 text-sm text-gray-900 dark:text-white outline-none"
+                            value={customerSearch}
+                            onChange={e => setCustomerSearch(e.target.value)}
+                        />
+                    </div>
                 </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="p-4 bg-white dark:bg-gray-800">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search Name or Number..."
-                                className="w-full bg-gray-100 dark:bg-gray-900 border border-transparent focus:border-[var(--theme-color)] rounded-xl pl-10 pr-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-[var(--theme-color)]/10 outline-none transition-all"
-                                value={customerSearch}
-                                onChange={e => setCustomerSearch(e.target.value)}
-                            />
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {filteredCustomers.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                            <Users size={36} className="mb-2 opacity-20" />
+                            <p className="text-sm">No contacts found</p>
                         </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                        {filteredCustomers.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-                                <Users size={40} className="mb-3 opacity-20" />
-                                <p className="text-sm font-medium">No contacts found</p>
-                            </div>
-                        ) : (
-                            filteredCustomers.map(c => (
-                                <div
-                                    key={c.id}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-white dark:hover:bg-gray-700/50 rounded-xl transition-all group border border-transparent hover:border-gray-200 dark:hover:border-gray-600 shadow-sm hover:shadow"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center font-bold text-lg flex-shrink-0">
-                                        {c.full_name?.charAt(0) || <User size={24} />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-bold text-gray-900 dark:text-white truncate text-[15px]">{c.full_name}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{c.phone}</div>
-                                    </div>
+                    ) : (
+                        filteredCustomers.map(c => (
+                            <button
+                                key={c.id}
+                                onClick={() => handleCreateOrder(c)}
+                                className="w-full flex items-center gap-3 p-3 hover:bg-white dark:hover:bg-gray-700/50 rounded-xl transition-all text-left group"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center font-bold flex-shrink-0">
+                                    {c.full_name?.charAt(0) || <User size={18} />}
                                 </div>
-                            ))
-                        )}
-                    </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-gray-900 dark:text-white truncate text-sm">{c.full_name}</div>
+                                    <div className="text-xs text-gray-500 truncate">{c.phone}</div>
+                                </div>
+                                <ShoppingCart size={14} className="text-gray-400 group-hover:text-[var(--theme-color)] transition-colors flex-shrink-0" />
+                            </button>
+                        ))
+                    )}
                 </div>
             </div>
 
-            {/* Right Panel: Call History & Orders */}
-            <div className={`${(mobileView === 'history' || mobileView === 'orders') ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 h-full overflow-hidden bg-gray-50 dark:bg-gray-900/50`}>
+            {/* Right Panel */}
+            <div className={`${(mobileView === 'history' || mobileView === 'orders') ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 h-full overflow-hidden`}>
 
-                {/* Header & Desktop Tabs */}
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 w-full flex-shrink-0 z-10 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                {/* Header & Tabs */}
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                            {activeRightTab === 'calls' ? 'Call History' : 'Active Phone Orders'}
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                            {activeTab === 'orders' ? 'Phone Orders' : 'Call Logs'}
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            {activeRightTab === 'calls' ? 'Recent incoming and outgoing calls' : 'Currently active orders placed via phone'}
+                        <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
+                            {activeTab === 'orders' ? 'Active orders placed via phone' : 'Recent incoming and outgoing calls'}
                         </p>
                     </div>
 
-                    {/* Desktop Tabs */}
                     <div className="hidden md:flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
                         <button
-                            onClick={() => setActiveRightTab('calls')}
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeRightTab === 'calls' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            onClick={() => setActiveTab('orders')}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'orders' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                         >
-                            <Clock size={16} />
-                            Call Logs
-                        </button>
-                        <button
-                            onClick={() => setActiveRightTab('orders')}
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeRightTab === 'orders' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                        >
-                            <ShoppingCart size={16} />
+                            <ShoppingCart size={15} />
                             Phone Orders
                             {phoneOrders.length > 0 && (
-                                <span className="ml-1 bg-[var(--theme-color)] text-white text-[10px] px-1.5 py-0.5 rounded-full">{phoneOrders.length}</span>
+                                <span className="bg-[var(--theme-color)] text-white text-[10px] px-1.5 py-0.5 rounded-full">{phoneOrders.length}</span>
                             )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('calls')}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'calls' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            <Clock size={15} />
+                            Call Logs
                         </button>
                     </div>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex-1 overflow-auto p-6">
-                    {activeRightTab === 'calls' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {Number(calls.length) === 0 ? (
-                                <div className="text-center p-12 text-gray-400 flex flex-col items-center col-span-full">
-                                    <PhoneMissed size={48} className="mb-4 opacity-50" />
-                                    <p className="text-lg">No calls recorded yet.</p>
-                                </div>
-                            ) : (
-                                calls.map(call => (
-                                    <div key={call.id} className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col justify-between group hover:border-[var(--theme-color)] hover:shadow-md transition-all h-full">
-                                        <div className="flex items-start gap-4 mb-4">
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${call.direction === 'inbound'
-                                                ? (call.status === 'missed' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-green-100 text-green-600 dark:bg-green-900/30')
-                                                : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'
-                                                }`}>
-                                                {call.direction === 'inbound'
-                                                    ? <PhoneIncoming size={20} />
-                                                    : <PhoneOutgoing size={20} />
-                                                }
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2 flex-wrap">
-                                                    {call.profiles?.full_name || customers.find(c => c.id === call.customer_id || c.phone === call.caller_number)?.full_name || formatPhoneNumber(call.caller_number)}
-                                                    {(call.profiles || customers.find(c => c.id === call.customer_id || c.phone === call.caller_number)) && <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-color)]/10 text-[var(--theme-color)] rounded-full font-bold uppercase tracking-wide">Customer</span>}
-                                                </div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
-                                                    <span>{format(new Date(call.created_at), 'MMM d, h:mm a')}</span>
-                                                </div>
-                                                <div className={`text-sm mt-1 font-medium capitalize ${call.status === 'missed' ? 'text-red-500' : 'text-gray-600 dark:text-gray-300'}`}>
-                                                    {call.status} {call.duration > 0 && `• ${Math.floor(call.duration / 60)}:${(call.duration % 60).toString().padStart(2, '0')}`}
-                                                </div>
-                                            </div>
-                                        </div>
+                {/* Content */}
+                <div className="flex-1 overflow-auto p-4 md:p-6">
 
-                                        <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
-                                            <button
-                                                onClick={() => handleCreateOrder(call)}
-                                                className="flex-1 py-2.5 bg-[var(--theme-color)] text-white rounded-xl flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg active:scale-95 transition-all w-full"
-                                            >
-                                                <ShoppingCart size={18} />
-                                                Start Order
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {phoneOrders.length === 0 ? (
-                                <div className="text-center p-12 text-gray-400 flex flex-col items-center col-span-full">
-                                    <ShoppingCart size={48} className="mb-4 opacity-50" />
-                                    <p className="text-lg">No active phone orders yet.</p>
-                                </div>
-                            ) : (
-                                phoneOrders.map(order => (
-                                    <div key={order.id} className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col justify-between group hover:border-[var(--theme-color)] hover:shadow-md transition-all h-full">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <div className="font-bold text-gray-900 dark:text-white text-lg">
-                                                    Order #{order.daily_order_number || order.order_number || order.id.slice(0, 6)}
+                    {/* --- PHONE ORDERS TAB --- */}
+                    {activeTab === 'orders' && (
+                        ordersLoading ? (
+                            <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div>
+                        ) : phoneOrders.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                                <ShoppingCart size={48} className="mb-4 opacity-20" />
+                                <p className="text-lg font-medium">No active phone orders</p>
+                                <p className="text-sm mt-1">Orders placed via phone will appear here</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {phoneOrders.map(order => (
+                                        <button
+                                            key={order.id}
+                                            onClick={() => setSelectedOrder(order)}
+                                            className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col hover:border-[var(--theme-color)] hover:shadow-md transition-all text-left w-full"
+                                        >
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <div className="font-bold text-gray-900 dark:text-white text-base">
+                                                        {order.readable_id
+                                                            ? order.readable_id
+                                                            : order.daily_order_number
+                                                                ? `#${order.daily_order_number}`
+                                                                : `#${order.id.slice(0, 6)}`}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-0.5">
+                                                        {format(new Date(order.created_at), 'MMM d, h:mm a')}
+                                                    </div>
                                                 </div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                    {format(new Date(order.created_at), 'MMM d, h:mm a')}
-                                                </div>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
+                                                    {order.status}
+                                                </span>
                                             </div>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
-                                                {order.status}
-                                            </span>
-                                        </div>
 
-                                        <div className="mb-4 text-sm text-gray-700 dark:text-gray-300">
-                                            {order.customer ? (
-                                                <>
-                                                    <div className="font-semibold flex items-center gap-1"><User size={14} /> {order.customer.full_name}</div>
-                                                    {order.customer.phone && <div className="flex items-center gap-1 mt-1 text-gray-500"><Phone size={14} /> {order.customer.phone}</div>}
-                                                    {(order.customer.address || order.customer.postcode) && (
-                                                        <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-xs">
-                                                            {order.customer.address && <div>{order.customer.address}</div>}
-                                                            {order.customer.postcode && <div className="font-medium">{order.customer.postcode}</div>}
+                                            {order.profiles ? (
+                                                <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                                                    <div className="font-semibold flex items-center gap-1">
+                                                        <User size={13} /> {order.profiles.full_name || 'Guest'}
+                                                    </div>
+                                                    {order.profiles.phone && (
+                                                        <div className="flex items-center gap-1 mt-1 text-gray-500">
+                                                            <Phone size={13} /> {order.profiles.phone}
                                                         </div>
                                                     )}
-                                                </>
+                                                </div>
                                             ) : (
-                                                <div className="italic text-gray-500">Guest Customer</div>
+                                                <div className="text-sm text-gray-500 italic mb-3">Guest Customer</div>
                                             )}
-                                        </div>
 
-                                        <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
-                                            <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                                ${(order.total_amount || 0).toFixed(2)}
+                                            <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
+                                                <div className="font-bold text-gray-900 dark:text-white">
+                                                    £{(order.total_amount || 0).toFixed(2)}
+                                                </div>
+                                                <div className="text-xs text-[var(--theme-color)] font-semibold flex items-center gap-1">
+                                                    {order.order_items?.length || 0} items · View →
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-gray-500">
-                                                {order.order_items?.length || 0} items
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Order Detail Modal */}
+                                {selectedOrder && (
+                                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
+                                        <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col overflow-hidden">
+                                            {/* Header */}
+                                            <div className="bg-[var(--theme-color)] px-5 py-4 flex items-center justify-between flex-shrink-0">
+                                                <div>
+                                                    <div className="text-white font-bold text-lg">
+                                                        {selectedOrder.readable_id
+                                                            ? selectedOrder.readable_id
+                                                            : selectedOrder.daily_order_number
+                                                                ? `Order #${selectedOrder.daily_order_number}`
+                                                                : `Order #${selectedOrder.id.slice(0, 6)}`}
+                                                    </div>
+                                                    <div className="text-white/70 text-xs mt-0.5">
+                                                        {format(new Date(selectedOrder.created_at), 'MMMM d, yyyy · h:mm a')}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(selectedOrder.status)}`}>
+                                                        {selectedOrder.status}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setSelectedOrder(null)}
+                                                        className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Scrollable body */}
+                                            <div className="overflow-y-auto flex-1 p-5 space-y-5">
+                                                {/* Customer info */}
+                                                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-1.5">
+                                                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Customer</p>
+                                                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                                        <User size={14} className="text-[var(--theme-color)]" />
+                                                        {selectedOrder.profiles?.full_name || 'Guest Customer'}
+                                                    </div>
+                                                    {selectedOrder.profiles?.phone && (
+                                                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                                            <Phone size={14} />
+                                                            {selectedOrder.profiles.phone}
+                                                        </div>
+                                                    )}
+                                                    {selectedOrder.order_type && (
+                                                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 capitalize">
+                                                            <ShoppingCart size={14} />
+                                                            {selectedOrder.order_type}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Notes */}
+                                                {selectedOrder.notes && (
+                                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                                        <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-1">Notes</p>
+                                                        <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">{selectedOrder.notes}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Order items */}
+                                                <div>
+                                                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Items</p>
+                                                    <div className="space-y-2">
+                                                        {(selectedOrder.order_items || []).map((item: any, idx: number) => (
+                                                            <div key={idx} className="flex items-center justify-between py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="w-6 h-6 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                                        {item.quantity}
+                                                                    </span>
+                                                                    <span className="text-sm text-gray-800 dark:text-gray-200 font-medium">
+                                                                        {item.name_snapshot || 'Item'}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                                    £{((item.price_snapshot || 0) * item.quantity).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Totals */}
+                                                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-2">
+                                                    {selectedOrder.metadata?.delivery_fee > 0 && (
+                                                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                                            <span>Delivery fee</span>
+                                                            <span>£{Number(selectedOrder.metadata.delivery_fee).toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedOrder.metadata?.tax > 0 && (
+                                                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                                            <span>Tax</span>
+                                                            <span>£{Number(selectedOrder.metadata.tax).toFixed(2)}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
+                                                        <span>Total</span>
+                                                        <span>£{(selectedOrder.total_amount || 0).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                        <span>Payment</span>
+                                                        <span className="capitalize">{selectedOrder.payment_method || 'N/A'} · {selectedOrder.payment_status || 'unpaid'}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                ))
+                                )}
+                            </>
+                        )
+                    )}
+
+
+                    {/* --- CALL LOGS TAB --- */}
+                    {activeTab === 'calls' && (
+                        <div className="flex flex-col gap-4">
+                            {/* Search */}
+                            <div className="relative max-w-xs">
+                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by number..."
+                                    className="w-full bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-[var(--theme-color)] rounded-lg pl-9 pr-3 py-2 text-sm outline-none"
+                                    value={callSearch}
+                                    onChange={e => { setCallSearch(e.target.value); setCallPage(1); }}
+                                />
+                            </div>
+
+                            {callsLoading ? (
+                                <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div>
+                            ) : calls.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                                    <PhoneMissed size={48} className="mb-4 opacity-20" />
+                                    <p className="text-lg font-medium">No calls found</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {calls.map(call => {
+                                            // Check if an order already exists for this caller
+                                            const linkedOrder = phoneToOrder[call.caller_number] ||
+                                                phoneToOrder[call.caller_number?.replace(/\D/g, '')];
+                                            const customerName = call.profiles?.full_name ||
+                                                customers.find(c => c.phone === call.caller_number)?.full_name;
+
+                                            return (
+                                                <div key={call.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col hover:border-[var(--theme-color)] hover:shadow-md transition-all">
+                                                    <div className="flex items-start gap-3 mb-3">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${call.direction === 'inbound'
+                                                            ? call.status === 'missed' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-green-100 text-green-600 dark:bg-green-900/30'
+                                                            : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'
+                                                            }`}>
+                                                            {call.direction === 'inbound'
+                                                                ? call.status === 'missed' ? <PhoneMissed size={18} /> : <PhoneIncoming size={18} />
+                                                                : <PhoneOutgoing size={18} />
+                                                            }
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-gray-900 dark:text-white text-sm truncate flex items-center gap-1.5">
+                                                                {customerName || call.caller_number}
+                                                                {customerName && (
+                                                                    <span className="text-[9px] px-1.5 py-0.5 bg-[var(--theme-color)]/10 text-[var(--theme-color)] rounded-full font-bold uppercase tracking-wide">Customer</span>
+                                                                )}
+                                                            </div>
+                                                            {customerName && (
+                                                                <div className="text-xs text-gray-500 mt-0.5">{call.caller_number}</div>
+                                                            )}
+                                                            <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                                                                <span>{format(new Date(call.created_at), 'MMM d, h:mm a')}</span>
+                                                                <span className={`font-medium capitalize ${call.status === 'missed' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                                    · {call.status}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-auto pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                                        {linkedOrder ? (
+                                                            // Order already exists for this caller
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-semibold">
+                                                                    <CheckCircle2 size={16} />
+                                                                    Order #{linkedOrder.readable_id || linkedOrder.daily_order_number}
+                                                                </div>
+                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getStatusColor(linkedOrder.status)}`}>
+                                                                    {linkedOrder.status}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleCreateOrder(call)}
+                                                                className="w-full py-2 bg-[var(--theme-color)] text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm hover:opacity-90 active:scale-95 transition-all"
+                                                            >
+                                                                <ShoppingCart size={15} />
+                                                                Start Order
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Pagination */}
+                                    {totalCallPages > 1 && (
+                                        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                                            <p className="text-sm text-gray-500">
+                                                Showing {((callPage - 1) * CALLS_PER_PAGE) + 1}–{Math.min(callPage * CALLS_PER_PAGE, callTotal)} of {callTotal} calls
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    disabled={callPage === 1}
+                                                    onClick={() => setCallPage(p => p - 1)}
+                                                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                >
+                                                    <ChevronLeft size={16} />
+                                                </button>
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    {callPage} / {totalCallPages}
+                                                </span>
+                                                <button
+                                                    disabled={callPage === totalCallPages}
+                                                    onClick={() => setCallPage(p => p + 1)}
+                                                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                >
+                                                    <ChevronRight size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}

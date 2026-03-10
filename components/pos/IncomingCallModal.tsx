@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useSip } from '../../context/SipContext';
-import { supabase } from '../../supabaseClient';
 import { Phone, PhoneOff, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useSip } from '../../context/SipContext';
+import { supabase } from '../../supabaseClient';
+import { usePOS } from '../../context/POSContext';
 
 interface CustomerInfo {
     id: string;
@@ -13,6 +14,7 @@ interface CustomerInfo {
 
 export const IncomingCallModal: React.FC = () => {
     const { callState: sipCallState } = useSip();
+    const { staff } = usePOS();
     const [realtimeCall, setRealtimeCall] = useState<{ callerId: string } | null>(null);
     const [customer, setCustomer] = useState<CustomerInfo | null>(null);
     const [loading, setLoading] = useState(false);
@@ -21,24 +23,34 @@ export const IncomingCallModal: React.FC = () => {
 
     // Supabase Realtime Listener
     useEffect(() => {
+        if (!staff?.restaurant_id) return;
+
         const channel = supabase
             .channel('call_logs_realtime')
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'call_logs',
-                filter: 'direction=eq.inbound'
+                filter: `restaurant_id=eq.${staff.restaurant_id}`
             }, (payload: any) => {
-                console.log('New incoming call detected via Realtime:', payload);
-                setRealtimeCall({ callerId: payload.new.caller_number });
-                setIsDismissed(false); // Reset dismiss state for new call
+                const newLog = payload.new;
+
+                // Only trigger for inbound calls that are missed or 'called' (the new default)
+                if (newLog.direction === 'inbound' && (newLog.status === 'missed' || newLog.status === 'called')) {
+                    console.log('New incoming call detected via Realtime:', payload);
+                    setRealtimeCall({ callerId: newLog.caller_number });
+                    setIsDismissed(false); // Reset dismiss state for new call
+                }
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`Realtime channel status for restaurant ${staff.restaurant_id}:`, status);
+            });
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [staff?.restaurant_id]);
+
 
     // Derived State: Is there any ringing call?
     const isRinging = sipCallState.isRinging || (realtimeCall !== null && !isDismissed);
@@ -193,21 +205,24 @@ export const IncomingCallModal: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="flex gap-3 w-full">
-                        <button
-                            onClick={handleDismiss}
-                            className="flex-1 py-3 px-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm"
-                        >
-                            Dismiss
-                        </button>
+                    <div className="flex flex-col gap-3 w-full mt-4">
                         <button
                             onClick={handleStartOrder}
-                            className="flex-1 py-3 px-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 text-sm"
+                            className="w-full h-12 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 text-base active:scale-[0.98] group"
                         >
-                            <User size={18} className="animate-pulse" />
-                            Start Order
+                            <User size={20} className="group-hover:scale-110 transition-transform" />
+                            <span>Start Order</span>
+                        </button>
+                        <button
+                            onClick={handleDismiss}
+                            className="w-full h-12 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-600 active:scale-[0.98]"
+                        >
+                            <PhoneOff size={18} />
+                            <span>Dismiss Call</span>
                         </button>
                     </div>
+
+
                 </div>
             </div>
         </div>

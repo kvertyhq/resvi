@@ -25,7 +25,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
 
     // Retrieve incoming params
     const incomingState = location.state || {};
-    const { customer, isPhoneOrder } = incomingState;
+    const { customer, isPhoneOrder, callLogId } = incomingState;
 
     const [orderType, setOrderType] = useState<'delivery' | 'collection' | null>(null);
     const [localDate, setLocalDate] = useState('');
@@ -37,8 +37,46 @@ const POSPhoneOrderSetupPage: React.FC = () => {
     const [postcode, setPostcode] = useState(customer?.postcode || '');
     const [address, setAddress] = useState(customer?.address || '');
 
+    // Postcode address lookup
+    const [addressOptions, setAddressOptions] = useState<string[]>([]);
+    const [isLookingUp, setIsLookingUp] = useState(false);
+    const [lookupError, setLookupError] = useState<string | null>(null);
+    const [addressMode, setAddressMode] = useState<'dropdown' | 'manual'>('manual');
+
     const [isCheckingCapacity, setIsCheckingCapacity] = useState(false);
     const [capacityError, setCapacityError] = useState<string | null>(null);
+
+    const lookupAddresses = async () => {
+        const trimmed = postcode.trim().replace(/\s+/g, '');
+        if (!trimmed) return;
+        setIsLookingUp(true);
+        setLookupError(null);
+        setAddressOptions([]);
+        try {
+            const apiKey = import.meta.env.VITE_IDEAL_POSTCODES_API_KEY;
+            const res = await fetch(
+                `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(trimmed)}?api_key=${apiKey}`
+            );
+            if (res.status === 404) throw new Error('Postcode not found');
+            if (!res.ok) throw new Error('Failed to fetch addresses');
+            const data = await res.json();
+            const addresses: any[] = data.result || [];
+            const formatted: string[] = addresses.map((a: any) => {
+                const parts = [
+                    a.line_1, a.line_2, a.line_3, a.post_town, a.county
+                ].filter(Boolean);
+                return parts.join(', ');
+            });
+            if (formatted.length === 0) throw new Error('No addresses found for this postcode');
+            setAddressOptions(formatted);
+            setAddressMode('dropdown');
+            setAddress(''); // reset so user must select
+        } catch (err: any) {
+            setLookupError(err.message || 'Failed to fetch addresses');
+        } finally {
+            setIsLookingUp(false);
+        }
+    };
 
     useEffect(() => {
         const today = new Date();
@@ -100,7 +138,8 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                         customer: updatedCustomer,
                         isPhoneOrder: true,
                         orderType: orderType, // 'delivery' or 'collection'
-                        timeslot: timeslot
+                        timeslot: timeslot,
+                        callLogId: callLogId ?? null  // carry through so POSOrderPage can link the order
                     }
                 });
             } else {
@@ -191,25 +230,77 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                             <div className="animate-fade-in space-y-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700">
                                 <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700 text-sm">Delivery Details</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
+                                    <div className="sm:col-span-2">
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Postcode <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={postcode}
-                                            onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                                            placeholder="e.g. NW10 1AA"
-                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-sm"
-                                        />
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={postcode}
+                                                onChange={(e) => {
+                                                    setPostcode(e.target.value.toUpperCase());
+                                                    setAddressOptions([]);
+                                                    setAddressMode('manual');
+                                                    setLookupError(null);
+                                                }}
+                                                onKeyDown={(e) => e.key === 'Enter' && lookupAddresses()}
+                                                placeholder="e.g. NW10 1AA"
+                                                className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={lookupAddresses}
+                                                disabled={!postcode.trim() || isLookingUp}
+                                                title="Find address"
+                                                className="px-3 py-2.5 bg-[var(--theme-color)] text-white rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0"
+                                            >
+                                                {isLookingUp ? (
+                                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                                                ) : (
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                        {lookupError && (
+                                            <p className="text-xs text-red-500 mt-1.5">{lookupError}</p>
+                                        )}
                                     </div>
                                     <div className="sm:col-span-2">
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Full Address <span className="text-red-500">*</span></label>
-                                        <textarea
-                                            value={address}
-                                            onChange={(e) => setAddress(e.target.value)}
-                                            placeholder="Enter delivery address"
-                                            rows={2}
-                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none resize-none text-sm"
-                                        />
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Full Address <span className="text-red-500">*</span></label>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setAddressMode('manual'); }}
+                                                className="text-xs text-[var(--theme-color)] font-semibold hover:underline"
+                                            >
+                                                {addressMode === 'dropdown' ? 'Enter manually' : addressOptions.length === 0 ? 'Type manually instead' : null}
+                                            </button>
+                                        </div>
+                                        {addressMode === 'dropdown' && addressOptions.length > 0 ? (
+                                            <select
+                                                value={address}
+                                                onChange={(e) => setAddress(e.target.value)}
+                                                className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-sm appearance-none"
+                                            >
+                                                <option value="">— Select an address —</option>
+                                                {addressOptions.map((addr, i) => (
+                                                    <option key={i} value={addr}>{addr}</option>
+                                                ))}
+                                            </select>
+                                        ) : addressMode === 'manual' ? (
+                                            <textarea
+                                                value={address}
+                                                onChange={(e) => setAddress(e.target.value)}
+                                                placeholder="Type the full delivery address"
+                                                rows={2}
+                                                autoFocus
+                                                className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none resize-none text-sm"
+                                            />
+                                        ) : (
+                                            <div className="w-full px-4 py-2.5 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-sm text-gray-400 dark:text-gray-500 flex items-center gap-2 cursor-not-allowed select-none bg-gray-50 dark:bg-gray-800/40">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                                                Use postcode lookup to find address
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Delivery Date</label>

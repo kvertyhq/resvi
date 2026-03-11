@@ -637,6 +637,16 @@ const POSOrderPage: React.FC = () => {
             if (orderId && settings?.id) {
                 await receiptService.printOrder(orderId, settings.id);
             }
+
+            // Link the order to the originating call log (if the flow started from a call)
+            const callLogId = (location.state as any)?.callLogId;
+            if (isPhoneOrder && callLogId && orderId) {
+                await supabase
+                    .from('call_logs')
+                    .update({ order_id: orderId })
+                    .eq('id', callLogId);
+            }
+
         } catch (error) {
             console.error('Order failed:', error);
             alert('Failed to create order. Please try again.');

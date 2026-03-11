@@ -7,6 +7,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User } from 'lucide-react';
 import PrinterConfigModal from './PrinterConfigModal';
 import { IncomingCallModal } from './IncomingCallModal';
+import VirtualKeyboard from './VirtualKeyboard';
 const POSLayout: React.FC = () => {
     const { user, loading: adminLoading } = useAdmin();
     const { staff, logout, loading: posLoading, clockIn, clockOut, activeShift } = usePOS();
@@ -304,6 +305,8 @@ const POSLayout: React.FC = () => {
             <PrinterConfigModal isOpen={showPrinterModal} onClose={() => setShowPrinterModal(false)} />
             {/* Global Incoming Call Modal */}
             <IncomingCallModal />
+            {/* Floating Virtual Keyboard */}
+            <VirtualKeyboard />
         </div >
     );
 };

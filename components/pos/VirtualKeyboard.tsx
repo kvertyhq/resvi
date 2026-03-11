@@ -89,6 +89,9 @@ const VirtualKeyboard: React.FC = () => {
     const [open, setOpen] = useState(false);
     const [shift, setShift] = useState(false);
     const [mode, setMode] = useState<'qwerty' | 'numpad'>('qwerty');
+    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 350, y: window.innerHeight - 450 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
 
     // Track the element that was focused BEFORE the keyboard button was pressed
     const focusTarget = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
@@ -121,6 +124,8 @@ const VirtualKeyboard: React.FC = () => {
 
     const handleToggle = () => {
         if (!open) {
+            // Center the keyboard when opening if it's off-screen
+            setPosition({ x: window.innerWidth / 2 - 350, y: window.innerHeight - 450 });
             // Record current focus target before it blurs
             const el = document.activeElement;
             if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
@@ -129,6 +134,45 @@ const VirtualKeyboard: React.FC = () => {
         }
         setOpen(o => !o);
     };
+
+    // Drag handlers
+    const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        setIsDragging(true);
+        dragOffset.current = {
+            x: clientX - position.x,
+            y: clientY - position.y
+        };
+    };
+
+    React.useEffect(() => {
+        const handleMove = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+            const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+
+            // Constrain to viewport
+            const newX = Math.max(10, Math.min(window.innerWidth - 700, clientX - dragOffset.current.x));
+            const newY = Math.max(10, Math.min(window.innerHeight - 350, clientY - dragOffset.current.y));
+
+            setPosition({ x: newX, y: newY });
+        };
+        const handleEnd = () => setIsDragging(false);
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+            window.addEventListener('touchmove', handleMove);
+            window.addEventListener('touchend', handleEnd);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleEnd);
+            window.removeEventListener('touchmove', handleMove);
+            window.removeEventListener('touchend', handleEnd);
+        };
+    }, [isDragging, position]);
 
     /** Restore focus to the target field before typing */
     const ensureFocus = useCallback(() => {
@@ -207,32 +251,44 @@ const VirtualKeyboard: React.FC = () => {
             {/* Keyboard panel */}
             {open && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 z-[390] bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl p-2 pb-3"
+                    className="fixed z-[390] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-3 pb-4 rounded-2xl overflow-hidden w-[720px]"
+                    style={{ left: position.x, top: position.y }}
                     onMouseDown={(e) => e.preventDefault()} // never steal focus
                 >
-                    {/* Mode switch tabs */}
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                        <button
-                            onMouseDown={(e) => { e.preventDefault(); setMode('qwerty'); }}
-                            className={`text-xs px-3 py-1 rounded-md font-bold transition-all ${mode === 'qwerty' ? 'bg-[var(--theme-color)] text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                        >ABC</button>
-                        <button
-                            onMouseDown={(e) => { e.preventDefault(); setMode('numpad'); }}
-                            className={`text-xs px-3 py-1 rounded-md font-bold transition-all ${mode === 'numpad' ? 'bg-[var(--theme-color)] text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                        >123</button>
+                    {/* Drag Handle & Header */}
+                    <div
+                        className="flex items-center justify-between mb-2 cursor-move bg-gray-200/50 dark:bg-gray-700/50 -mx-3 -mt-3 p-1.5 px-4 border-b border-gray-300 dark:border-gray-600 active:bg-gray-300 dark:active:bg-gray-600 transition-colors"
+                        onMouseDown={handleDragStart}
+                        onTouchStart={handleDragStart}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-1 bg-gray-400 dark:bg-gray-500 rounded-full" />
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Drag to Move</span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                onMouseDown={(e) => { e.preventDefault(); setMode('qwerty'); }}
+                                className={`text-sm px-5 py-1.5 rounded-md font-bold transition-all ${mode === 'qwerty' ? 'bg-[var(--theme-color)] text-white' : 'text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'}`}
+                            >ABC</button>
+                            <button
+                                onMouseDown={(e) => { e.preventDefault(); setMode('numpad'); }}
+                                className={`text-sm px-5 py-1.5 rounded-md font-bold transition-all ${mode === 'numpad' ? 'bg-[var(--theme-color)] text-white' : 'text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'}`}
+                            >123</button>
+                        </div>
                     </div>
 
                     {mode === 'qwerty' ? (
                         <div className="space-y-1.5">
                             {rows.map((row, ri) => (
-                                <div key={ri} className="flex justify-center gap-1">
+                                <div key={ri} className="flex justify-center gap-1.5">
                                     {ri === 3 && (
                                         // Shift key
                                         <button
                                             onMouseDown={(e) => { e.preventDefault(); setShift(s => !s); }}
-                                            className={`${keyAccent} text-xs w-10 h-9 ${shift ? 'ring-2 ring-[var(--theme-color)]' : ''}`}
+                                            className={`${keyAccent} text-sm w-16 h-12 ${shift ? 'ring-2 ring-[var(--theme-color)]' : ''}`}
                                         >
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill={shift ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill={shift ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
                                                 <path d="M12 2L2 12h5v8h10v-8h5z" />
                                             </svg>
                                         </button>
@@ -241,7 +297,7 @@ const VirtualKeyboard: React.FC = () => {
                                         <button
                                             key={key}
                                             onMouseDown={(e) => { e.preventDefault(); handleKey(key); }}
-                                            className={`${keyDefault} text-sm w-9 h-9`}
+                                            className={`${keyDefault} text-2xl font-bold w-14 h-12`}
                                         >
                                             {key}
                                         </button>
@@ -250,9 +306,9 @@ const VirtualKeyboard: React.FC = () => {
                                         // Backspace at end of row 2
                                         <button
                                             onMouseDown={(e) => { e.preventDefault(); handleBackspace(); }}
-                                            className={`${keyDanger} w-12 h-9`}
+                                            className={`${keyDanger} w-16 h-12`}
                                         >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                                 <path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" />
                                                 <line x1="12" y1="10" x2="16" y2="14" />
                                                 <line x1="16" y1="10" x2="12" y2="14" />
@@ -262,40 +318,40 @@ const VirtualKeyboard: React.FC = () => {
                                 </div>
                             ))}
                             {/* Bottom row: Space + Enter */}
-                            <div className="flex justify-center gap-1 mt-0.5">
+                            <div className="flex justify-center gap-1.5 mt-0.5">
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleKey('@'); }}
-                                    className={`${keyDefault} text-xs w-10 h-9`}
+                                    className={`${keyDefault} text-sm w-16 h-12`}
                                 >@</button>
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleKey('-'); }}
-                                    className={`${keyDefault} text-xs w-10 h-9`}
+                                    className={`${keyDefault} text-sm w-16 h-12`}
                                 >-</button>
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleSpace(); }}
-                                    className={`${keyDefault} text-sm flex-1 max-w-[220px] h-9`}
+                                    className={`${keyDefault} text-lg flex-1 max-w-[320px] h-12`}
                                 >Space</button>
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleKey('/'); }}
-                                    className={`${keyDefault} text-xs w-10 h-9`}
+                                    className={`${keyDefault} text-sm w-16 h-12`}
                                 >/</button>
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleEnter(); }}
-                                    className={`${keyAccent} text-xs w-14 h-9 font-bold`}
+                                    className={`${keyAccent} text-lg w-20 h-12 font-bold`}
                                 >↵</button>
                             </div>
                         </div>
                     ) : (
                         /* Numpad mode */
-                        <div className="flex gap-2 justify-center">
+                        <div className="flex gap-4 justify-center">
                             <div className="space-y-1.5">
                                 {NUMPAD_ROWS.map((row, ri) => (
-                                    <div key={ri} className="flex gap-1.5">
+                                    <div key={ri} className="flex gap-2">
                                         {row.map(key => (
                                             <button
                                                 key={key}
                                                 onMouseDown={(e) => { e.preventDefault(); handleKey(key); }}
-                                                className={`${keyDefault} text-lg font-semibold w-16 h-12`}
+                                                className={`${keyDefault} text-2xl font-semibold w-20 h-14`}
                                             >
                                                 {key}
                                             </button>
@@ -303,12 +359,12 @@ const VirtualKeyboard: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-2">
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleBackspace(); }}
-                                    className={`${keyDanger} w-16 h-12`}
+                                    className={`${keyDanger} w-20 h-14 flex items-center justify-center`}
                                 >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                         <path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" />
                                         <line x1="12" y1="10" x2="16" y2="14" />
                                         <line x1="16" y1="10" x2="12" y2="14" />
@@ -316,7 +372,7 @@ const VirtualKeyboard: React.FC = () => {
                                 </button>
                                 <button
                                     onMouseDown={(e) => { e.preventDefault(); handleEnter(); }}
-                                    className={`${keyAccent} w-16 flex-1 font-bold text-lg`}
+                                    className={`${keyAccent} w-20 flex-1 font-bold text-2xl`}
                                 >↵</button>
                             </div>
                         </div>

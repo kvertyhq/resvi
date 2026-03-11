@@ -170,10 +170,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
             {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={() => navigate(-1)}
-            />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
             {/* Modal Panel */}
             <div className="relative w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col animate-fade-in">
@@ -236,6 +233,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                             <input
                                                 type="text"
                                                 value={postcode}
+                                                autoFocus
                                                 onChange={(e) => {
                                                     setPostcode(e.target.value.toUpperCase());
                                                     setAddressOptions([]);
@@ -276,23 +274,32 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                             </button>
                                         </div>
                                         {addressMode === 'dropdown' && addressOptions.length > 0 ? (
-                                            <select
-                                                value={address}
-                                                onChange={(e) => setAddress(e.target.value)}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-lg appearance-none"
-                                            >
-                                                <option value="">— Select an address —</option>
-                                                {addressOptions.map((addr, i) => (
-                                                    <option key={i} value={addr}>{addr}</option>
-                                                ))}
-                                            </select>
+                                            <div className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden shadow-md max-h-80 flex flex-col">
+                                                <div className="p-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
+                                                    Select an address ({addressOptions.length} found)
+                                                </div>
+                                                <div className="overflow-y-auto flex-1 divide-y divide-gray-100 dark:divide-gray-800">
+                                                    {addressOptions.map((addr, i) => (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setAddress(addr);
+                                                                setAddressMode('manual'); // once selected, show as text
+                                                            }}
+                                                            className="w-full text-left px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 transition-colors text-base font-medium text-gray-700 dark:text-gray-200"
+                                                        >
+                                                            {addr}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         ) : addressMode === 'manual' ? (
                                             <textarea
                                                 value={address}
                                                 onChange={(e) => setAddress(e.target.value)}
                                                 placeholder="Type the full delivery address"
                                                 rows={2}
-                                                autoFocus
                                                 className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none resize-none text-sm"
                                             />
                                         ) : (

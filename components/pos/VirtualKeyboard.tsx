@@ -93,6 +93,32 @@ const VirtualKeyboard: React.FC = () => {
     // Track the element that was focused BEFORE the keyboard button was pressed
     const focusTarget = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
+    // Auto-open on input focus
+    React.useEffect(() => {
+        const handleFocusIn = (e: FocusEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                // Ignore special inputs that might not need the keyboard, e.g., checkboxes, radio buttons
+                if (target.tagName === 'INPUT' && ['checkbox', 'radio', 'range', 'color', 'file'].includes((target as HTMLInputElement).type)) {
+                    return;
+                }
+
+                // Don't auto-open if it's already open, but DO update the focus target
+                focusTarget.current = target as HTMLInputElement | HTMLTextAreaElement;
+
+                // Small delay to ensure the focus event has fully resolved
+                setTimeout(() => setOpen(true), 50);
+            }
+        };
+
+        // Listen for focusin on the document (captures focus events bubbled up)
+        document.addEventListener('focusin', handleFocusIn);
+
+        return () => {
+            document.removeEventListener('focusin', handleFocusIn);
+        };
+    }, []);
+
     const handleToggle = () => {
         if (!open) {
             // Record current focus target before it blurs

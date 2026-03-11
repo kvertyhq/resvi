@@ -195,7 +195,7 @@ const POSCallHistoryPage: React.FC = () => {
         const name = callOrCustomer.profiles?.full_name || callOrCustomer.full_name || '';
         navigate('/pos/phone-setup', {
             state: {
-                customer: { id: callOrCustomer.profiles?.id || callOrCustomer.id, name, phone, full_name: name },
+                customer: { id: callOrCustomer.profiles?.id || null, name, phone, full_name: name },
                 isPhoneOrder: true,
                 callLogId: callOrCustomer.id ?? null  // pass the call_logs row id
             }

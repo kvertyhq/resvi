@@ -279,7 +279,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                             <select
                                                 value={address}
                                                 onChange={(e) => setAddress(e.target.value)}
-                                                className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-sm appearance-none"
+                                                className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-lg appearance-none"
                                             >
                                                 <option value="">— Select an address —</option>
                                                 {addressOptions.map((addr, i) => (

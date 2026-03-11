@@ -89,7 +89,7 @@ const VirtualKeyboard: React.FC = () => {
     const [open, setOpen] = useState(false);
     const [shift, setShift] = useState(false);
     const [mode, setMode] = useState<'qwerty' | 'numpad'>('qwerty');
-    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 350, y: window.innerHeight - 450 });
+    const [position, setPosition] = useState({ x: window.innerWidth - 740, y: 20 });
     const [isDragging, setIsDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
 
@@ -124,8 +124,6 @@ const VirtualKeyboard: React.FC = () => {
 
     const handleToggle = () => {
         if (!open) {
-            // Center the keyboard when opening if it's off-screen
-            setPosition({ x: window.innerWidth / 2 - 350, y: window.innerHeight - 450 });
             // Record current focus target before it blurs
             const el = document.activeElement;
             if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {

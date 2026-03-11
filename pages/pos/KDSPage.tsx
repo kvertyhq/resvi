@@ -68,8 +68,9 @@ const KDSPage: React.FC = () => {
                         const defaultStation = data.find(s => s.is_default && s.type === 'kitchen') || data[0];
                         setActiveStationId(defaultStation.id);
                     }
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Failed to load stations for KDS", error);
+                    alert(`KDS Station Loading Error: ${error.message || 'Unknown error'}`);
                 }
             };
             loadStations();
@@ -107,8 +108,9 @@ const KDSPage: React.FC = () => {
             previousOrderCount.current = typedData.length;
 
             setOrders(typedData);
-        } catch (error) {
+        } catch (error: any) {
             console.error('KDS Fetch Error:', error);
+            alert(`KDS Order Fetch Error: ${error.message || error.details || 'Check console'}`);
         } finally {
             setLoading(false);
         }

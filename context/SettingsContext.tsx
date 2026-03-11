@@ -76,7 +76,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         );
 
-        if (!res.ok) throw new Error("Failed to load settings");
+        if (!res.ok) {
+          const body = await res.text();
+          console.error('Settings fetch failed:', res.status, body);
+          throw new Error(`Failed to load settings: ${res.statusText}`);
+        }
 
         const data = await res.json();
 
@@ -94,7 +98,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
           link.href = data.data.logo_url;
         }
       } catch (err: any) {
+        console.error('Settings load error:', err);
         setError(err.message);
+        alert(`Configuration Error: ${err.message}`);
       } finally {
         setLoading(false);
       }

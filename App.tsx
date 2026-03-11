@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import React, { useEffect } from 'react';
 // Context
 import { OrderProvider } from './context/OrderContext';
@@ -66,14 +66,20 @@ const RequirePOSAuth = ({ children }: { children: React.ReactElement }) => {
 
 const RedirectHandler = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = usePOS();
+
   useEffect(() => {
-    const mode = import.meta.env.VITE_APP_MODE;
-    if (mode === 'pos') {
-      navigate('/pos/login', { replace: true });
-    } else if (mode === 'admin') {
-      navigate('/admin/login', { replace: true });
+    // Only redirect if at the root path
+    if (location.pathname === '/') {
+      const mode = import.meta.env.VITE_APP_MODE;
+      if (mode === 'pos') {
+        navigate(isAuthenticated ? '/pos' : '/pos/login', { replace: true });
+      } else if (mode === 'admin') {
+        navigate('/admin/login', { replace: true });
+      }
     }
-  }, [navigate]);
+  }, [navigate, location.pathname, isAuthenticated]);
   return null;
 };
 
@@ -84,7 +90,6 @@ function App() {
   }, [settings]);
   return (
     <HashRouter>
-      <RedirectHandler />
       <AuthCallbackHandler />
       <AdminProvider>
         <OrderProvider>
@@ -93,6 +98,7 @@ function App() {
             <POSProvider>
               <SipProvider>
                 <OfflineProvider>
+                  <RedirectHandler />
                   <Routes>
                     {/* Public Routes */}
                     <Route path="/" element={

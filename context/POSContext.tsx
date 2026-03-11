@@ -62,7 +62,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, []);
 
     const login = async (pin: string) => {
-        if (!settings?.id) return false;
+        if (!settings?.id) {
+            console.error('Login failed: Settings not loaded or restaurant_id missing');
+            return false;
+        }
 
         try {
             // 1. Find profile with this PIN code for this restaurant
@@ -73,7 +76,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 })
                 .maybeSingle();
 
-            if (error || !data) {
+            if (error) {
+                console.error('Supabase RPC Login Error:', error);
+                alert(`Login Error: ${error.message}`);
+                return false;
+            }
+
+            if (!data) {
+                console.warn('Login failed: No profile found for this PIN');
                 return false;
             }
 

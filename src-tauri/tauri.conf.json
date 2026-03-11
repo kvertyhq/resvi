@@ -13,14 +13,15 @@
     "windows": [
       {
         "title": "Resvi POS",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' http://localhost:3000; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://qbgziszculmwzyhjvfyc.supabase.co; connect-src 'self' https://qbgziszculmwzyhjvfyc.supabase.co wss://qbgziszculmwzyhjvfyc.supabase.co http://localhost:3000;"
     }
   },
   "bundle": {

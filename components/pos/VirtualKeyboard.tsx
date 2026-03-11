@@ -135,6 +135,10 @@ const VirtualKeyboard: React.FC = () => {
 
     // Drag handlers
     const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+        // Prevent background scrolling/interactions
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
         setIsDragging(true);
@@ -147,6 +151,11 @@ const VirtualKeyboard: React.FC = () => {
     React.useEffect(() => {
         const handleMove = (e: MouseEvent | TouchEvent) => {
             if (!isDragging) return;
+
+            // Block browser default touch behavior (scrolling) during drag
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+
             const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
             const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
 
@@ -161,7 +170,7 @@ const VirtualKeyboard: React.FC = () => {
         if (isDragging) {
             window.addEventListener('mousemove', handleMove);
             window.addEventListener('mouseup', handleEnd);
-            window.addEventListener('touchmove', handleMove);
+            window.addEventListener('touchmove', handleMove, { passive: false });
             window.addEventListener('touchend', handleEnd);
         }
         return () => {

@@ -159,7 +159,7 @@ const POSPaymentPage: React.FC = () => {
 
             // Auto-print receipt if enabled (only for full payment)
             if (result.fully_paid && orderId && order?.restaurant_id) {
-                await receiptService.printOrder(orderId, order.restaurant_id);
+                await receiptService.printOrder(orderId, order.restaurant_id, false, paymentMethod);
             }
 
             if (!result.fully_paid) {
@@ -216,7 +216,7 @@ const POSPaymentPage: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => receiptService.printOrder(order.id)}
+                        onClick={() => receiptService.printOrder(order.id, order.restaurant_id, true, payments?.[0]?.payment_method)}
                         className="mt-4 w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 rounded font-bold transition-colors"
                     >
                         🖨️ Print Receipt

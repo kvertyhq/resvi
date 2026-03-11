@@ -66,6 +66,7 @@ const POSOrderPage: React.FC = () => {
     const [customerAddress, setCustomerAddress] = useState('');
     const [customerPostcode, setCustomerPostcode] = useState('');
     const [isPhoneOrder, setIsPhoneOrder] = useState(false);
+    const [callLogId, setCallLogId] = useState<string | null>(null);
     const [phoneOrderType, setPhoneOrderType] = useState<'delivery' | 'collection' | null>(null);
     const [phoneOrderTimeslot, setPhoneOrderTimeslot] = useState<{ date: string, time: string } | null>(null);
 
@@ -170,6 +171,7 @@ const POSOrderPage: React.FC = () => {
                 const explicitState = state as any;
                 if (explicitState.orderType) setPhoneOrderType(explicitState.orderType);
                 if (explicitState.timeslot) setPhoneOrderTimeslot(explicitState.timeslot);
+                if (explicitState.callLogId) setCallLogId(explicitState.callLogId);
             }
             // Clear the navigation state 
             navigate(location.pathname, { replace: true, state: {} });
@@ -568,13 +570,15 @@ const POSOrderPage: React.FC = () => {
                         address: customerAddress || null,
                         postcode: customerPostcode || null,
                         ...(phone && !selectedCustomer?.phone ? { phone } : {})
-                    }).eq('id', finalCustomerId);
+                    }).eq('id', finalCustomerId)
+                        .eq('restaurant_id', settings?.id);
                 } else if (phone) {
                     // Try to find an existing profile by phone number first
                     const normalizedPhone = phone.replace(/\D/g, '');
                     const { data: existingProfiles } = await supabase
                         .from('profiles')
                         .select('id, full_name, phone')
+                        .eq('restaurant_id', settings?.id)
                         .filter('phone', 'ilike', `%${normalizedPhone.slice(-9)}%`)
                         .limit(1);
 
@@ -582,7 +586,10 @@ const POSOrderPage: React.FC = () => {
                         finalCustomerId = existingProfiles[0].id;
                         // Update name if we now have one and they didn't before
                         if (name && !existingProfiles[0].full_name) {
-                            await supabase.from('profiles').update({ full_name: name }).eq('id', finalCustomerId);
+                            await supabase.from('profiles')
+                                .update({ full_name: name })
+                                .eq('id', finalCustomerId)
+                                .eq('restaurant_id', settings?.id);
                         }
                     } else {
                         // Create a new profile with at least the phone number and default 'Guest' name
@@ -591,6 +598,7 @@ const POSOrderPage: React.FC = () => {
                             .insert({
                                 full_name: name || 'Guest',
                                 phone: phone,
+                                restaurant_id: settings?.id,
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
                             })
@@ -626,23 +634,22 @@ const POSOrderPage: React.FC = () => {
             }
 
             // Success - show modal
-            setCreatedOrderId(result.order_uuid || result.order_id); // Prefer explicit UUID
+            const finalOrderId = result.order_uuid || result.order_id;
+            setCreatedOrderId(finalOrderId);
             setCreatedDailyOrderNumber(result.daily_order_number);
             setShowSuccessModal(true);
             setCartItems([]);
 
             // Auto-print receipt if enabled
-            const orderId = result.order_uuid || result.order_id;
-            if (orderId && settings?.id) {
-                await receiptService.printOrder(orderId, settings.id);
+            if (finalOrderId && settings?.id) {
+                await receiptService.printOrder(finalOrderId, settings.id, false, method);
             }
 
             // Link the order to the originating call log (if the flow started from a call)
-            const callLogId = (location.state as any)?.callLogId;
-            if (isPhoneOrder && callLogId && orderId) {
+            if (isPhoneOrder && callLogId && finalOrderId) {
                 await supabase
                     .from('call_logs')
-                    .update({ order_id: orderId })
+                    .update({ order_id: finalOrderId })
                     .eq('id', callLogId);
             }
 
@@ -887,7 +894,7 @@ const POSOrderPage: React.FC = () => {
                                 <input
                                     type="text"
                                     placeholder="Search customer (name, phone)..."
-                                    value={selectedCustomer ? selectedCustomer.full_name : customerSearch}
+                                    value={selectedCustomer ? `${selectedCustomer.full_name || selectedCustomer.name || 'Guest'}${selectedCustomer.phone ? ` (${selectedCustomer.phone})` : ''}` : customerSearch}
                                     onChange={(e) => {
                                         setCustomerSearch(e.target.value);
                                         if (selectedCustomer) setSelectedCustomer(null);
@@ -902,6 +909,8 @@ const POSOrderPage: React.FC = () => {
                                             setCustomerSearch('');
                                             setCustomerAddress('');
                                             setCustomerPostcode('');
+                                            setCustomerResults([]);
+                                            setShowCustomerDropdown(false);
                                         }}
                                         className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
                                     >
@@ -925,7 +934,7 @@ const POSOrderPage: React.FC = () => {
                                                 }}
                                                 className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-0"
                                             >
-                                                <div className="font-medium text-gray-900 dark:text-white">{customer.full_name}</div>
+                                                <div className="font-medium text-gray-900 dark:text-white">{customer.full_name || 'Guest'}</div>
                                                 {customer.phone && (
                                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                                         {customer.phone}
@@ -936,8 +945,8 @@ const POSOrderPage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Show address and postcode fields if Walkin/Phone Order is active, BUT hide for Phone Collection orders */}
-                                {(!isPhoneOrder || phoneOrderType !== 'collection') && (
+                                {/* Only show address and postcode fields for Phone Delivery orders */}
+                                {(isPhoneOrder && phoneOrderType === 'delivery') && (
                                     <div className="flex gap-2 mt-2">
                                         <input
                                             type="text"

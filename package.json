@@ -11,7 +11,9 @@
     "build:mobile:default": "tsc -b && vite build && npx cap sync",
     "save:mobile:admin": "rm -rf ios-admin && cp -R ios ios-admin && rm -rf android-admin && cp -R android android-admin",
     "save:mobile:pos": "rm -rf ios-pos && cp -R ios ios-pos && rm -rf android-pos && cp -R android android-pos",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri:dev": "npx @tauri-apps/cli dev",
+    "tauri:build": "npx @tauri-apps/cli build"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.2.1",
+    "@tauri-apps/cli": "^2.0.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",

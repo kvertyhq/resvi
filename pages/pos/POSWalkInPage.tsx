@@ -403,7 +403,8 @@ const POSWalkInPage: React.FC = () => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            receiptService.printOrder(order.id);
+                                            const primaryMethod = order.payments?.[0]?.payment_method;
+                                            receiptService.printOrder(order.id, settings?.id, true, primaryMethod);
                                         }}
                                         className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm transition-colors flex items-center justify-center"
                                         title="Print Receipt"

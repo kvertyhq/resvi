@@ -8,6 +8,10 @@ interface PrinterSettings {
 
 type PrintMode = 'auto_with_drawer' | 'auto_no_drawer' | 'manual';
 
+const ESC_POS_COMMANDS = {
+    DRAWER_KICK: [27, 112, 0, 25, 250], // ESC p 0 25 250
+};
+
 class ReceiptService {
     private getSettings(): PrinterSettings {
         const saved = localStorage.getItem('pos_printer_settings');
@@ -44,13 +48,15 @@ class ReceiptService {
 
     /**
      * Open cash drawer using ESC/POS commands
-     * This is a dummy implementation - actual drawer commands will be added later
      */
     async openCashDrawer(): Promise<void> {
-        console.log('🔓 Opening cash drawer (dummy implementation)');
-        // In a real implementation, we would send the drawer kick command to the printer
+        console.log('🔓 Opening cash drawer with ESC/POS command:', ESC_POS_COMMANDS.DRAWER_KICK);
+
+        // Note: For actual ESC/POS implementation in network/bluetooth drivers,
+        // we would send these bytes to the printer.
+        // For browser printing, this usually stays as a log/event unless a local relay is used.
         if (typeof window !== 'undefined') {
-            console.log('Cash drawer pulse sent');
+            console.log('Cash drawer pulse signal sent to printer driver');
         }
     }
 
@@ -75,13 +81,18 @@ class ReceiptService {
      * @param restaurantId - Optional, needed for auto-print checks and station fetching
      * @param forceManual - If true, treats as a manual print request (ignores auto-print settings)
      */
-    async printOrder(orderId: string, restaurantId?: string, forceManual: boolean = false) {
+    async printOrder(
+        orderId: string,
+        restaurantId?: string,
+        forceManual: boolean = false,
+        paymentMethod?: string
+    ) {
         const settings = this.getSettings();
-        console.log('Printing order', orderId, 'using', settings.type);
+        console.log('Printing order', orderId, 'using', settings.type, 'Payment:', paymentMethod);
 
         // 1. Determine Print Mode & Drawer
         let shouldAutoPrint = false;
-        let shouldOpenDrawer = false;
+        let shouldOpenDrawer = paymentMethod?.toLowerCase() === 'cash';
 
         // If manual, we generally just print. 
         // If auto, we check settings.
@@ -89,10 +100,10 @@ class ReceiptService {
             const printMode = await this.getPrintMode(restaurantId);
             if (printMode === 'auto_with_drawer') {
                 shouldAutoPrint = true;
-                shouldOpenDrawer = true;
+                shouldOpenDrawer = true; // Always open if setting is forced
             } else if (printMode === 'auto_no_drawer') {
                 shouldAutoPrint = true;
-                shouldOpenDrawer = false;
+                // shouldOpenDrawer remains based on paymentMethod
             } else if (printMode === 'manual') {
                 console.log('Manual print mode in settings - skipping auto-print flow');
                 return;

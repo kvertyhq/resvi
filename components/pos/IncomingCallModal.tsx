@@ -38,7 +38,10 @@ export const IncomingCallModal: React.FC = () => {
                 // Only trigger for inbound calls that are missed or 'called' (the new default)
                 if (newLog.direction === 'inbound' && (newLog.status === 'missed' || newLog.status === 'called')) {
                     console.log('New incoming call detected via Realtime:', payload);
-                    setRealtimeCall({ callerId: newLog.caller_number });
+                    setRealtimeCall({
+                        callerId: newLog.caller_number,
+                        callLogId: newLog.id
+                    });
                     setIsDismissed(false); // Reset dismiss state for new call
                 }
             })
@@ -66,6 +69,7 @@ export const IncomingCallModal: React.FC = () => {
                         .from('profiles')
                         .select('id, full_name, phone')
                         .eq('phone', currentCallerId)
+                        .eq('restaurant_id', staff?.restaurant_id)
                         .single();
 
                     if (!error && data) {
@@ -81,6 +85,7 @@ export const IncomingCallModal: React.FC = () => {
                             .insert({
                                 full_name: 'Guest',
                                 phone: currentCallerId,
+                                restaurant_id: staff?.restaurant_id
                             })
                             .select('id, full_name, phone')
                             .single();
@@ -189,7 +194,8 @@ export const IncomingCallModal: React.FC = () => {
         navigate('/pos/phone-setup', {
             state: {
                 customer: customer || { phone: currentCallerId, full_name: 'Guest Caller' },
-                isPhoneOrder: true
+                isPhoneOrder: true,
+                callLogId: realtimeCall?.callLogId || sipCallState.callId || null
             }
         });
     };

@@ -15,6 +15,17 @@ const POSCallHistoryPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
 
+    const formatDate = (dateString: string | null | undefined, formatStr: string) => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            return format(date, formatStr);
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    };
+
     // Tab state — default to 'orders'
     const [activeTab, setActiveTab] = useState<'orders' | 'calls'>('orders');
 
@@ -372,14 +383,16 @@ const POSCallHistoryPage: React.FC = () => {
                                                         <div className="flex items-start justify-between mb-3">
                                                             <div>
                                                                 <div className="font-bold text-gray-900 dark:text-white text-base">
-                                                                    {order.daily_order_number
-                                                                        ? order.daily_order_number
-                                                                        : order.readable_id
-                                                                            ? order.readable_id
-                                                                            : `#${order.id.slice(0, 6)}`}
+                                                                    {order.readable_id}
+                                                                    {order.daily_order_number && (
+                                                                        <span className="text-xs text-gray-400 font-normal ml-1">
+                                                                            (#{order.daily_order_number})
+                                                                        </span>
+                                                                    )}
+                                                                    {!order.readable_id && !order.daily_order_number && `#${order.id.slice(0, 6)}`}
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-0.5">
-                                                                    {format(new Date(order.created_at), 'MMM d, h:mm a')}
+                                                                    {formatDate(order.created_at, 'MMM d, h:mm a')}
                                                                     {order.order_type && (
                                                                         <span className="ml-1.5 capitalize font-medium text-[var(--theme-color)]">
                                                                             · {order.order_type}
@@ -470,7 +483,7 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 {order.readable_id || (order.daily_order_number ? order.daily_order_number : `#${order.id.slice(0, 6)}`)}
                                                             </div>
                                                             <div className="text-xs text-gray-400 mt-0.5">
-                                                                {format(new Date(order.created_at), 'MMM d, h:mm a')}
+                                                                {formatDate(order.created_at, 'MMM d, h:mm a')}
                                                                 {order.order_type && (
                                                                     <span className="ml-1.5 capitalize opacity-70"> · {order.order_type}</span>
                                                                 )}
@@ -508,14 +521,15 @@ const POSCallHistoryPage: React.FC = () => {
                                 <div className="bg-[var(--theme-color)] px-5 py-4 flex items-center justify-between flex-shrink-0">
                                     <div>
                                         <div className="text-white font-bold text-lg">
-                                            {selectedOrder.readable_id
-                                                ? selectedOrder.readable_id
-                                                : selectedOrder.daily_order_number
-                                                    ? `Order #${selectedOrder.daily_order_number}`
-                                                    : `Order #${selectedOrder.id.slice(0, 6)}`}
+                                            {selectedOrder.readable_id || `Order #${selectedOrder.id.slice(0, 6)}`}
+                                            {selectedOrder.daily_order_number && (
+                                                <span className="ml-2 opacity-70 text-base font-normal">
+                                                    (#{selectedOrder.daily_order_number})
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-white/70 text-xs mt-0.5">
-                                            {format(new Date(selectedOrder.created_at), 'MMMM d, yyyy · h:mm a')}
+                                            {formatDate(selectedOrder.created_at, 'MMMM d, yyyy · h:mm a')}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -667,7 +681,7 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 <div className="text-xs text-gray-500 mt-0.5">{call.caller_number}</div>
                                                             )}
                                                             <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                                                                <span>{format(new Date(call.created_at), 'MMM d, h:mm a')}</span>
+                                                                <span>{formatDate(call.created_at, 'MMM d, h:mm a')}</span>
                                                                 <span className={`font-medium capitalize ${call.status === 'missed' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
                                                                     · {call.status}
                                                                 </span>
@@ -682,7 +696,12 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 text-sm font-semibold min-w-0">
                                                                     <CheckCircle2 size={15} className="flex-shrink-0" />
                                                                     <span className="truncate">
-                                                                        {linkedOrder.readable_id || `#${linkedOrder.daily_order_number}`}
+                                                                        {linkedOrder.readable_id || `#${linkedOrder.id.slice(0, 6)}`}
+                                                                        {linkedOrder.daily_order_number && (
+                                                                            <span className="ml-1 opacity-60">
+                                                                                (#{linkedOrder.daily_order_number})
+                                                                            </span>
+                                                                        )}
                                                                     </span>
                                                                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${getStatusColor(linkedOrder.status)}`}>
                                                                         {linkedOrder.status}

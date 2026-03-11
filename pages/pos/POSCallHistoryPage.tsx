@@ -372,10 +372,10 @@ const POSCallHistoryPage: React.FC = () => {
                                                         <div className="flex items-start justify-between mb-3">
                                                             <div>
                                                                 <div className="font-bold text-gray-900 dark:text-white text-base">
-                                                                    {order.readable_id
-                                                                        ? order.readable_id
-                                                                        : order.daily_order_number
-                                                                            ? `#${order.daily_order_number}`
+                                                                    {order.daily_order_number
+                                                                        ? order.daily_order_number
+                                                                        : order.readable_id
+                                                                            ? order.readable_id
                                                                             : `#${order.id.slice(0, 6)}`}
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-0.5">
@@ -467,7 +467,7 @@ const POSCallHistoryPage: React.FC = () => {
                                                     <div className="flex items-start justify-between mb-2">
                                                         <div>
                                                             <div className="font-bold text-gray-700 dark:text-gray-300 text-sm">
-                                                                {order.readable_id || (order.daily_order_number ? `#${order.daily_order_number}` : `#${order.id.slice(0, 6)}`)}
+                                                                {order.readable_id || (order.daily_order_number ? order.daily_order_number : `#${order.id.slice(0, 6)}`)}
                                                             </div>
                                                             <div className="text-xs text-gray-400 mt-0.5">
                                                                 {format(new Date(order.created_at), 'MMM d, h:mm a')}

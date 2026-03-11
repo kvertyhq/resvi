@@ -64,7 +64,7 @@ export const IncomingCallModal: React.FC = () => {
                     // Attempt to find customer in profiles by phone number
                     const { data, error } = await supabase
                         .from('profiles')
-                        .select('id, full_name, phone, email')
+                        .select('id, full_name, phone')
                         .eq('phone', currentCallerId)
                         .single();
 
@@ -75,7 +75,25 @@ export const IncomingCallModal: React.FC = () => {
                             phone: data.phone || currentCallerId
                         });
                     } else {
-                        setCustomer(null);
+                        // Create a new guest profile instantly for this caller
+                        const { data: newProfile, error: insertError } = await supabase
+                            .from('profiles')
+                            .insert({
+                                full_name: 'Guest',
+                                phone: currentCallerId,
+                            })
+                            .select('id, full_name, phone')
+                            .single();
+
+                        if (!insertError && newProfile) {
+                            setCustomer({
+                                id: newProfile.id,
+                                name: newProfile.full_name || 'Guest',
+                                phone: newProfile.phone || currentCallerId
+                            });
+                        } else {
+                            setCustomer(null);
+                        }
                     }
                 } catch (err) {
                     console.error("Error fetching customer info:", err);

@@ -554,13 +554,12 @@ const POSOrderPage: React.FC = () => {
             // 1. If it's a Phone/Walk-in order and we have customer details, upsert the customer
             let finalCustomerId = selectedCustomer?.id || null;
 
-            // For phone orders: ensure the caller's number is saved as a profile
-            const phoneCustomer = isPhoneOrder ? (location.state?.customer || null) : null;
-            const callerPhone = phoneCustomer?.phone || null;
+            // For phone orders: the customer details are stored in selectedCustomer
+            const callerPhone = isPhoneOrder ? (selectedCustomer?.phone || null) : null;
 
             if (isWalkIn && (customerSearch || customerAddress || customerPostcode || callerPhone)) {
                 const isPhone = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
-                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || phoneCustomer?.name || phoneCustomer?.full_name || null);
+                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || selectedCustomer?.name || null);
                 const phone = isPhone ? customerSearch : (selectedCustomer?.phone || callerPhone || null);
 
                 if (finalCustomerId) {
@@ -586,11 +585,11 @@ const POSOrderPage: React.FC = () => {
                             await supabase.from('profiles').update({ full_name: name }).eq('id', finalCustomerId);
                         }
                     } else {
-                        // Create a new profile with at least the phone number
+                        // Create a new profile with at least the phone number and default 'Guest' name
                         const { data: newProfile } = await supabase
                             .from('profiles')
                             .insert({
-                                full_name: name || null,
+                                full_name: name || 'Guest',
                                 phone: phone,
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
@@ -937,23 +936,25 @@ const POSOrderPage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Always show address and postcode fields if Walkin/Phone Order is active, to capture caller details */}
-                                <div className="flex gap-2 mt-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Address..."
-                                        value={customerAddress}
-                                        onChange={(e) => setCustomerAddress(e.target.value)}
-                                        className="w-2/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Postcode"
-                                        value={customerPostcode}
-                                        onChange={(e) => setCustomerPostcode(e.target.value)}
-                                        className="w-1/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
+                                {/* Show address and postcode fields if Walkin/Phone Order is active, BUT hide for Phone Collection orders */}
+                                {(!isPhoneOrder || phoneOrderType !== 'collection') && (
+                                    <div className="flex gap-2 mt-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Address..."
+                                            value={customerAddress}
+                                            onChange={(e) => setCustomerAddress(e.target.value)}
+                                            className="w-2/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Postcode"
+                                            value={customerPostcode}
+                                            onChange={(e) => setCustomerPostcode(e.target.value)}
+                                            className="w-1/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1304,7 +1305,7 @@ const POSOrderPage: React.FC = () => {
                     isOpen={showSuccessModal}
                     onClose={() => {
                         setShowSuccessModal(false);
-                        navigate(isPhoneOrder ? '/pos/call-history' : '/pos/walk-in');
+                        navigate(isPhoneOrder ? '/pos/calls' : '/pos/walk-in');
                     }}
                     orderId={createdOrderId}
                     dailyOrderNumber={createdDailyOrderNumber}

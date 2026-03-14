@@ -125,13 +125,14 @@ const POSLayout: React.FC = () => {
                     {staff ? (
                         <div className="flex flex-col items-center gap-2 group">
                             {/* Shift Status */}
-                            <button
+                            {/* Shift Status HIDDEN as per user request */}
+                            {/* <button
                                 onClick={activeShift ? clockOut : clockIn}
                                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${activeShift ? 'bg-green-600 text-white animate-pulse' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 hover:bg-green-600 hover:text-white'}`}
                                 title={activeShift ? "Clock Out" : "Clock In"}
                             >
                                 <Clock size={16} />
-                            </button>
+                            </button> */}
 
                             {/* Theme Toggle */}
                             <button
@@ -249,7 +250,8 @@ const POSLayout: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">
-                            <button
+                            {/* Clock In HIDDEN as per user request */}
+                            {/* <button
                                 onClick={() => {
                                     activeShift ? clockOut() : clockIn();
                                     setShowMobileMenu(false);
@@ -258,7 +260,7 @@ const POSLayout: React.FC = () => {
                             >
                                 <Clock size={28} className="mb-2" />
                                 <span className="font-bold text-sm">{activeShift ? "Clock Out" : "Clock In"}</span>
-                            </button>
+                            </button> */}
 
                             <button
                                 onClick={() => {

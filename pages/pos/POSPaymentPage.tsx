@@ -213,8 +213,12 @@ const POSPaymentPage: React.FC = () => {
                         ))
                     )}
 
-                    <button onClick={() => navigate('/pos')} className="mt-4 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm md:text-base">
-                        &larr; Back to Order / Tables
+                    <button 
+                        onClick={() => navigate('/pos')} 
+                        className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all shadow-sm border border-gray-300 dark:border-gray-600"
+                    >
+                        <span className="text-lg">←</span>
+                        <span>Back to Order / Tables</span>
                     </button>
 
                     <button

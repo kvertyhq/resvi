@@ -145,9 +145,9 @@ const POSPhoneOrderSetupPage: React.FC = () => {
         setCapacityError(null);
     }, [orderType]);
 
-    // Validation
-    const isDeliveryReady = orderType === 'delivery' && deliveryDate && deliveryTime && postcode && address;
-    const isCollectionReady = orderType === 'collection' && localDate && localTime;
+    // Validation - Date/Time hidden, so only postcode/address required for delivery
+    const isDeliveryReady = orderType === 'delivery' && postcode && address;
+    const isCollectionReady = orderType === 'collection';
     const canContinue = isDeliveryReady || isCollectionReady;
 
     const handleContinue = async () => {
@@ -160,8 +160,9 @@ const POSPhoneOrderSetupPage: React.FC = () => {
             return;
         }
 
-        const date = orderType === 'delivery' ? deliveryDate : localDate;
-        const time = orderType === 'delivery' ? deliveryTime : localTime;
+        const today = new Date().toISOString().split('T')[0];
+        const date = orderType === 'delivery' ? (deliveryDate || today) : (localDate || today);
+        const time = orderType === 'delivery' ? (deliveryTime || 'ASAP') : (localTime || 'ASAP');
 
         try {
             // Check capacity in the same way `OrderPage.tsx` does
@@ -406,7 +407,8 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <div>
+                                    {/* HIDDEN: Date and Time selection as per user request */}
+                                    {/* <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Delivery Date</label>
                                         <DatePicker
                                             value={deliveryDate}
@@ -424,7 +426,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                                 {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                                             </select>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                         )}
@@ -433,7 +435,8 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                             <div className="animate-fade-in space-y-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700">
                                 <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700 text-sm">Collection Details</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
+                                    {/* HIDDEN: Date and Time selection as per user request */}
+                                    {/* <div>
                                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Collection Date</label>
                                         <DatePicker
                                             value={localDate}
@@ -451,7 +454,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                                                 {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
                                             </select>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                         )}

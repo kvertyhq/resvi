@@ -3,6 +3,9 @@ import { useParams, useNavigate, useSearchParams, useLocation } from 'react-rout
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
+import { useAdmin } from '../../context/AdminContext';
+import { usePOS } from '../../context/POSContext';
+import { useOffline } from '../../context/OfflineContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
@@ -12,12 +15,10 @@ import POSPaymentModal from '../../components/pos/POSPaymentModal';
 import MiscItemModal from '../../components/pos/MiscItemModal';
 import HeldOrdersModal from '../../components/pos/HeldOrdersModal';
 import NotificationModal from '../../components/pos/NotificationModal';
-import { usePOS } from '../../context/POSContext';
-import { useOffline } from '../../context/OfflineContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { receiptService } from '../../services/ReceiptService';
-import { Pause, X } from 'lucide-react';
+import { Pause, X, Trash2, Printer, Check, Send, ShoppingCart, CreditCard } from 'lucide-react';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -43,8 +44,9 @@ const POSOrderPage: React.FC = () => {
     const mode = searchParams.get('mode');
     const specificOrderId = searchParams.get('orderId');
     const { settings } = useSettings();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const { staff } = usePOS();
+    const { user } = useAdmin();
     const { isOnline, addToQueue } = useOffline();
 
     // Check if this is a walk-in order
@@ -98,6 +100,7 @@ const POSOrderPage: React.FC = () => {
 
     // Payment Modal
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [isHoldingOrder, setIsHoldingOrder] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
     const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
     const [showCashDrawerButton, setShowCashDrawerButton] = useState(false);
@@ -109,7 +112,6 @@ const POSOrderPage: React.FC = () => {
     // Held Orders
     const [heldOrders, setHeldOrders] = useState<any[]>([]);
     const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
-    const [isHoldingOrder, setIsHoldingOrder] = useState(false);
 
     // Notification Modal
     const [showNotification, setShowNotification] = useState(false);
@@ -138,7 +140,7 @@ const POSOrderPage: React.FC = () => {
 
     // Check for held order data from navigation state
     useEffect(() => {
-    const state = location.state as { heldOrder?: any; customer?: any; isPhoneOrder?: boolean; repeatItems?: any[] };
+        const state = location.state as { heldOrder?: any; customer?: any; isPhoneOrder?: boolean; repeatItems?: any[] };
         if (state?.heldOrder) {
             const heldOrder = state.heldOrder;
 
@@ -245,6 +247,106 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
+    // Cancel / Clear Order
+    const handleCancelOrder = async () => {
+        const confirmed = await showConfirm(
+            'Cancel Order?',
+            'This will clear the current cart and reset any unsaved changes. Are you sure?',
+            'warning'
+        );
+
+        if (confirmed) {
+            setCartItems([]);
+            setDiscountValue(0);
+            if (isWalkIn && mode === 'new') {
+                setSelectedCustomer(null);
+                setCustomerSearch('');
+                setCustomerAddress('');
+                setCustomerPostcode('');
+                setPhoneOrderType(null);
+                setPhoneOrderTimeslot(null);
+            }
+            if (mobileTab === 'cart') setMobileTab('menu');
+        }
+    };
+
+    const handlePrintBill = async () => {
+        if (!settings?.id) return;
+
+        let orderId = currentOrder?.id;
+
+        // If there are unsaved items, we must save them first so they appear on the receipt
+        if (cartItems.length > 0) {
+            setLoading(true);
+            try {
+                if (isWalkIn && !currentOrder) {
+                    // Create a pending walk-in order so we can print it
+                    const orderItems = cartItems.map(item => ({
+                        menu_item_id: item.isMiscellaneous ? null : item.id,
+                        quantity: item.quantity,
+                        price: item.price,
+                        modifiers: item.modifiers,
+                        notes: item.notes || null,
+                        course: item.course,
+                        is_miscellaneous: item.isMiscellaneous || false,
+                        custom_item_name: item.isMiscellaneous ? item.name : null,
+                        name: item.name,
+                        station_id: item.station_id
+                    }));
+
+                    const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
+                        p_restaurant_id: settings?.id,
+                        p_staff_id: staff?.id,
+                        p_order_items: orderItems,
+                        p_total_amount: total,
+                        p_user_id: selectedCustomer?.id || null,
+                        p_discount_type: discountType || null,
+                        p_discount_amount: discountAmount || 0,
+                        p_payment_method: null, // No payment yet
+                        p_payment_transaction_id: null,
+                        p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
+                        p_customer_postcode: customerPostcode || null,
+                        p_order_type: isPhoneOrder ? (phoneOrderType || 'phone') : 'takeaway', // use takeaway to match walk-in page
+                        p_order_source: isPhoneOrder ? 'phone' : 'pos'
+                    });
+
+                    if (rpcError) throw rpcError;
+
+                    const result = data as any;
+                    if (result.success) {
+                        orderId = result.order_uuid || result.order_id;
+                        setCreatedOrderId(orderId);
+                        setCreatedDailyOrderNumber(result.daily_order_number);
+                        setCartItems([]);
+                        // Fetch the created order so UI updates
+                        const { data: newOrder } = await supabase.from('orders').select('*').eq('id', orderId).single();
+                        if (newOrder) setCurrentOrder(newOrder);
+                        fetchExistingOrder();
+                    }
+                } else {
+                    // Update existing table or walk-in order
+                    await handlePlaceOrder(true); // silent update
+                    orderId = currentOrder?.id || createdOrderId;
+                }
+            } catch (error) {
+                console.error('Failed to save before printing:', error);
+                showAlert('Print Error', 'Failed to save items before printing.', 'error');
+                setLoading(false);
+                return;
+            }
+            setLoading(false);
+        }
+
+        const finalOrderId = orderId || currentOrder?.id || createdOrderId;
+
+        if (!finalOrderId) {
+            showAlert('Print Bill', 'Please add items to the order first.', 'info');
+            return;
+        }
+
+        await receiptService.printOrder(finalOrderId, settings.id, true, undefined, showAlert);
+    };
+
     // Debounced customer search
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -279,14 +381,23 @@ const POSOrderPage: React.FC = () => {
                     *,
                     menu_item: menu_items ( name )
                 )
-            `)
-            .eq('table_id', tableId);
+            `);
+
+        if (tableId && !isWalkIn) {
+            query = query.eq('table_id', tableId);
+        } else if (currentOrder?.id) {
+            query = query.eq('id', currentOrder.id);
+        } else if (createdOrderId) {
+            query = query.eq('id', createdOrderId);
+        } else {
+            return; // Nothing to fetch
+        }
 
         // If specific ID requested, fetch that one
         if (specificOrderId) {
             query = query.eq('id', specificOrderId);
-        } else {
-            // Otherwise fetch any open status
+        } else if (tableId && !isWalkIn) {
+            // For tables, fetch any open status
             query = query.in('status', ['pending', 'preparing', 'ready']);
         }
 
@@ -465,7 +576,7 @@ const POSOrderPage: React.FC = () => {
                 p_discount_amount: discountAmount,
                 p_tax: tax,
                 p_total: total,
-                p_order_type: isWalkIn ? 'walkin' : 'table',
+                p_order_type: isWalkIn ? 'takeaway' : 'dine_in',
                 p_table_id: currentOrder?.table_id || null,
                 p_notes: null
             });
@@ -626,7 +737,7 @@ const POSOrderPage: React.FC = () => {
                 p_payment_transaction_id: transactionId || null,
                 p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
                 p_customer_postcode: customerPostcode || null,
-                p_order_type: isPhoneOrder ? (phoneOrderType || 'phone') : 'walkin',
+                p_order_type: isPhoneOrder ? (phoneOrderType || 'takeaway') : 'takeaway',
                 p_order_source: isPhoneOrder ? 'phone' : 'pos'
             });
 
@@ -666,7 +777,7 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
-    const handlePlaceOrder = async () => {
+    const handlePlaceOrder = async (isSilent: boolean = false) => {
         if (cartItems.length === 0) return;
         if (!settings?.id) return;
 
@@ -789,11 +900,19 @@ const POSOrderPage: React.FC = () => {
 
             // Success
             setCreatedOrderId(orderId);
-            setShowUpdateModal(true);
-            setCartItems([]);
+
+            // If silent update (for printing), we need to refresh the submitted items FIRST
+            // to avoid a flash of emptiness
+            if (isSilent) {
+                await fetchExistingOrder();
+                setCartItems([]);
+            } else {
+                setShowUpdateModal(true);
+                setCartItems([]);
+            }
 
             // Auto-print receipt if enabled (for new orders or updates)
-            if (orderId && settings?.id) {
+            if (orderId && settings?.id && !isSilent) {
                 await receiptService.printOrder(orderId, settings.id, true, undefined, showAlert);
             }
             // navigate('/pos'); // Handled by modal close
@@ -807,7 +926,7 @@ const POSOrderPage: React.FC = () => {
 
     const completeOrder = async () => {
         if (!currentOrder?.id) return;
-        
+
         showAlert(
             'Confirm Completion',
             'Are you sure you want to complete this order and free the table?',
@@ -1051,22 +1170,30 @@ const POSOrderPage: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {/* Submitted Items (Read-Only) */}
-                    {submittedItems.length > 0 && (
-                        <div className="space-y-2 mb-4">
-                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sent to Kitchen</h4>
+                    {/* Unified Cart Items List */}
+                    {submittedItems.length === 0 && cartItems.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 gap-2 opacity-50 my-10">
+                            <ShoppingCart className="w-12 h-12" />
+                            <p>No items added</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {/* Render Submitted/Sent Items */}
                             {submittedItems.map((item, idx) => (
-                                <div key={idx} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex justify-between opacity-80">
+                                <div key={`submitted-${item.id || idx}`} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-3 flex justify-between shadow-sm relative overflow-hidden group">
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 opacity-50"></div>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start">
-                                            <span className="text-gray-900 dark:text-white font-medium">
-                                                {item.quantity}x {item.menu_item?.name || 'Unknown Item'}
-                                            </span>
-                                            <span className="text-gray-900 dark:text-white font-mono text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-gray-900 dark:text-white font-medium">
+                                                    {item.quantity}x {item.menu_item?.name || item.name_snapshot || 'Unknown Item'}
+                                                </span>
+                                                <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Sent</span>
+                                            </div>
+                                            <span className="text-gray-500 dark:text-gray-400 font-mono text-sm">
                                                 {settings?.currency || '$'}{((item.price_snapshot || item.price) * item.quantity).toFixed(2)}
                                             </span>
                                         </div>
-                                        {/* Modifiers? */}
                                         {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                             <div className="text-xs text-gray-500 mt-1 pl-2 border-l-2 border-gray-300">
                                                 {item.selected_modifiers.map((m: any, i: number) => (
@@ -1078,98 +1205,81 @@ const POSOrderPage: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            <div className="border-b border-gray-200 dark:border-gray-700 my-2"></div>
-                        </div>
-                    )}
 
-                    {/* New Cart Items */}
-                    {cartItems.length === 0 && submittedItems.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 gap-2 opacity-50 my-10">
-                            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                            <p>No items added</p>
-                        </div>
-                    ) : (
-                        cartItems.map((item) => (
-                            <div key={item.tempId} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between group animate-fadeIn transition-colors">
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-gray-900 dark:text-white font-bold">{item.name}</span>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-2">
-                                            <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
+                            {/* Render New/Local Items */}
+                            {cartItems.map((item) => (
+                                <div key={item.tempId} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between group animate-fadeIn transition-colors shadow-sm relative overflow-hidden">
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--theme-color)]"></div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-gray-900 dark:text-white font-bold">{item.name}</span>
+                                                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">New</span>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2">
+                                                <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
 
-                                            {/* Quantity Controls */}
-                                            <div className="flex items-center gap-1">
+                                                {/* Quantity Controls */}
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => decrementQuantity(item.tempId)}
+                                                        className="w-6 h-6 flex items-center justify-center bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded transition-colors"
+                                                        title="Decrease quantity"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                                                        </svg>
+                                                    </button>
+                                                    <span className="w-8 text-center text-sm font-bold text-gray-900 dark:text-white">
+                                                        {item.quantity}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => incrementQuantity(item.tempId)}
+                                                        className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                        title="Increase quantity"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+
                                                 <button
-                                                    onClick={() => decrementQuantity(item.tempId)}
-                                                    className="w-6 h-6 flex items-center justify-center bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded transition-colors"
-                                                    title="Decrease quantity"
+                                                    onClick={() => removeFromCart(item.tempId)}
+                                                    className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium"
                                                 >
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
-                                                    </svg>
-                                                </button>
-                                                <span className="w-8 text-center text-sm font-bold text-gray-900 dark:text-white">
-                                                    {item.quantity}
-                                                </span>
-                                                <button
-                                                    onClick={() => incrementQuantity(item.tempId)}
-                                                    className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                                                    title="Increase quantity"
-                                                >
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                                                    </svg>
+                                                    Remove
                                                 </button>
                                             </div>
-
-                                            <button
-                                                onClick={() => removeFromCart(item.tempId)}
-                                                className="text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-xs"
-                                            >
-                                                Remove
-                                            </button>
                                         </div>
-                                    </div>
 
-                                    {/* Course Selector */}
-                                    <div className="mt-2">
-                                        <select
-                                            value={item.course}
-                                            onChange={(e) => updateItemCourse(item.tempId, e.target.value)}
-                                            style={{ color: 'var(--theme-color)' }}
-                                            className="bg-white dark:bg-gray-800 text-xs rounded border border-gray-300 dark:border-gray-600 px-1 py-0.5 outline-none focus:border-[var(--theme-color)] transition-colors"
-                                        >
-                                            {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-
-                                    {item.modifiers && item.modifiers.length > 0 && (
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5 border-t border-gray-300 dark:border-gray-600 pt-1">
-                                            {item.modifiers.map((mod, idx) => (
-                                                <div key={idx} className="flex justify-between">
-                                                    <span>+ {mod.name}</span>
-                                                    {Number(mod.price) > 0 && <span>{settings?.currency || '$'}{Number(mod.price).toFixed(2)}</span>}
-                                                </div>
-                                            ))}
+                                        {item.modifiers && item.modifiers.length > 0 && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5 border-t border-gray-300 dark:border-gray-600 pt-1">
+                                                {item.modifiers.map((mod, idx) => (
+                                                    <div key={idx} className="flex justify-between">
+                                                        <span>+ {mod.name}</span>
+                                                        {Number(mod.price) > 0 && <span>{settings?.currency || '$'}{Number(mod.price).toFixed(2)}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* Notes Section */}
+                                        <div className="mt-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Add note..."
+                                                className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-[var(--theme-color)] outline-none transition-colors"
+                                                value={item.notes || ''}
+                                                onChange={(e) => updateItemNote(item.tempId, e.target.value)}
+                                            />
                                         </div>
-                                    )}
-                                    {/* Notes Section */}
-                                    <div className="mt-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Add note..."
-                                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-[var(--theme-color)] outline-none transition-colors"
-                                            value={item.notes || ''}
-                                            onChange={(e) => updateItemNote(item.tempId, e.target.value)}
-                                        />
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     )}
                 </div>
+                {/* The orphaned </div> was here */}
 
                 <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 space-y-2 transition-colors duration-300">
                     {/* Discount Button */}
@@ -1210,38 +1320,62 @@ const POSOrderPage: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-stretch h-14">
+                        <button
+                            onClick={handleCancelOrder}
+                            disabled={cartItems.length === 0 && !selectedCustomer && !currentOrder}
+                            className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 rounded-xl font-bold shadow-lg hover:bg-red-600 hover:text-white transition-all flex items-center justify-center min-w-[56px] h-full"
+                            title="Cancel Order"
+                        >
+                            <Trash2 className="h-6 w-6" />
+                        </button>
+                        <button
+                            onClick={handlePrintBill}
+                            disabled={cartItems.length === 0 && !currentOrder}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center min-w-[56px] h-full"
+                            title="Print Bill"
+                        >
+                            <Printer className="h-6 w-6" />
+                        </button>
+                        <button
+                            onClick={handleHoldOrder}
+                            disabled={cartItems.length === 0 || isHoldingOrder}
+                            className="bg-yellow-600 hover:bg-yellow-500 text-white px-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center min-w-[56px] disabled:opacity-50 h-full"
+                            title="Hold Order"
+                        >
+                            <Pause className="h-6 w-6" />
+                        </button>
+
                         {currentOrder && (
                             currentOrder.payment_status === 'paid' ? (
                                 <button
                                     onClick={completeOrder}
-                                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-4 rounded-xl font-bold shadow-lg text-xl"
+                                    className="bg-gray-800 hover:bg-gray-700 text-white px-4 rounded-xl font-bold shadow-lg flex items-center justify-center min-w-[56px] h-full"
+                                    title="Free Table"
                                 >
-                                    Free Table
+                                    <X className="h-6 w-6" />
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => navigate(`/pos/payment/${currentOrder.id}`)}
-                                    className="flex-1 bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold shadow-lg text-xl"
+                                    className="bg-green-600 hover:bg-green-500 text-white px-4 rounded-xl font-bold shadow-lg flex items-center justify-center min-w-[56px] h-full"
+                                    title="Pay Now"
                                 >
-                                    Pay
+                                    <CreditCard className="h-6 w-6" />
                                 </button>
                             )
                         )}
-                        <button
-                            onClick={handleHoldOrder}
-                            disabled={cartItems.length === 0 || isHoldingOrder}
-                            className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white py-4 rounded-xl font-bold shadow-lg text-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                            {isHoldingOrder ? 'Holding...' : 'HOLD'}
-                        </button>
+
                         <button
                             onClick={handlePlaceOrder}
                             disabled={cartItems.length === 0}
                             style={{ backgroundColor: 'var(--theme-color)' }}
-                            className={`flex-[2] text-white py-4 rounded-xl font-bold shadow-lg text-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all`}
+                            className="flex-1 text-white rounded-xl font-bold shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center justify-center gap-2 px-4 h-full"
                         >
-                            {currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new' ? 'Update Order' : 'Place Order'}
+                            <Check className="h-6 w-6" />
+                            <span className="hidden sm:inline whitespace-nowrap">
+                                {currentOrder && ['pending', 'confirmed'].includes(currentOrder.status) && mode !== 'new' ? 'Update Order' : 'Place Order'}
+                            </span>
                         </button>
                     </div>
 

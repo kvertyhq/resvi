@@ -6,10 +6,13 @@ interface AlertState {
   title: string;
   message: string;
   type: AlertType;
+  isConfirm?: boolean;
+  resolve?: (value: boolean) => void;
 }
 
 interface AlertContextProps {
   showAlert: (title: string, message?: string, type?: AlertType) => void;
+  showConfirm: (title: string, message?: string, type?: AlertType) => Promise<boolean>;
   hideAlert: () => void;
 }
 
@@ -24,21 +27,49 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const showAlert = useCallback((title: string, message: string = '', type: AlertType = 'info') => {
-    setAlert({ isOpen: true, title, message, type });
+    setAlert({ isOpen: false, title: '', message: '', type: 'info' }); // Reset first
+    setTimeout(() => {
+        setAlert({ isOpen: true, title, message, type, isConfirm: false });
+    }, 10);
+  }, []);
+
+  const showConfirm = useCallback((title: string, message: string = '', type: AlertType = 'warning'): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setAlert({
+        isOpen: true,
+        title,
+        message,
+        type,
+        isConfirm: true,
+        resolve
+      });
+    });
   }, []);
 
   const hideAlert = useCallback(() => {
+    if (alert.isConfirm && alert.resolve) {
+      alert.resolve(false);
+    }
     setAlert(prev => ({ ...prev, isOpen: false }));
-  }, []);
+  }, [alert]);
+
+  const handleConfirm = useCallback(() => {
+    if (alert.resolve) {
+      alert.resolve(true);
+    }
+    setAlert(prev => ({ ...prev, isOpen: false }));
+  }, [alert]);
 
   return (
-    <AlertContext.Provider value={{ showAlert, hideAlert }}>
+    <AlertContext.Provider value={{ showAlert, showConfirm, hideAlert }}>
       {children}
       <AlertModal
         isOpen={alert.isOpen}
         title={alert.title}
         message={alert.message}
         type={alert.type}
+        isConfirm={alert.isConfirm}
+        onConfirm={handleConfirm}
         onClose={hideAlert}
       />
     </AlertContext.Provider>

@@ -7,10 +7,12 @@ interface AlertModalProps {
   title: string;
   message: string;
   type: AlertType;
+  isConfirm?: boolean;
+  onConfirm?: () => void;
   onClose: () => void;
 }
 
-const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, onClose }) => {
+const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, isConfirm, onConfirm, onClose }) => {
   if (!isOpen) return null;
 
   const mode = import.meta.env.VITE_APP_MODE;
@@ -35,14 +37,32 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, o
             <h3 className="text-3xl font-black uppercase tracking-wider text-white mb-2">{title}</h3>
             {message && <p className="text-gray-400 text-lg leading-relaxed">{message}</p>}
           </div>
-          <div className="p-4 bg-gray-800">
-            <button
-              onClick={onClose}
-              style={{ backgroundColor: 'var(--theme-color)' }}
-              className="w-full text-white font-bold text-2xl py-4 rounded-xl shadow-lg active:scale-95 transition-all text-center uppercase tracking-wider focus:outline-none focus:ring-4 focus:ring-gray-500"
-            >
-              OK
-            </button>
+          <div className="p-4 bg-gray-800 flex gap-4">
+            {isConfirm ? (
+              <>
+                <button
+                  onClick={onClose}
+                  className="flex-1 bg-gray-700 text-white font-bold text-2xl py-4 rounded-xl shadow-lg active:scale-95 transition-all text-center uppercase tracking-wider focus:outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onConfirm}
+                  style={{ backgroundColor: 'var(--theme-color)' }}
+                  className="flex-[2] text-white font-bold text-2xl py-4 rounded-xl shadow-lg active:scale-95 transition-all text-center uppercase tracking-wider focus:outline-none"
+                >
+                  Confirm
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onClose}
+                style={{ backgroundColor: 'var(--theme-color)' }}
+                className="w-full text-white font-bold text-2xl py-4 rounded-xl shadow-lg active:scale-95 transition-all text-center uppercase tracking-wider focus:outline-none focus:ring-4 focus:ring-gray-500"
+              >
+                OK
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -60,14 +80,32 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, o
             {message && <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{message}</p>}
           </div>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-900/50 px-5 py-3 flex justify-end border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onClose}
-            style={{ backgroundColor: 'var(--theme-color)' }}
-            className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            Close
-          </button>
+        <div className="bg-gray-50 dark:bg-gray-900/50 px-5 py-3 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
+          {isConfirm ? (
+            <>
+              <button
+                onClick={onClose}
+                className="text-gray-500 dark:text-gray-400 font-medium px-6 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                style={{ backgroundColor: 'var(--theme-color)' }}
+                className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none"
+              >
+                Confirm
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{ backgroundColor: 'var(--theme-color)' }}
+              className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
     </div>

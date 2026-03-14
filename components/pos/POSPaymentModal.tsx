@@ -27,46 +27,15 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
     };
 
     const handleCardPayment = async () => {
-        if (!stripe || !elements) {
-            setCardError('Stripe not loaded');
-            return;
-        }
-
+        // Temporarily simplified for POS terminal use (external to this software)
         setProcessing(true);
-        setCardError(null);
-
         try {
-            // Create payment intent
-            const { data, error: intentError } = await supabase.rpc('create_stripe_payment_intent', {
-                p_amount: amount,
-                p_currency: 'gbp'
-            });
-
-            if (intentError) {
-                throw new Error(intentError.message || 'Failed to initialize payment');
-            }
-
-            // Confirm card payment
-            const cardElement = elements.getElement(CardElement);
-            if (!cardElement) throw new Error("Card element not found");
-
-            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
-                payment_method: {
-                    card: cardElement as any,
-                    billing_details: {
-                        name: cardholderName,
-                    },
-                }
-            });
-
-            if (error) {
-                setCardError(error.message || 'Payment failed');
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                onPaymentSuccess('card', paymentIntent.id);
-                onClose();
-            }
+            // In the future, this will connect to a physical terminal
+            // For now, we assume the transaction was successful on the external terminal
+            onPaymentSuccess('card');
+            onClose();
         } catch (err: any) {
-            setCardError(err.message);
+            setCardError('Payment failed');
         } finally {
             setProcessing(false);
         }
@@ -137,6 +106,8 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
                     </div>
                 ) : (
                     <div className="mb-6">
+                        {/* Cardholder Name and Details Hidden for POS Terminal Integration */}
+                        {/* 
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Cardholder Name
@@ -177,13 +148,20 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
                             </div>
                             {cardError && <div className="text-red-500 text-sm mt-2">{cardError}</div>}
                         </div>
+                        */}
+
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
+                            <p className="text-center text-blue-700 dark:text-blue-300 text-sm">
+                                Please use the card terminal to process the payment of <strong>£{amount.toFixed(2)}</strong>.
+                            </p>
+                        </div>
 
                         <button
                             onClick={handleCardPayment}
-                            disabled={processing || !stripe || !cardholderName}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-xl font-bold transition-colors"
+                            disabled={processing}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
                         >
-                            {processing ? 'Processing...' : 'Pay with Card'}
+                            {processing ? 'Processing...' : 'Confirm Card Payment'}
                         </button>
                     </div>
                 )}

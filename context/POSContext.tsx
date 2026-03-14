@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useSettings } from './SettingsContext';
+import { useAlert } from './AlertContext';
 
 interface StaffProfile {
     id: string;
@@ -33,6 +34,7 @@ const POSContext = createContext<POSContextType>({
 
 export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const [staff, setStaff] = useState<any>(null);
     const [activeShift, setActiveShift] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -78,7 +80,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             if (error) {
                 console.error('Supabase RPC Login Error:', error);
-                alert(`Login Error: ${error.message}`);
+                showAlert('Login Error', error.message, 'error');
                 return false;
             }
 
@@ -122,7 +124,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .single();
 
         if (!error) setActiveShift(data);
-        else alert('Clock In Failed');
+        else showAlert('Clock In Failed', 'Could not start shift. Please try again.', 'error');
     };
 
     const clockOut = async () => {
@@ -133,7 +135,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .eq('id', activeShift.id);
 
         if (!error) setActiveShift(null);
-        else alert('Clock Out Failed');
+        else showAlert('Clock Out Failed', 'Could not end shift. Please try again.', 'error');
     };
 
     return (

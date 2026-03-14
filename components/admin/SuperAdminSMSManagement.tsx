@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAlert } from '../../context/AlertContext';
 import { Plus, Trash2, Edit2, Tag, Percent } from 'lucide-react';
 
 interface SMSPackage {
@@ -23,6 +24,7 @@ interface Coupon {
 }
 
 const SuperAdminSMSManagement: React.FC = () => {
+    const { showAlert } = useAlert();
     const [packages, setPackages] = useState<SMSPackage[]>([]);
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
@@ -73,19 +75,28 @@ const SuperAdminSMSManagement: React.FC = () => {
             setPkgForm({ name: '', credits: 100, price: 10, currency: 'GBP', is_active: true });
             fetchData();
         } catch (error: any) {
-            alert('Error saving package: ' + error.message);
+            showAlert('Error', 'Error saving package: ' + error.message, 'error');
         }
     };
 
     const handleDeletePackage = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this package?')) return;
-        try {
-            const { error } = await supabase.from('sms_packages').delete().eq('id', id);
-            if (error) throw error;
-            fetchData();
-        } catch (error: any) {
-            alert('Error deleting package: ' + error.message);
-        }
+        showAlert(
+            'Confirm Delete',
+            'Are you sure you want to delete this package?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        const { error } = await supabase.from('sms_packages').delete().eq('id', id);
+                        if (error) throw error;
+                        fetchData();
+                    } catch (error: any) {
+                        showAlert('Error', 'Error deleting package: ' + error.message, 'error');
+                    }
+                }
+            }
+        );
     };
 
     const handleSaveCoupon = async (e: React.FormEvent) => {
@@ -102,19 +113,28 @@ const SuperAdminSMSManagement: React.FC = () => {
             setCpnForm({ code: '', discount_type: 'percent', discount_value: 10, max_uses: null, is_active: true });
             fetchData();
         } catch (error: any) {
-            alert('Error saving coupon: ' + error.message);
+            showAlert('Error', 'Error saving coupon: ' + error.message, 'error');
         }
     };
 
     const handleDeleteCoupon = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this coupon?')) return;
-        try {
-            const { error } = await supabase.from('coupons').delete().eq('id', id);
-            if (error) throw error;
-            fetchData();
-        } catch (error: any) {
-            alert('Error deleting coupon: ' + error.message);
-        }
+        showAlert(
+            'Confirm Delete',
+            'Are you sure you want to delete this coupon?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        const { error } = await supabase.from('coupons').delete().eq('id', id);
+                        if (error) throw error;
+                        fetchData();
+                    } catch (error: any) {
+                        showAlert('Error', 'Error deleting coupon: ' + error.message, 'error');
+                    }
+                }
+            }
+        );
     };
 
     if (loading) return <div>Loading SMS Settings...</div>;

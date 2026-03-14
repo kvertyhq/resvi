@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAlert } from '../../context/AlertContext';
 
 interface ModifierItem {
     id: string;
@@ -25,6 +26,7 @@ interface POSModifierModalProps {
 }
 
 const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart }) => {
+    const { showAlert } = useAlert();
     const [loading, setLoading] = useState(true);
     const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
     const [selections, setSelections] = useState<Record<string, string[]>>({}); // groupId -> array of itemIds
@@ -130,11 +132,11 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
         for (const group of modifierGroups) {
             const selectedCount = (selections[group.id] || []).length;
             if (group.is_required && selectedCount < (group.min_selection || 1)) {
-                alert(`Please select options for ${group.name}`);
+                showAlert('Selection Required', `Please select options for ${group.name}`, 'warning');
                 return;
             }
             if (group.max_selection && selectedCount > group.max_selection) {
-                alert(`Too many options for ${group.name} (Max ${group.max_selection})`);
+                showAlert('Too Many Options', `Too many options for ${group.name} (Max ${group.max_selection})`, 'warning');
                 return;
             }
         }

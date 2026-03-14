@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import UserManagementModal from '../../components/admin/UserManagementModal';
 import SuperAdminSMSManagement from '../../components/admin/SuperAdminSMSManagement';
 import { Plus, CreditCard, MessageSquare, Shield, Users, Building2 } from 'lucide-react';
@@ -19,6 +20,7 @@ interface Restaurant {
 
 const SuperAdminDashboard: React.FC = () => {
     const { role } = useAdmin();
+    const { showAlert } = useAlert();
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'restaurants' | 'sms'>('restaurants');
@@ -98,7 +100,7 @@ const SuperAdminDashboard: React.FC = () => {
             fetchRestaurants();
         } catch (error: any) {
             console.error('Error creating restaurant:', error);
-            alert('Failed to create restaurant: ' + error.message);
+            showAlert('Error', 'Failed to create restaurant: ' + error.message, 'error');
         }
     };
 
@@ -131,7 +133,7 @@ const SuperAdminDashboard: React.FC = () => {
             fetchRestaurants();
         } catch (error: any) {
             console.error('Error adding credits:', error);
-            alert('Failed to add credits: ' + error.message);
+            showAlert('Error', 'Failed to add credits: ' + error.message, 'error');
         }
     };
 

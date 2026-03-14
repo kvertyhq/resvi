@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
+import { useAlert } from '../../context/AlertContext';
 import { format } from 'date-fns';
 import KDSTimer from '../../components/pos/KDSTimer';
 import { StationService, Station } from '../../services/StationService';
@@ -42,6 +43,7 @@ interface KDSOrder {
 
 const KDSPage: React.FC = () => {
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const [orders, setOrders] = useState<KDSOrder[]>([]);
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ const KDSPage: React.FC = () => {
                     }
                 } catch (error: any) {
                     console.error("Failed to load stations for KDS", error);
-                    alert(`KDS Station Loading Error: ${error.message || 'Unknown error'}`);
+                    showAlert('Station Loading Error', error.message || 'Unknown error', 'error');
                 }
             };
             loadStations();
@@ -110,7 +112,7 @@ const KDSPage: React.FC = () => {
             setOrders(typedData);
         } catch (error: any) {
             console.error('KDS Fetch Error:', error);
-            alert(`KDS Order Fetch Error: ${error.message || error.details || 'Check console'}`);
+            showAlert('Order Fetch Error', error.message || error.details || 'Check console', 'error');
         } finally {
             setLoading(false);
         }
@@ -126,7 +128,7 @@ const KDSPage: React.FC = () => {
             if (error) throw error;
             fetchOrders();
         } catch (error) {
-            alert('Failed to update status');
+            showAlert('Error', 'Failed to update status', 'error');
         }
     };
 

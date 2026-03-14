@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { SettingsProvider } from './context/SettingsContext';
+import { AlertProvider } from './context/AlertContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,7 +15,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <SettingsProvider>
-      <App />
+      <AlertProvider>
+        <App />
+      </AlertProvider>
     </SettingsProvider>
   </React.StrictMode>
 );

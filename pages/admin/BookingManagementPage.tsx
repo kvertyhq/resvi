@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
 import { Calendar, Users, Check, X, UserCheck, List, Grid, RefreshCcw } from 'lucide-react';
 import CalendarView, { Booking } from '../../components/admin/CalendarView';
@@ -69,6 +70,7 @@ const PreOrderModal = ({ content, onClose }: { content: string; onClose: () => v
 
 const BookingManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('today');
@@ -210,7 +212,7 @@ const BookingManagementPage: React.FC = () => {
 
         if (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status');
+            showAlert('Error', 'Failed to update status', 'error');
         } else {
             fetchBookings();
         }
@@ -226,7 +228,7 @@ const BookingManagementPage: React.FC = () => {
 
             if (error) {
                 console.error('Error assigning table:', error);
-                alert('Failed to assign table');
+                showAlert('Error', 'Failed to assign table', 'error');
             } else {
                 fetchBookings();
             }

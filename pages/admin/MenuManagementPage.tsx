@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
 import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService'; // Added import
@@ -48,6 +49,7 @@ interface MenuItemAddon {
 
 const MenuManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons'>('items');
     const [loading, setLoading] = useState(false);
 
@@ -246,10 +248,18 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteCategory = async (id: string) => {
-        if (confirm('Are you sure? This might affect items linked to this category.')) {
-            await supabase.from('menu_categories').delete().eq('id', id);
-            fetchCategories();
-        }
+        showAlert(
+            'Confirm Delete',
+            'Are you sure? This might affect items linked to this category.',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    await supabase.from('menu_categories').delete().eq('id', id);
+                    fetchCategories();
+                }
+            }
+        );
     };
 
     // --- Handlers for Items ---
@@ -343,7 +353,7 @@ const MenuManagementPage: React.FC = () => {
         if (!selectedRestaurantId) return;
 
         if (aiCheckStatus === 'rejected') {
-            alert("Cannot save: Image was rejected by AI.");
+            showAlert('Rejected', "Cannot save: Image was rejected by AI.", 'error');
             return;
         }
 
@@ -396,10 +406,18 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteItem = async (id: string) => {
-        if (confirm('Delete this item?')) {
-            await supabase.from('menu_items').delete().eq('id', id);
-            fetchItems();
-        }
+        showAlert(
+            'Confirm Delete',
+            'Delete this item?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    await supabase.from('menu_items').delete().eq('id', id);
+                    fetchItems();
+                }
+            }
+        );
     };
 
     // --- Handlers for Addons ---
@@ -448,10 +466,18 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteAddon = async (id: string) => {
-        if (confirm('Delete this add-on?')) {
-            await supabase.from('addons').delete().eq('id', id);
-            fetchAddons();
-        }
+        showAlert(
+            'Confirm Delete',
+            'Delete this add-on?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    await supabase.from('addons').delete().eq('id', id);
+                    fetchAddons();
+                }
+            }
+        );
     };
 
     if (!selectedRestaurantId) return <div className="text-center py-10 text-gray-500">Select a restaurant context</div>;

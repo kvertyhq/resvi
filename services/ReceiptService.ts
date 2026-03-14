@@ -63,13 +63,13 @@ class ReceiptService {
     /**
      * Helper to dispatch print job to the correct driver
      */
-    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string) {
+    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any) {
         if (settings.type === 'browser') {
             await this.printBrowser(orderId, true, stationId);
         } else if (settings.type === 'bluetooth') {
-            await this.printBluetooth(orderId, stationId);
+            await this.printBluetooth(orderId, stationId, showAlert);
         } else if (settings.type === 'network') {
-            await this.printNetwork(orderId, settings.networkIp, stationId);
+            await this.printNetwork(orderId, settings.networkIp, stationId, showAlert);
         }
     }
 
@@ -85,7 +85,8 @@ class ReceiptService {
         orderId: string,
         restaurantId?: string,
         forceManual: boolean = false,
-        paymentMethod?: string
+        paymentMethod?: string,
+        showAlert?: any
     ) {
         const settings = this.getSettings();
         console.log('Printing order', orderId, 'using', settings.type, 'Payment:', paymentMethod);
@@ -120,7 +121,7 @@ class ReceiptService {
 
         // 3. Print Master Receipt
         // Always print the master receipt (contains everything)
-        await this.printToDriver(orderId, settings, undefined);
+        await this.printToDriver(orderId, settings, undefined, showAlert);
 
         // 4. Print Station Tickets (Kitchen/Bar)
         // We do this if:
@@ -138,7 +139,7 @@ class ReceiptService {
                 // Add a small delay between prints to avoid browser blocking
                 for (const station of stations) {
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    await this.printToDriver(orderId, settings, station.id);
+                    await this.printToDriver(orderId, settings, station.id, showAlert);
                 }
             }
         }
@@ -172,20 +173,25 @@ class ReceiptService {
         }
     }
 
-    private async printBluetooth(orderId: string, stationId?: string) {
+    private async printBluetooth(orderId: string, stationId?: string, showAlert?: any) {
         // Placeholder for Bluetooth logic
         console.log(`Bluetooth print for order ${orderId} (Station: ${stationId})`);
-        alert(`Bluetooth printing${stationId ? ` for station ${stationId}` : ''} not fully implemented yet.`);
+        const msg = `Bluetooth printing${stationId ? ` for station ${stationId}` : ''} not fully implemented yet.`;
+        if (showAlert) showAlert('Bluetooth Printing', msg, 'info');
+        else console.log(msg);
     }
 
-    private async printNetwork(orderId: string, ip?: string, stationId?: string) {
+    private async printNetwork(orderId: string, ip?: string, stationId?: string, showAlert?: any) {
         if (!ip) {
-            alert('No Printer IP configured.');
+            if (showAlert) showAlert('Printer Error', 'No Printer IP configured.', 'error');
+            else console.error('No Printer IP configured.');
             return;
         }
         console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId})`);
         // In a real app, we would send different content based on stationId.
-        alert(`Network print sent to ${ip}${stationId ? ` (Station ID: ${stationId})` : ''}`);
+        const msg = `Network print sent to ${ip}${stationId ? ` (Station ID: ${stationId})` : ''}`;
+        if (showAlert) showAlert('Network Print', msg, 'success');
+        else console.log(msg);
     }
 }
 

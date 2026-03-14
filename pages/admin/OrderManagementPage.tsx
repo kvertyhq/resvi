@@ -45,10 +45,12 @@ interface Order {
 }
 
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
 
 const OrderManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -181,14 +183,14 @@ const OrderManagementPage: React.FC = () => {
 
             if (error) {
                 console.error('Error updating order status:', error);
-                alert('Failed to update order status');
+                showAlert('Error', 'Failed to update order status', 'error');
             } else {
                 // Optimistic update
                 setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as any } : o));
             }
         } catch (err) {
             console.error('Failed to update order:', err);
-            alert('Failed to update order status');
+            showAlert('Error', 'Failed to update order status', 'error');
         }
     };
 
@@ -201,7 +203,7 @@ const OrderManagementPage: React.FC = () => {
 
             if (error) {
                 console.error('Error updating payment status:', error);
-                alert('Failed to mark as paid');
+                showAlert('Error', 'Failed to mark as paid', 'error');
             } else {
                 // Optimistic update
                 setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: 'paid' } : o));
@@ -211,7 +213,7 @@ const OrderManagementPage: React.FC = () => {
             }
         } catch (err) {
             console.error('Failed to update payment status:', err);
-            alert('Failed to mark as paid');
+            showAlert('Error', 'Failed to mark as paid', 'error');
         }
     };
 
@@ -482,7 +484,7 @@ const OrderManagementPage: React.FC = () => {
 
                                     <button
                                         onClick={() => {
-                                            receiptService.printOrder(order.id);
+                                            receiptService.printOrder(order.id, undefined, true, undefined, showAlert);
                                         }}
                                         className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center border border-gray-200"
                                         title="Print Receipt"

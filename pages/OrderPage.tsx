@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
 import { useSettings } from '../context/SettingsContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabaseClient';
 
 const DeliveryIcon: React.FC = () => (
@@ -24,6 +25,7 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot, setDeliverySlot, deliveryFee } = useOrder();
 
     const [localPostcode, setLocalPostcode] = useState(postcode);
@@ -303,7 +305,7 @@ const OrderPage: React.FC = () => {
                                                                     onChange={e => {
                                                                         const selectedDate = e.target.value;
                                                                         if (settings?.closure_dates?.includes(selectedDate)) {
-                                                                            alert("We are closed on this date. Please select another date.");
+                                                                            showAlert("Store Closed", "We are closed on this date. Please select another date.", "warning");
                                                                             setDeliveryDate('');
                                                                         } else {
                                                                             setDeliveryDate(selectedDate);
@@ -352,7 +354,7 @@ const OrderPage: React.FC = () => {
                                                             onChange={e => {
                                                                 const selectedDate = e.target.value;
                                                                 if (settings?.closure_dates?.includes(selectedDate)) {
-                                                                    alert("We are closed on this date. Please select another date.");
+                                                                    showAlert("Store Closed", "We are closed on this date. Please select another date.", "warning");
                                                                     setLocalDate('');
                                                                 } else {
                                                                     setLocalDate(selectedDate);

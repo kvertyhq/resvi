@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from './AlertContext';
 
 interface OfflineAction {
     type: 'place_order';
@@ -22,6 +23,7 @@ const OfflineContext = createContext<OfflineContextType>({
 });
 
 export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { showAlert } = useAlert();
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [queue, setQueue] = useState<OfflineAction[]>([]);
 
@@ -62,7 +64,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // For simplicity, we assume payload has what it needs.
         const newQueue = [...queue, { ...action, timestamp: Date.now() }];
         saveQueue(newQueue);
-        alert('You are offline. Action saved to queue.');
+        showAlert('Offline', 'You are offline. Action saved to queue.', 'info');
     };
 
     const attemptSync = async () => {
@@ -122,9 +124,9 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         saveQueue(failed);
         if (failed.length === 0) {
-            alert('All offline data synced successfully!');
+            showAlert('Sync Success', 'All offline data synced successfully!', 'success');
         } else {
-            alert(`Sync complete. ${failed.length} items failed and kept in queue.`);
+            showAlert('Sync Partial', `Sync complete. ${failed.length} items failed and kept in queue.`, 'warning');
         }
     };
 

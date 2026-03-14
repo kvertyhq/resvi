@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import { StationService, Station } from '../../services/StationService';
 import { Plus, Edit, Trash2, Save, X, Settings } from 'lucide-react';
 
 const StationManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,7 +74,7 @@ const StationManagementPage: React.FC = () => {
             setIsModalOpen(false);
             fetchStations();
         } catch (error) {
-            alert('Failed to save station');
+            showAlert('Error', 'Failed to save station', 'error');
         }
     };
 
@@ -82,7 +84,7 @@ const StationManagementPage: React.FC = () => {
                 await StationService.deleteStation(id);
                 fetchStations();
             } catch (error) {
-                alert('Failed to delete station');
+                showAlert('Error', 'Failed to delete station', 'error');
             }
         }
     };

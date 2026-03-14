@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { FileText, Upload, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { useAlert } from '../../../context/AlertContext';
 
 interface SettingsMediaProps {
     formData: any;
@@ -9,6 +10,7 @@ interface SettingsMediaProps {
 }
 
 const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, setFormData }) => {
+    const { showAlert } = useAlert();
     const [uploadingPdf, setUploadingPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -57,9 +59,17 @@ const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, s
     };
 
     const handleRemovePdf = () => {
-        if (confirm('Are you sure you want to remove the specific menu PDF link?')) {
-            setFormData((prev: any) => ({ ...prev, menu_pdf_url: '' }));
-        }
+        showAlert(
+            'Remove PDF',
+            'Are you sure you want to remove the specific menu PDF link?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: () => {
+                    setFormData((prev: any) => ({ ...prev, menu_pdf_url: '' }));
+                }
+            }
+        );
     };
 
     return (

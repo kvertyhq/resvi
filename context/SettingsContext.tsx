@@ -100,7 +100,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (err: any) {
         console.error('Settings load error:', err);
         setError(err.message);
-        alert(`Configuration Error: ${err.message}`);
       } finally {
         setLoading(false);
       }

@@ -21,12 +21,13 @@ export const PrinterService = {
     },
 
     // Format and Print Receipt
-    printReceipt: async (order: any, items: any[]) => {
+    printReceipt: async (order: any, items: any[], showAlert?: any) => {
         const printer = window.sunmiInnerPrinter;
 
         if (!printer) {
             console.log('Mock Print (No Hardware):', order, items);
-            alert('Printer not found. Mock print logged to console.');
+            if (showAlert) showAlert('Printer Not Found', 'Printer not found. Mock print logged to console.', 'info');
+            else console.log('Printer not found. Mock print logged to console.');
             return;
         }
 
@@ -77,7 +78,8 @@ export const PrinterService = {
 
         } catch (e) {
             console.error('Printing Error:', e);
-            alert('Failed to print receipt.');
+            if (showAlert) showAlert('Printing Error', 'Failed to print receipt.', 'error');
+            else console.error('Failed to print receipt.');
         }
     }
 };

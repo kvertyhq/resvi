@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import {
     Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing,
     ShoppingCart, Search, User, Users, Clock,
@@ -8,12 +8,16 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import { useAlert } from '../../context/AlertContext';
 
 const CALLS_PER_PAGE = 12;
+const HISTORY_PER_PAGE = 12;
+const CUSTOMERS_PER_PAGE = 15;
 
 const POSCallHistoryPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
 
     const formatDate = (dateString: string | null | undefined, formatStr: string) => {
         if (!dateString) return 'N/A';
@@ -27,7 +31,7 @@ const POSCallHistoryPage: React.FC = () => {
     };
 
     // Tab state — default to 'orders'
-    const [activeTab, setActiveTab] = useState<'orders' | 'calls'>('orders');
+    const [activeTab, setActiveTab] = useState<'orders' | 'history' | 'customers' | 'calls'>('orders');
 
     // Call logs state
     const [calls, setCalls] = useState<any[]>([]);
@@ -43,6 +47,12 @@ const POSCallHistoryPage: React.FC = () => {
     const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
     const [markingComplete, setMarkingComplete] = useState<string | null>(null); // order id being marked
 
+    // History filtering & pagination
+    const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'custom' | 'all'>('all');
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyTotal, setHistoryTotal] = useState(0);
+    const [customDate, setCustomDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
 
     // Map of phone number -> order (to link calls to orders)
     const [phoneToOrder, setPhoneToOrder] = useState<Record<string, any>>({});
@@ -50,9 +60,12 @@ const POSCallHistoryPage: React.FC = () => {
     // Contacts
     const [customers, setCustomers] = useState<any[]>([]);
     const [customerSearch, setCustomerSearch] = useState('');
+    const [customerPage, setCustomerPage] = useState(1);
+    const [customerTotal, setCustomerTotal] = useState(0);
+    const [customerLoading, setCustomerLoading] = useState(false);
 
     // Mobile view
-    const [mobileView, setMobileView] = useState<'history' | 'contacts' | 'orders'>('orders');
+    const [mobileView, setMobileView] = useState<'history' | 'customers' | 'orders'>('orders');
 
     useEffect(() => {
         if (settings?.id) {
@@ -78,6 +91,16 @@ const POSCallHistoryPage: React.FC = () => {
     useEffect(() => {
         if (settings?.id) fetchCalls();
     }, [callPage, callSearch]);
+
+    // Refetch history when filter or page changes
+    useEffect(() => {
+        if (settings?.id && activeTab === 'history') fetchCompletedOrders();
+    }, [historyFilter, historyPage, customDate, activeTab]);
+
+    // Refetch customers when page or search changes
+    useEffect(() => {
+        if (settings?.id && activeTab === 'customers') fetchCustomers();
+    }, [customerPage, customerSearch, activeTab]);
 
     const fetchCalls = useCallback(async () => {
         if (!settings?.id) return;
@@ -114,11 +137,29 @@ const POSCallHistoryPage: React.FC = () => {
 
     }, [settings?.id, callPage, callSearch]);
 
-    const fetchCustomers = async () => {
+    const fetchCustomers = useCallback(async () => {
         if (!settings?.id) return;
-        const { data } = await supabase.rpc('get_pos_customers', { p_restaurant_id: settings.id });
-        if (data) setCustomers(data);
-    };
+        setCustomerLoading(true);
+
+        const from = (customerPage - 1) * CUSTOMERS_PER_PAGE;
+
+        const { data, error } = await supabase.rpc('get_pos_customers_v2', {
+            p_restaurant_id: settings.id,
+            p_search_query: customerSearch.trim() || null,
+            p_limit: CUSTOMERS_PER_PAGE,
+            p_offset: from
+        });
+
+        if (!error && data) {
+            setCustomers(data || []);
+            setCustomerTotal(data[0]?.total_count || 0);
+        } else if (error) {
+            console.error('Error fetching customers:', error);
+            setCustomers([]);
+            setCustomerTotal(0);
+        }
+        setCustomerLoading(false);
+    }, [settings?.id, customerPage, customerSearch]);
 
     const fetchPhoneOrders = async () => {
         if (!settings?.id) return;
@@ -148,44 +189,79 @@ const POSCallHistoryPage: React.FC = () => {
         setOrdersLoading(false);
     };
 
-    const fetchCompletedOrders = async () => {
+    const fetchCompletedOrders = useCallback(async () => {
         if (!settings?.id) return;
-        const { data, error } = await supabase
+        setOrdersLoading(true);
+
+        const from = (historyPage - 1) * HISTORY_PER_PAGE;
+        const to = from + HISTORY_PER_PAGE - 1;
+
+        let query = supabase
             .from('orders')
             .select(`
                 *,
                 profiles!orders_user_id_fkey ( full_name, phone ),
                 order_items ( id, quantity, price_snapshot, name_snapshot )
-            `)
+            `, { count: 'exact' })
             .eq('restaurant_id', settings.id)
             .eq('source', 'phone')
-            .in('status', ['completed', 'cancelled', 'served'])
-            .order('created_at', { ascending: false })
-            .limit(50);
-        if (!error && data) setCompletedOrders(data);
-    };
+            .in('status', ['completed', 'cancelled', 'served']);
+
+        // Apply filters
+        if (historyFilter === 'today') {
+            const start = startOfDay(new Date()).toISOString();
+            const end = endOfDay(new Date()).toISOString();
+            query = query.gte('created_at', start).lte('created_at', end);
+        } else if (historyFilter === 'yesterday') {
+            const yesterday = subDays(new Date(), 1);
+            const start = startOfDay(yesterday).toISOString();
+            const end = endOfDay(yesterday).toISOString();
+            query = query.gte('created_at', start).lte('created_at', end);
+        } else if (historyFilter === 'custom' && customDate) {
+            const date = new Date(customDate);
+            const start = startOfDay(date).toISOString();
+            const end = endOfDay(date).toISOString();
+            query = query.gte('created_at', start).lte('created_at', end);
+        }
+
+        query = query.order('created_at', { ascending: false }).range(from, to);
+
+        const { data, error, count } = await query;
+        if (!error && data) {
+            setCompletedOrders(data);
+            setHistoryTotal(count || 0);
+        }
+        setOrdersLoading(false);
+    }, [settings?.id, historyFilter, historyPage, customDate]);
 
     const markOrderComplete = async (order: any, e: React.MouseEvent) => {
         e.stopPropagation(); // don't open the detail modal
         const label = order.order_type === 'delivery' ? 'Delivered' : 'Completed';
-        const confirmed = window.confirm(
-            `Mark order ${order.readable_id || (order.daily_order_number ? '#' + order.daily_order_number : '')} as ${label}?\n\nThis will move it to the completed history.`
+        
+        showAlert(
+            'Confirm Complete',
+            `Mark order ${order.readable_id || (order.daily_order_number ? '#' + order.daily_order_number : '')} as ${label}?\n\nThis will move it to the completed history.`,
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    setMarkingComplete(order.id);
+                    const { error } = await supabase
+                        .from('orders')
+                        .update({ status: 'completed' })
+                        .eq('id', order.id);
+                    if (!error) {
+                        // Move locally: remove from active, add to completed
+                        setPhoneOrders(prev => prev.filter(o => o.id !== order.id));
+                        setCompletedOrders(prev => [
+                            { ...order, status: 'completed' },
+                            ...prev
+                        ]);
+                    }
+                    setMarkingComplete(null);
+                }
+            }
         );
-        if (!confirmed) return;
-        setMarkingComplete(order.id);
-        const { error } = await supabase
-            .from('orders')
-            .update({ status: 'completed' })
-            .eq('id', order.id);
-        if (!error) {
-            // Move locally: remove from active, add to completed
-            setPhoneOrders(prev => prev.filter(o => o.id !== order.id));
-            setCompletedOrders(prev => [
-                { ...order, status: 'completed' },
-                ...prev
-            ]);
-        }
-        setMarkingComplete(null);
     };
 
     const getStatusColor = (status: string) => {
@@ -211,13 +287,9 @@ const POSCallHistoryPage: React.FC = () => {
                 callLogId: callOrCustomer.id ?? null  // pass the call_logs row id
             }
         });
-    };
+    };    const totalCallPages = Math.ceil(callTotal / CALLS_PER_PAGE);
 
-    const totalCallPages = Math.ceil(callTotal / CALLS_PER_PAGE);
-    const filteredCustomers = customers.filter(c =>
-        (c.full_name?.toLowerCase() || '').includes(customerSearch.toLowerCase()) ||
-        (c.phone || '').includes(customerSearch)
-    );
+
 
     return (
         <div className="w-full h-full flex flex-col md:flex-row bg-white dark:bg-gray-900 overflow-hidden relative">
@@ -231,75 +303,38 @@ const POSCallHistoryPage: React.FC = () => {
                     <ShoppingCart size={14} /> Phone Orders
                 </button>
                 <button
-                    onClick={() => { setMobileView('history'); setActiveTab('calls'); }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'history' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
+                    onClick={() => { setMobileView('history'); setActiveTab('history'); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'history' && activeTab === 'history' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
                 >
-                    <Clock size={14} /> Call Logs
+                    <CheckCircle2 size={14} /> History
                 </button>
                 <button
-                    onClick={() => setMobileView('contacts')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'contacts' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
+                    onClick={() => { setMobileView('history'); setActiveTab('calls'); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${mobileView === 'history' && activeTab === 'calls' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
                 >
-                    <Users size={14} /> Contacts
+                    <Clock size={14} /> Calls
+                </button>
+                <button
+                    onClick={() => { setMobileView('orders'); setActiveTab('customers'); }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${activeTab === 'customers' ? 'bg-white dark:bg-gray-700 shadow text-[var(--theme-color)]' : 'text-gray-500'}`}
+                >
+                    <Users size={14} /> Customers
                 </button>
             </div>
 
-            {/* Left Panel: Contacts */}
-            <div className={`${mobileView === 'contacts' ? 'flex' : 'hidden'} md:flex w-full md:w-72 flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 h-full`}>
-                <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
-                    <h2 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                        <Users size={20} className="text-[var(--theme-color)]" />
-                        Contacts
-                    </h2>
-                    <div className="relative mt-3">
-                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search..."
-                            className="w-full bg-gray-100 dark:bg-gray-900 border border-transparent focus:border-[var(--theme-color)] rounded-lg pl-9 pr-3 py-2 text-sm text-gray-900 dark:text-white outline-none"
-                            value={customerSearch}
-                            onChange={e => setCustomerSearch(e.target.value)}
-                        />
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {filteredCustomers.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-                            <Users size={36} className="mb-2 opacity-20" />
-                            <p className="text-sm">No contacts found</p>
-                        </div>
-                    ) : (
-                        filteredCustomers.map(c => (
-                            <button
-                                key={c.id}
-                                onClick={() => handleCreateOrder(c)}
-                                className="w-full flex items-center gap-3 p-3 hover:bg-white dark:hover:bg-gray-700/50 rounded-xl transition-all text-left group"
-                            >
-                                <div className="w-10 h-10 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center font-bold flex-shrink-0">
-                                    {c.full_name?.charAt(0) || <User size={18} />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-gray-900 dark:text-white truncate text-sm">{c.full_name}</div>
-                                    <div className="text-xs text-gray-500 truncate">{c.phone}</div>
-                                </div>
-                                <ShoppingCart size={14} className="text-gray-400 group-hover:text-[var(--theme-color)] transition-colors flex-shrink-0" />
-                            </button>
-                        ))
-                    )}
-                </div>
-            </div>
+            {/* Left Panel: Removed (Moved to Customers Tab) */}
 
-            {/* Right Panel */}
-            <div className={`${(mobileView === 'history' || mobileView === 'orders') ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 h-full overflow-hidden`}>
+            {/* Panel */}
+            <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
 
                 {/* Header & Tabs */}
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
                     <div>
                         <div className="flex items-center gap-3">
                             <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                                {activeTab === 'orders' ? 'Phone Orders' : 'Call Logs'}
+                                {activeTab === 'orders' ? 'Phone Orders' : activeTab === 'history' ? 'Order History' : activeTab === 'customers' ? 'Customer Contacts' : 'Call Logs'}
                             </h1>
-                            {activeTab === 'orders' && (
+                            {(activeTab === 'orders' || activeTab === 'history') && (
                                 <button
                                     onClick={() => {
                                         fetchPhoneOrders();
@@ -314,7 +349,7 @@ const POSCallHistoryPage: React.FC = () => {
                             )}
                         </div>
                         <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
-                            {activeTab === 'orders' ? 'Active orders placed via phone' : 'Recent incoming and outgoing calls'}
+                            {activeTab === 'orders' ? 'Active orders placed via phone' : activeTab === 'history' ? 'Completed and cancelled phone orders' : activeTab === 'customers' ? 'Manage and contact your customers' : 'Recent incoming and outgoing calls'}
                         </p>
                     </div>
 
@@ -328,6 +363,20 @@ const POSCallHistoryPage: React.FC = () => {
                             {phoneOrders.length > 0 && (
                                 <span className="bg-[var(--theme-color)] text-white text-[10px] px-1.5 py-0.5 rounded-full">{phoneOrders.length}</span>
                             )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'history' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            <CheckCircle2 size={15} />
+                            History
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('customers')}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'customers' ? 'bg-white dark:bg-gray-600 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            <Users size={15} />
+                            Customers
                         </button>
                         <button
                             onClick={() => setActiveTab('calls')}
@@ -348,15 +397,12 @@ const POSCallHistoryPage: React.FC = () => {
                             <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div>
                         ) : (
                             <div className="space-y-8">
-
                                 {/* ── ACTIVE ORDERS ── */}
                                 <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <h2 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                            Active Orders
-                                        </h2>
+                                    <div className="flex items-center gap-2 mb-4 font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider text-sm">
+                                        Active Orders
                                         {phoneOrders.length > 0 && (
-                                            <span className="bg-[var(--theme-color)] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                            <span className="bg-[var(--theme-color)] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
                                                 {phoneOrders.length}
                                             </span>
                                         )}
@@ -451,64 +497,243 @@ const POSCallHistoryPage: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        )
+                    )}
 
-                                {/* ── COMPLETED HISTORY ── */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                            Completed / History
-                                        </h2>
-                                        {completedOrders.length > 0 && (
-                                            <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-                                                {completedOrders.length}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {completedOrders.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-32 text-gray-400 bg-gray-50/50 dark:bg-gray-800/20 rounded-xl border border-dashed border-gray-200 dark:border-gray-700/50">
-                                            <p className="text-xs font-medium italic">No completed history found</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                                            {completedOrders.map(order => (
-                                                <button
-                                                    key={order.id}
-                                                    onClick={() => setSelectedOrder(order)}
-                                                    className="bg-gray-50 dark:bg-gray-800/60 p-4 rounded-xl border border-gray-200 dark:border-gray-700 flex flex-col opacity-80 hover:opacity-100 hover:shadow-md transition-all text-left w-full"
-                                                >
-                                                    <div className="flex items-start justify-between mb-2">
-                                                        <div>
-                                                            <div className="font-bold text-gray-700 dark:text-gray-300 text-sm">
-                                                                {order.readable_id || (order.daily_order_number ? order.daily_order_number : `#${order.id.slice(0, 6)}`)}
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 mt-0.5">
-                                                                {formatDate(order.created_at, 'MMM d, h:mm a')}
-                                                                {order.order_type && (
-                                                                    <span className="ml-1.5 capitalize opacity-70"> · {order.order_type}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getStatusColor(order.status)}`}>
-                                                            {order.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700/30 mt-auto">
-                                                        <span className="text-xs text-gray-500">
-                                                            {order.profiles?.full_name || 'Guest'}
-                                                        </span>
-                                                        <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
-                                                            £{(order.total_amount || 0).toFixed(2)}
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
+                    {/* --- HISTORY TAB --- */}
+                    {activeTab === 'history' && (
+                        <div className="flex flex-col h-full">
+                            {/* History Header & Filters */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-2 font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider text-sm">
+                                    Full Order History
+                                    {historyTotal > 0 && (
+                                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full ml-1">
+                                            {historyTotal}
+                                        </span>
                                     )}
                                 </div>
 
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        {[
+                                            { id: 'all', label: 'All' },
+                                            { id: 'today', label: 'Today' },
+                                            { id: 'yesterday', label: 'Yesterday' },
+                                            { id: 'custom', label: 'Custom' }
+                                        ].map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => { setHistoryFilter(f.id as any); setHistoryPage(1); }}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${historyFilter === f.id ? 'bg-white dark:bg-gray-700 shadow-sm text-[var(--theme-color)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                            >
+                                                {f.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {historyFilter === 'custom' && (
+                                        <input
+                                            type="date"
+                                            value={customDate}
+                                            onChange={(e) => { setCustomDate(e.target.value); setHistoryPage(1); }}
+                                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium outline-none focus:border-[var(--theme-color)]"
+                                        />
+                                    )}
+                                </div>
                             </div>
-                        )
+
+                            {ordersLoading ? (
+                                <div className="flex flex-1 items-center justify-center py-20">
+                                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                                        <RotateCw size={32} className="animate-spin" />
+                                        <span className="text-sm font-medium">Fetching history...</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex-1 space-y-6">
+                                    {completedOrders.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                                            <Clock size={48} className="mb-4 opacity-10" />
+                                            <p className="text-base font-semibold">No history found</p>
+                                            <p className="text-xs mt-1">Try changing the filters or date range</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                                {completedOrders.map(order => (
+                                                    <button
+                                                        key={order.id}
+                                                        onClick={() => setSelectedOrder(order)}
+                                                        className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col hover:border-[var(--theme-color)] hover:shadow-md transition-all text-left w-full group"
+                                                    >
+                                                        <div className="flex items-start justify-between mb-3">
+                                                            <div>
+                                                                <div className="font-bold text-gray-900 dark:text-white text-base group-hover:text-[var(--theme-color)] transition-colors">
+                                                                    {order.readable_id || (order.daily_order_number ? order.daily_order_number : `#${order.id.slice(0, 6)}`)}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                                                    {formatDate(order.created_at, 'MMM d, h:mm a')}
+                                                                    {order.order_type && (
+                                                                        <span className="capitalize opacity-70"> · {order.order_type}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
+                                                                {order.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                {order.profiles?.full_name || 'Guest'}
+                                                            </span>
+                                                            <div className="text-right">
+                                                                <span className="text-sm font-bold text-gray-900 dark:text-white block">
+                                                                    £{(order.total_amount || 0).toFixed(2)}
+                                                                </span>
+                                                                <span className="text-[10px] text-gray-400 capitalize">{order.payment_method || 'no payment'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Pagination */}
+                                            {Math.ceil(historyTotal / HISTORY_PER_PAGE) > 1 && (
+                                                <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                                                    <p className="text-xs text-gray-500">
+                                                        Showing {((historyPage - 1) * HISTORY_PER_PAGE) + 1}–{Math.min(historyPage * HISTORY_PER_PAGE, historyTotal)} of {historyTotal} orders
+                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            disabled={historyPage === 1}
+                                                            onClick={() => setHistoryPage(p => p - 1)}
+                                                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                        >
+                                                            <ChevronLeft size={16} />
+                                                        </button>
+                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 px-2">
+                                                            Page {historyPage} of {Math.ceil(historyTotal / HISTORY_PER_PAGE)}
+                                                        </span>
+                                                        <button
+                                                            disabled={historyPage >= Math.ceil(historyTotal / HISTORY_PER_PAGE)}
+                                                            onClick={() => setHistoryPage(p => p + 1)}
+                                                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                        >
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* --- CUSTOMERS TAB --- */}
+                    {activeTab === 'customers' && (
+                        <div className="flex flex-col h-full">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-2 font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider text-sm">
+                                    Saved Customers
+                                    {customerTotal > 0 && (
+                                        <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full ml-1">
+                                            {customerTotal}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="relative max-w-xs w-full">
+                                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name or phone..."
+                                        className="w-full bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-[var(--theme-color)] rounded-lg pl-9 pr-3 py-2 text-sm outline-none transition-all"
+                                        value={customerSearch}
+                                        onChange={e => { setCustomerSearch(e.target.value); setCustomerPage(1); }}
+                                    />
+                                </div>
+                            </div>
+
+                            {customerLoading ? (
+                                <div className="flex flex-1 items-center justify-center py-20">
+                                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                                        <RotateCw size={32} className="animate-spin" />
+                                        <span className="text-sm font-medium">Loading customers...</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex flex-col">
+                                    {customers.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                                            <Users size={48} className="mb-4 opacity-10" />
+                                            <p className="text-base font-semibold">No customers found</p>
+                                            <p className="text-xs mt-1 italic">Try searching for a different name or number</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                {customers.map(customer => (
+                                                    <div
+                                                        key={customer.id}
+                                                        className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col hover:border-[var(--theme-color)] hover:shadow-md transition-all group"
+                                                    >
+                                                        <div className="flex items-center gap-4 mb-4">
+                                                            <div className="w-12 h-12 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center font-bold text-lg group-hover:scale-110 transition-transform">
+                                                                {customer.full_name?.charAt(0) || <User size={20} />}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-bold text-gray-900 dark:text-white truncate">{customer.full_name}</div>
+                                                                <div className="text-xs text-gray-500 font-medium">{customer.phone}</div>
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            onClick={() => handleCreateOrder(customer)}
+                                                            className="mt-auto w-full py-2 bg-[var(--theme-color)]/5 hover:bg-[var(--theme-color)] text-[var(--theme-color)] hover:text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            <ShoppingCart size={14} />
+                                                            Start New Order
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Pagination */}
+                                            {Math.ceil(customerTotal / CUSTOMERS_PER_PAGE) > 1 && (
+                                                <div className="flex items-center justify-between pt-8 border-t border-gray-100 dark:border-gray-800 mt-8">
+                                                    <p className="text-xs text-gray-500">
+                                                        Showing {((customerPage - 1) * CUSTOMERS_PER_PAGE) + 1}–{Math.min(customerPage * CUSTOMERS_PER_PAGE, customerTotal)} of {customerTotal} customers
+                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            disabled={customerPage === 1}
+                                                            onClick={() => setCustomerPage(p => p - 1)}
+                                                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                        >
+                                                            <ChevronLeft size={16} />
+                                                        </button>
+                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 px-2 min-w-[100px] text-center">
+                                                            Page {customerPage} of {Math.ceil(customerTotal / CUSTOMERS_PER_PAGE)}
+                                                        </span>
+                                                        <button
+                                                            disabled={customerPage >= Math.ceil(customerTotal / CUSTOMERS_PER_PAGE)}
+                                                            onClick={() => setCustomerPage(p => p + 1)}
+                                                            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                        >
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
 
 

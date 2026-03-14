@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { usePOS } from '../../context/POSContext';
+import { useAlert } from '../../context/AlertContext';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Eye, CreditCard, Trash2, Printer, Pause } from 'lucide-react';
 import OrderDetailsModal from '../../components/pos/OrderDetailsModal';
@@ -31,6 +32,7 @@ interface WalkInOrder {
 const POSWalkInPage: React.FC = () => {
     const { settings } = useSettings();
     const { staff } = usePOS();
+    const { showAlert } = useAlert();
     const navigate = useNavigate();
 
     const [orders, setOrders] = useState<WalkInOrder[]>([]);
@@ -152,7 +154,7 @@ const POSWalkInPage: React.FC = () => {
             if (error) throw error;
             fetchOrders();
         } catch (error) {
-            alert('Failed to delete order');
+            showAlert('Error', 'Failed to delete order', 'error');
         }
     };
 
@@ -166,7 +168,7 @@ const POSWalkInPage: React.FC = () => {
             if (error) throw error;
             fetchOrders();
         } catch (error) {
-            alert('Failed to update order status');
+            showAlert('Error', 'Failed to update order status', 'error');
         }
     };
 
@@ -197,7 +199,7 @@ const POSWalkInPage: React.FC = () => {
             setShowOrderModal(true);
         } catch (error) {
             console.error('Error fetching order details:', error);
-            alert('Failed to load order details');
+            showAlert('Error', 'Failed to load order details', 'error');
         }
     };
 
@@ -404,7 +406,7 @@ const POSWalkInPage: React.FC = () => {
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             const primaryMethod = order.payments?.[0]?.payment_method;
-                                            receiptService.printOrder(order.id, settings?.id, true, primaryMethod);
+                                            receiptService.printOrder(order.id, settings?.id, true, primaryMethod, showAlert);
                                         }}
                                         className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm transition-colors flex items-center justify-center"
                                         title="Print Receipt"

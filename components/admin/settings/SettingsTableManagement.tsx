@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { Trash2, Plus, Layout } from 'lucide-react';
 import { useAdmin } from '../../../context/AdminContext';
+import { useAlert } from '../../../context/AlertContext';
 
 interface TableInfo {
     id: string;
@@ -18,6 +19,7 @@ interface Floor {
 
 const SettingsTableManagement: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [tables, setTables] = useState<TableInfo[]>([]);
     const [floors, setFloors] = useState<Floor[]>([]);
     const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
@@ -89,7 +91,7 @@ const SettingsTableManagement: React.FC = () => {
             await fetchData();
         } catch (error) {
             console.error('Error adding floor:', error);
-            alert('Failed to add floor');
+            showAlert('Error', 'Failed to add floor', 'error');
         } finally {
             setIsAddingFloor(false);
         }
@@ -98,46 +100,50 @@ const SettingsTableManagement: React.FC = () => {
     const handleDeleteFloor = async (floorId: string) => {
         // Check if floor has tables
         const hasTables = tables.some(t => t.floor_id === floorId);
-        if (hasTables) {
-            if (!confirm('This floor contains tables. Deleting it will delete all tables on it. Continue?')) return;
-        } else {
-            if (!confirm('Delete this floor?')) return;
-        }
+        const message = hasTables 
+            ? 'This floor contains tables. Deleting it will delete all tables on it. Continue?'
+            : 'Delete this floor?';
 
-        try {
-            // Delete tables first (if cascade not set, safe to do manual)
-            // But usually we want to keep them? For now, assume delete functionality implies cleanup
-            // Ideally we might want to move them to another floor, but simplified reqs for now.
-            if (hasTables) {
-                const { error: tableDelError } = await supabase
-                    .from('table_info')
-                    .delete()
-                    .eq('floor_id', floorId);
-                if (tableDelError) throw tableDelError;
+        showAlert(
+            'Confirm Delete',
+            message,
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        if (hasTables) {
+                            const { error: tableDelError } = await supabase
+                                .from('table_info')
+                                .delete()
+                                .eq('floor_id', floorId);
+                            if (tableDelError) throw tableDelError;
+                        }
+
+                        const { error } = await supabase
+                            .from('restaurant_floors')
+                            .delete()
+                            .eq('id', floorId);
+
+                        if (error) throw error;
+
+                        if (selectedFloorId === floorId) {
+                            setSelectedFloorId(null);
+                        }
+                        await fetchData();
+                    } catch (error) {
+                        console.error('Error deleting floor:', error);
+                        showAlert('Error', 'Failed to delete floor', 'error');
+                    }
+                }
             }
-
-            const { error } = await supabase
-                .from('restaurant_floors')
-                .delete()
-                .eq('id', floorId);
-
-            if (error) throw error;
-
-            // If deleted current floor, switch selection
-            if (selectedFloorId === floorId) {
-                setSelectedFloorId(null);
-            }
-            await fetchData();
-        } catch (error) {
-            console.error('Error deleting floor:', error);
-            alert('Failed to delete floor');
-        }
+        );
     };
 
     const handleAddTable = async () => {
         if (!newTable.table_name || !selectedRestaurantId) return;
         if (floors.length > 0 && !selectedFloorId) {
-            alert('Please select a floor first.');
+            showAlert('Required', 'Please select a floor first.', 'warning');
             return;
         }
 
@@ -163,27 +169,35 @@ const SettingsTableManagement: React.FC = () => {
             fetchData();
         } catch (error) {
             console.error('Error adding table:', error);
-            alert('Failed to add table');
+            showAlert('Error', 'Failed to add table', 'error');
         } finally {
             setIsAddingTable(false);
         }
     };
 
     const handleDeleteTable = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this table?')) return;
+        showAlert(
+            'Confirm Delete',
+            'Are you sure you want to delete this table?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        const { error } = await supabase
+                            .from('table_info')
+                            .delete()
+                            .eq('id', id);
 
-        try {
-            const { error } = await supabase
-                .from('table_info')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-            fetchData();
-        } catch (error) {
-            console.error('Error deleting table:', error);
-            alert('Failed to delete table');
-        }
+                        if (error) throw error;
+                        fetchData();
+                    } catch (error) {
+                        console.error('Error deleting table:', error);
+                        showAlert('Error', 'Failed to delete table', 'error');
+                    }
+                }
+            }
+        );
     };
 
     // Derived state

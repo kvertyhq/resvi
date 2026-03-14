@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
+import { useAlert } from '../../context/AlertContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
@@ -42,6 +43,7 @@ const POSOrderPage: React.FC = () => {
     const mode = searchParams.get('mode');
     const specificOrderId = searchParams.get('orderId');
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const { staff } = usePOS();
     const { isOnline, addToQueue } = useOffline();
 
@@ -136,7 +138,7 @@ const POSOrderPage: React.FC = () => {
 
     // Check for held order data from navigation state
     useEffect(() => {
-        const state = location.state as { heldOrder?: any; customer?: any; isPhoneOrder?: boolean };
+    const state = location.state as { heldOrder?: any; customer?: any; isPhoneOrder?: boolean; repeatItems?: any[] };
         if (state?.heldOrder) {
             const heldOrder = state.heldOrder;
 
@@ -172,6 +174,9 @@ const POSOrderPage: React.FC = () => {
                 if (explicitState.orderType) setPhoneOrderType(explicitState.orderType);
                 if (explicitState.timeslot) setPhoneOrderTimeslot(explicitState.timeslot);
                 if (explicitState.callLogId) setCallLogId(explicitState.callLogId);
+            }
+            if (state.repeatItems) {
+                setCartItems(state.repeatItems);
             }
             // Clear the navigation state 
             navigate(location.pathname, { replace: true, state: {} });
@@ -642,7 +647,7 @@ const POSOrderPage: React.FC = () => {
 
             // Auto-print receipt if enabled
             if (finalOrderId && settings?.id) {
-                await receiptService.printOrder(finalOrderId, settings.id, false, method);
+                await receiptService.printOrder(finalOrderId, settings.id, false, method, showAlert);
             }
 
             // Link the order to the originating call log (if the flow started from a call)
@@ -655,7 +660,7 @@ const POSOrderPage: React.FC = () => {
 
         } catch (error) {
             console.error('Order failed:', error);
-            alert('Failed to create order. Please try again.');
+            showAlert('Order Failed', 'Failed to create order. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -789,12 +794,12 @@ const POSOrderPage: React.FC = () => {
 
             // Auto-print receipt if enabled (for new orders or updates)
             if (orderId && settings?.id) {
-                await receiptService.printOrder(orderId, settings.id);
+                await receiptService.printOrder(orderId, settings.id, true, undefined, showAlert);
             }
             // navigate('/pos'); // Handled by modal close
         } catch (error) {
             console.error('Order failed:', error);
-            alert('Failed to place order.');
+            showAlert('Order Error', 'Failed to place order.', 'error');
         } finally {
             setLoading(false);
         }
@@ -802,22 +807,31 @@ const POSOrderPage: React.FC = () => {
 
     const completeOrder = async () => {
         if (!currentOrder?.id) return;
-        if (!window.confirm('Are you sure you want to complete this order and free the table?')) return;
+        
+        showAlert(
+            'Confirm Completion',
+            'Are you sure you want to complete this order and free the table?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    setLoading(true);
+                    try {
+                        const { error } = await supabase
+                            .from('orders')
+                            .update({ status: 'completed' })
+                            .eq('id', currentOrder.id);
 
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('orders')
-                .update({ status: 'completed' })
-                .eq('id', currentOrder.id);
-
-            if (error) throw error;
-            navigate('/pos');
-        } catch (error) {
-            console.error('Error completing order:', error);
-            alert('Failed to complete order');
-            setLoading(false);
-        }
+                        if (error) throw error;
+                        navigate('/pos');
+                    } catch (error) {
+                        console.error('Error completing order:', error);
+                        showAlert('Error', 'Failed to complete order', 'error');
+                        setLoading(false);
+                    }
+                }
+            }
+        );
     };
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);

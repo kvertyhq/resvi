@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Plus, CreditCard, Eye, CheckCircle } from 'lucide-react';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,6 +44,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
     tableId,
     onUpdate
 }) => {
+    const { showAlert } = useAlert();
     const navigate = useNavigate();
 
     const handleComplete = async (orderId: string) => {
@@ -62,7 +64,7 @@ const POSTableOrderModal: React.FC<POSTableOrderModalProps> = ({
             onClose();
         } catch (error) {
             console.error('Error completing order:', error);
-            alert('Failed to complete order');
+            showAlert('Error', 'Failed to complete order', 'error');
         }
     };
 

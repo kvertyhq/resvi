@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAlert } from '../../context/AlertContext';
 
 interface POSTableEditModalProps {
     isOpen: boolean;
@@ -9,6 +10,7 @@ interface POSTableEditModalProps {
 }
 
 const POSTableEditModal: React.FC<POSTableEditModalProps> = ({ isOpen, onClose, table, onUpdate }) => {
+    const { showAlert } = useAlert();
     const [tableName, setTableName] = useState('');
     const [seatCount, setSeatCount] = useState(4);
     const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ const POSTableEditModal: React.FC<POSTableEditModalProps> = ({ isOpen, onClose, 
 
     const handleSave = async () => {
         if (!tableName.trim()) {
-            alert('Table name is required');
+            showAlert('Required', 'Table name is required', 'warning');
             return;
         }
 
@@ -43,31 +45,39 @@ const POSTableEditModal: React.FC<POSTableEditModalProps> = ({ isOpen, onClose, 
             onClose();
         } catch (error) {
             console.error('Error updating table:', error);
-            alert('Failed to update table details');
+            showAlert('Error', 'Failed to update table details', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${tableName}? This action cannot be undone.`)) return;
+        showAlert(
+            'Confirm Delete',
+            `Are you sure you want to delete ${tableName}? This action cannot be undone.`,
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    setLoading(true);
+                    try {
+                        const { error } = await supabase
+                            .from('table_info')
+                            .delete()
+                            .eq('id', table.id);
 
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('table_info')
-                .delete()
-                .eq('id', table.id);
-
-            if (error) throw error;
-            onUpdate();
-            onClose();
-        } catch (error) {
-            console.error('Error deleting table:', error);
-            alert('Failed to delete table. Check if there are active orders linked to it.');
-        } finally {
-            setLoading(false);
-        }
+                        if (error) throw error;
+                        onUpdate();
+                        onClose();
+                    } catch (error) {
+                        console.error('Error deleting table:', error);
+                        showAlert('Error', 'Failed to delete table. Check if there are active orders linked to it.', 'error');
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
+        );
     };
 
     return (

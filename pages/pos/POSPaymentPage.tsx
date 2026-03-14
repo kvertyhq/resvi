@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { usePOS } from '../../context/POSContext';
+import { useAlert } from '../../context/AlertContext';
 import { receiptService } from '../../services/ReceiptService';
 import { PrinterService } from '../../utils/sunmiPrinter';
 import PaymentSuccessModal from '../../components/pos/PaymentSuccessModal';
@@ -9,6 +10,7 @@ const POSPaymentPage: React.FC = () => {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
     const { staff } = usePOS();
+    const { showAlert } = useAlert();
 
     const [order, setOrder] = useState<any>(null);
     const [payments, setPayments] = useState<any[]>([]);
@@ -98,7 +100,7 @@ const POSPaymentPage: React.FC = () => {
 
         } catch (error) {
             console.error('Error fetching payment data:', error);
-            alert('Could not load order');
+            showAlert('Error', 'Could not load order', 'error');
             navigate('/pos');
         } finally {
             setLoading(false);
@@ -122,11 +124,11 @@ const POSPaymentPage: React.FC = () => {
     const processPayment = async () => {
         const amount = parseFloat(amountToPay);
         if (isNaN(amount) || amount <= 0) {
-            alert('Please enter a valid amount');
+            showAlert('Invalid Amount', 'Please enter a valid amount', 'warning');
             return;
         }
         if (amount > remainingBalance + 0.01) { // Float tolerance
-            alert('Amount exceeds remaining balance');
+            showAlert('Invalid Amount', 'Amount exceeds remaining balance', 'warning');
             return;
         }
 
@@ -159,7 +161,7 @@ const POSPaymentPage: React.FC = () => {
 
             // Auto-print receipt if enabled (only for full payment)
             if (result.fully_paid && orderId && order?.restaurant_id) {
-                await receiptService.printOrder(orderId, order.restaurant_id, false, paymentMethod);
+                await receiptService.printOrder(orderId, order.restaurant_id, false, paymentMethod, showAlert);
             }
 
             if (!result.fully_paid) {
@@ -167,7 +169,7 @@ const POSPaymentPage: React.FC = () => {
             }
 
         } catch (error: any) {
-            alert('Payment failed: ' + error.message);
+            showAlert('Payment Failed', error.message, 'error');
         } finally {
             setProcessing(false);
         }
@@ -216,7 +218,7 @@ const POSPaymentPage: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => receiptService.printOrder(order.id, order.restaurant_id, true, payments?.[0]?.payment_method)}
+                        onClick={() => receiptService.printOrder(order.id, order.restaurant_id, true, payments?.[0]?.payment_method, showAlert)}
                         className="mt-4 w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 rounded font-bold transition-colors"
                     >
                         🖨️ Print Receipt

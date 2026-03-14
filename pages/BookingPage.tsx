@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { validateUKPhone } from '../utils/validation';
 import { useSettings } from '../context/SettingsContext';
+import { useAlert } from '../context/AlertContext';
 import BookingMenuStep from './BookingMenuStep';
 import { MenuItemData } from '../context/OrderContext';
 
@@ -279,6 +280,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading, stepN
 
 const BookingPage: React.FC = () => {
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const [step, setStep] = useState(1);
 
     if (settings?.bookings_enabled === false) {
@@ -439,7 +441,7 @@ const BookingPage: React.FC = () => {
         const fullPhone = '+44' + bookingData.phone;
         const validatedPhone = validateUKPhone(fullPhone);
         if (!validatedPhone) {
-            alert('Please enter a valid UK mobile number (e.g., 7123 456789).');
+            showAlert('Invalid Phone', 'Please enter a valid UK mobile number (e.g., 7123 456789).', 'warning');
             setIsLoading(false);
             return;
         }
@@ -465,11 +467,11 @@ const BookingPage: React.FC = () => {
             }
 
             if (data && !data.success) {
-                alert(data.error_message || 'Booking failed. Please try again.');
+                showAlert('Booking Error', data.error_message || 'Booking failed. Please try again.', 'error');
                 return;
             }
 
-            alert(data?.message || 'Thank you for your reservation request! We will contact you shortly to confirm.');
+            showAlert('Success', data?.message || 'Thank you for your reservation request! We will contact you shortly to confirm.', 'success');
 
             // Reset form state on successful submission
             setStep(1);
@@ -486,7 +488,7 @@ const BookingPage: React.FC = () => {
 
         } catch (error) {
             console.error("Booking submission error:", error);
-            alert(`Error: Could not submit your booking. Please try again. \n${(error as Error).message}`);
+            showAlert('Error', `Could not submit your booking. Please try again. \n${(error as Error).message}`, 'error');
         } finally {
             setIsLoading(false);
         }

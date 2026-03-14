@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 import { UserPlus } from 'lucide-react';
 import UserManagementModal from '../../components/admin/UserManagementModal';
 
@@ -15,6 +16,7 @@ interface Profile {
 
 const StaffManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [staff, setStaff] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -89,14 +91,14 @@ const StaffManagementPage: React.FC = () => {
 
             if (error) throw error;
 
-            alert('Staff updated successfully');
+            showAlert('Success', 'Staff updated successfully', 'success');
             setEditingId(null);
             fetchStaff();
         } catch (error: any) {
             if (error.message && error.message.includes('idx_profiles_restaurant_pin')) {
-                alert('Error: This PIN is already assigned to another staff member. Please choose a unique PIN.');
+                showAlert('PIN Error', 'This PIN is already assigned to another staff member. Please choose a unique PIN.', 'error');
             } else {
-                alert('Error updating staff: ' + error.message);
+                showAlert('Error', 'Error updating staff: ' + error.message, 'error');
             }
         }
     };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import TableMap from '../../components/pos/TableMap';
 import { useSettings } from '../../context/SettingsContext';
+import { useAlert } from '../../context/AlertContext';
 import { useNavigate } from 'react-router-dom';
 import POSQRModal from '../../components/pos/POSQRModal';
 import ManageFloorsModal from '../../components/pos/ManageFloorsModal';
@@ -13,6 +14,7 @@ import { Pause } from 'lucide-react';
 
 const POSTablesPage: React.FC = () => {
     const { settings } = useSettings();
+    const { showAlert } = useAlert();
     const navigate = useNavigate();
     const [tables, setTables] = useState<any[]>([]);
     const [floors, setFloors] = useState<any[]>([]);
@@ -193,12 +195,12 @@ const POSTablesPage: React.FC = () => {
                 if (error) throw error;
             }
 
-            alert('Layout saved successfully!');
+            showAlert('Success', 'Layout saved successfully!', 'success');
             setIsEditMode(false);
             fetchData(); // re-fetch to clean state
         } catch (error: any) {
             console.error('Error saving layout:', error);
-            alert('Failed to save layout');
+            showAlert('Error', 'Failed to save layout', 'error');
         } finally {
             setLoading(false);
         }
@@ -229,7 +231,7 @@ const POSTablesPage: React.FC = () => {
             fetchData();
         } catch (error) {
             console.error('Error adding table:', error);
-            alert('Failed to add table');
+            showAlert('Error', 'Failed to add table', 'error');
         } finally {
             setLoading(false);
         }

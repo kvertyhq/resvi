@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../context/AlertContext';
 import POSCategoryTabs from '../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../components/pos/POSMenuGrid';
 import POSModifierModal from '../components/pos/POSModifierModal';
@@ -10,6 +11,7 @@ import POSModifierModal from '../components/pos/POSModifierModal';
 
 const CustomerMenuPage: React.FC = () => {
     const { tableId } = useParams<{ tableId: string }>();
+    const { showAlert } = useAlert();
     const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
     // Data
@@ -79,7 +81,7 @@ const CustomerMenuPage: React.FC = () => {
 
         } catch (error) {
             console.error('Error loading menu:', error);
-            alert('Could not load menu. Please scan again.');
+            showAlert('Error', 'Could not load menu. Please scan again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -97,7 +99,7 @@ const CustomerMenuPage: React.FC = () => {
     const addToCart = (item: any, modifiers: any[], finalPrice: number) => {
         // Validation/Logic same as POS but maybe save to local storage for guest
         setCartCount(prev => prev + 1);
-        alert(`Added ${item.name} to order! (Checkout coming soon)`);
+        showAlert('Success', `Added ${item.name} to order! (Checkout coming soon)`, 'success');
         setIsModalOpen(false);
     };
 

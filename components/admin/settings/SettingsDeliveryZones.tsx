@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { Trash, Pencil, X } from 'lucide-react';
 import { useAdmin } from '../../../context/AdminContext';
+import { useAlert } from '../../../context/AlertContext';
 
 interface DeliveryZone {
     id: string;
@@ -14,6 +15,7 @@ interface DeliveryZone {
 
 const SettingsDeliveryZones: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [zones, setZones] = useState<DeliveryZone[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,7 @@ const SettingsDeliveryZones: React.FC = () => {
 
     const handleAddZone = async () => {
         if (!newZone.postcode_prefix || !newZone.zone_name) {
-            alert('Please enter a Zone Name and Postcode');
+            showAlert('Required', 'Please enter a Zone Name and Postcode', 'warning');
             return;
         }
 
@@ -79,7 +81,7 @@ const SettingsDeliveryZones: React.FC = () => {
 
         if (error) {
             console.error('Error adding zone:', error);
-            alert('Failed to add zone');
+            showAlert('Error', 'Failed to add zone', 'error');
         } else if (data) {
             setZones([...zones, data[0]]);
             resetForm();
@@ -89,7 +91,7 @@ const SettingsDeliveryZones: React.FC = () => {
     const handleUpdateZone = async () => {
         if (!editingId) return;
         if (!newZone.postcode_prefix || !newZone.zone_name) {
-            alert('Please enter a Zone Name and Postcode');
+            showAlert('Required', 'Please enter a Zone Name and Postcode', 'warning');
             return;
         }
 
@@ -107,7 +109,7 @@ const SettingsDeliveryZones: React.FC = () => {
 
         if (error) {
             console.error('Error updating zone:', error);
-            alert('Failed to update zone');
+            showAlert('Error', 'Failed to update zone', 'error');
         } else if (data) {
             setZones(zones.map(z => z.id === editingId ? data[0] : z));
             resetForm();
@@ -115,19 +117,28 @@ const SettingsDeliveryZones: React.FC = () => {
     };
 
     const handleDeleteZone = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this zone?')) return;
-        const { error } = await supabase
-            .from('delivery_zones')
-            .delete()
-            .eq('id', id);
+        showAlert(
+            'Confirm Delete',
+            'Are you sure you want to delete this zone?',
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    const { error } = await supabase
+                        .from('delivery_zones')
+                        .delete()
+                        .eq('id', id);
 
-        if (error) {
-            console.error('Error deleting zone:', error);
-            alert('Failed to delete zone');
-        } else {
-            setZones(zones.filter(z => z.id !== id));
-            if (editingId === id) resetForm();
-        }
+                    if (error) {
+                        console.error('Error deleting zone:', error);
+                        showAlert('Error', 'Failed to delete zone', 'error');
+                    } else {
+                        setZones(zones.filter(z => z.id !== id));
+                        if (editingId === id) resetForm();
+                    }
+                }
+            }
+        );
     };
 
     const handleEdit = (zone: DeliveryZone) => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAlert } from '../../context/AlertContext';
 
 interface Floor {
     id: string;
@@ -16,6 +17,7 @@ interface ManageFloorsModalProps {
 }
 
 const ManageFloorsModal: React.FC<ManageFloorsModalProps> = ({ isOpen, onClose, floors, settingsId, onUpdate }) => {
+    const { showAlert } = useAlert();
     const [newFloorName, setNewFloorName] = useState('');
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,29 +42,38 @@ const ManageFloorsModal: React.FC<ManageFloorsModalProps> = ({ isOpen, onClose, 
             onUpdate();
         } catch (error) {
             console.error('Error adding floor:', error);
-            alert('Failed to add floor');
+            showAlert('Error', 'Failed to add floor', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteFloor = async (id: string, name: string) => {
-        if (!confirm(`Are you sure you want to delete "${name}"? Tables on this floor will be unassigned.`)) return;
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('restaurant_floors')
-                .delete()
-                .eq('id', id);
+        showAlert(
+            'Confirm Delete',
+            `Are you sure you want to delete "${name}"? Tables on this floor will be unassigned.`,
+            'warning',
+            {
+                showCancel: true,
+                onConfirm: async () => {
+                    setLoading(true);
+                    try {
+                        const { error } = await supabase
+                            .from('restaurant_floors')
+                            .delete()
+                            .eq('id', id);
 
-            if (error) throw error;
-            onUpdate();
-        } catch (error) {
-            console.error('Error deleting floor:', error);
-            alert('Failed to delete floor');
-        } finally {
-            setLoading(false);
-        }
+                        if (error) throw error;
+                        onUpdate();
+                    } catch (error) {
+                        console.error('Error deleting floor:', error);
+                        showAlert('Error', 'Failed to delete floor', 'error');
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
+        );
     };
 
     const startEdit = (floor: Floor) => {
@@ -84,7 +95,7 @@ const ManageFloorsModal: React.FC<ManageFloorsModalProps> = ({ isOpen, onClose, 
             onUpdate();
         } catch (error) {
             console.error('Error updating floor:', error);
-            alert('Failed to update floor');
+            showAlert('Error', 'Failed to update floor', 'error');
         } finally {
             setLoading(false);
         }

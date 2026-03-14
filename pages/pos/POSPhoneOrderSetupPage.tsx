@@ -27,6 +27,11 @@ const POSPhoneOrderSetupPage: React.FC = () => {
     const incomingState = location.state || {};
     const { customer, isPhoneOrder, callLogId } = incomingState;
 
+    const [pastOrders, setPastOrders] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [selectedPastItems, setSelectedPastItems] = useState<any[] | null>(null);
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
     const [orderType, setOrderType] = useState<'delivery' | 'collection' | null>(null);
     const [localDate, setLocalDate] = useState('');
     const [localTime, setLocalTime] = useState('');
@@ -87,7 +92,54 @@ const POSPhoneOrderSetupPage: React.FC = () => {
 
         setLocalDate(formattedToday);
         setDeliveryDate(formattedToday);
-    }, []);
+
+        if (customer?.id) {
+            fetchCustomerHistory(customer.id);
+        }
+    }, [customer?.id]);
+
+    const fetchCustomerHistory = async (userId: string) => {
+        setLoadingHistory(true);
+        const { data, error } = await supabase
+            .from('orders')
+            .select(`
+                id, created_at, total_amount, readable_id, daily_order_number,
+                order_items (
+                    id, menu_item_id, quantity, price_snapshot, name_snapshot, modifiers, notes, course_name
+                )
+            `)
+            .eq('user_id', userId)
+            .in('status', ['completed', 'served'])
+            .order('created_at', { ascending: false })
+            .limit(3);
+
+        if (!error && data) {
+            setPastOrders(data);
+        }
+        setLoadingHistory(false);
+    };
+
+    const handleSelectPastOrder = (order: any) => {
+        if (selectedOrderId === order.id) {
+            setSelectedPastItems(null);
+            setSelectedOrderId(null);
+        } else {
+            // Map past items to CartItem format
+            const items = order.order_items.map((item: any) => ({
+                tempId: Math.random().toString(36).substr(2, 9),
+                id: item.menu_item_id,
+                name: item.name_snapshot,
+                price: item.price_snapshot,
+                basePrice: item.price_snapshot,
+                quantity: item.quantity,
+                modifiers: item.modifiers || [],
+                notes: item.notes || '',
+                course: item.course_name || 'Main'
+            }));
+            setSelectedPastItems(items);
+            setSelectedOrderId(order.id);
+        }
+    };
 
     useEffect(() => {
         setCapacityError(null);
@@ -139,7 +191,8 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                         isPhoneOrder: true,
                         orderType: orderType, // 'delivery' or 'collection'
                         timeslot: timeslot,
-                        callLogId: callLogId ?? null  // carry through so POSOrderPage can link the order
+                        callLogId: callLogId ?? null,
+                        repeatItems: selectedPastItems
                     }
                 });
             } else {
@@ -214,6 +267,50 @@ const POSPhoneOrderSetupPage: React.FC = () => {
                             <span className="font-bold">{settings?.collection_available === false ? 'Collection Unavailable' : 'Collection'}</span>
                         </button>
                     </div>
+
+                    {/* Past Orders History */}
+                    {pastOrders.length > 0 && (
+                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl animate-fade-in">
+                            <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-3 flex items-center gap-2">
+                                <Clock size={16} />
+                                Repeat a Past Order?
+                            </h3>
+                            <div className="space-y-2">
+                                {pastOrders.map(order => (
+                                    <button
+                                        key={order.id}
+                                        onClick={() => handleSelectPastOrder(order)}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between group ${selectedOrderId === order.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-400'}`}
+                                    >
+                                        <div>
+                                            <div className={`font-bold text-sm ${selectedOrderId === order.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                                {order.readable_id || `#${order.daily_order_number || order.id.slice(0, 6)}`}
+                                                <span className={`ml-2 font-normal text-xs ${selectedOrderId === order.id ? 'text-blue-100' : 'text-gray-500'}`}>
+                                                    {new Date(order.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <div className={`text-xs mt-0.5 ${selectedOrderId === order.id ? 'text-blue-100' : 'text-gray-500'} truncate max-w-[200px]`}>
+                                                {order.order_items.map((i: any) => `${i.quantity}x ${i.name_snapshot}`).join(', ')}
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex items-center gap-3">
+                                            <div className={`text-sm font-bold ${selectedOrderId === order.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                                £{Number(order.total_amount).toFixed(2)}
+                                            </div>
+                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedOrderId === order.id ? 'border-white bg-white text-blue-600' : 'border-gray-300 dark:border-gray-600 group-hover:border-blue-400'}`}>
+                                                {selectedOrderId === order.id && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6L9 17l-5-5"/></svg>}
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedPastItems && (
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-2 font-medium">
+                                    Items from this order will be pre-filled in the cart. You can still add more or change them.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Order Details Form */}
                     <div className="space-y-5">

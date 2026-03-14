@@ -12,9 +12,11 @@ interface ContactMessage {
 }
 
 import { useAdmin } from '../../context/AdminContext';
+import { useAlert } from '../../context/AlertContext';
 
 const ContactMessagesPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { showAlert } = useAlert();
     const [messages, setMessages] = useState<ContactMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
@@ -67,7 +69,7 @@ const ContactMessagesPage: React.FC = () => {
 
         if (error) {
             console.error('Error updating message:', error);
-            alert('Failed to update status');
+            showAlert('Error', 'Failed to update status', 'error');
         } else {
             // Optimistic update
             setMessages(messages.map(msg =>

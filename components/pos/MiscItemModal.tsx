@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus } from 'lucide-react';
+import { useAlert } from '../../context/AlertContext';
 
 interface MiscItemModalProps {
     isOpen: boolean;
@@ -9,6 +10,7 @@ interface MiscItemModalProps {
 }
 
 const MiscItemModal: React.FC<MiscItemModalProps> = ({ isOpen, onClose, onAdd, currency = '£' }) => {
+    const { showAlert } = useAlert();
     const [itemName, setItemName] = useState('Misc Item');
     const [itemPrice, setItemPrice] = useState('');
     const [itemNotes, setItemNotes] = useState('');
@@ -20,12 +22,12 @@ const MiscItemModal: React.FC<MiscItemModalProps> = ({ isOpen, onClose, onAdd, c
         const price = parseFloat(itemPrice);
 
         if (!name) {
-            alert('Please enter an item name');
+            showAlert('Name Required', 'Please enter an item name', 'warning');
             return;
         }
 
         if (isNaN(price) || price <= 0) {
-            alert('Please enter a valid price');
+            showAlert('Invalid Price', 'Please enter a valid price', 'warning');
             return;
         }
 

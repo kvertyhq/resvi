@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '../../supabaseClient';
-import { CreditCard, Banknote, X } from 'lucide-react';
+import { CreditCard, Banknote, X, Printer } from 'lucide-react';
 
 interface POSPaymentModalProps {
     isOpen: boolean;
@@ -165,6 +165,20 @@ const POSPaymentModal: React.FC<POSPaymentModalProps> = ({ isOpen, onClose, amou
                         </button>
                     </div>
                 )}
+
+                {/* Global Unpaid Option */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-2">
+                    <button
+                        onClick={() => {
+                            onPaymentSuccess('unpaid');
+                            onClose();
+                        }}
+                        className="w-full py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Printer className="h-5 w-5" />
+                        Print & Place Order (Unpaid)
+                    </button>
+                </div>
 
                 {/* Cancel Button */}
                 <button

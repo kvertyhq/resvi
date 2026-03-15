@@ -270,82 +270,6 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
-    const handlePrintBill = async () => {
-        if (!settings?.id) return;
-
-        let orderId = currentOrder?.id;
-
-        // If there are unsaved items, we must save them first so they appear on the receipt
-        if (cartItems.length > 0) {
-            setLoading(true);
-            try {
-                if (isWalkIn && !currentOrder) {
-                    // Create a pending walk-in order so we can print it
-                    const orderItems = cartItems.map(item => ({
-                        menu_item_id: item.isMiscellaneous ? null : item.id,
-                        quantity: item.quantity,
-                        price: item.price,
-                        modifiers: item.modifiers,
-                        notes: item.notes || null,
-                        course: item.course,
-                        is_miscellaneous: item.isMiscellaneous || false,
-                        custom_item_name: item.isMiscellaneous ? item.name : null,
-                        name: item.name,
-                        station_id: item.station_id
-                    }));
-
-                    const { data, error: rpcError } = await supabase.rpc('create_walkin_order', {
-                        p_restaurant_id: settings?.id,
-                        p_staff_id: staff?.id,
-                        p_order_items: orderItems,
-                        p_total_amount: total,
-                        p_user_id: selectedCustomer?.id || null,
-                        p_discount_type: discountType || null,
-                        p_discount_amount: discountAmount || 0,
-                        p_payment_method: null, // No payment yet
-                        p_payment_transaction_id: null,
-                        p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
-                        p_customer_postcode: customerPostcode || null,
-                        p_order_type: isPhoneOrder ? (phoneOrderType || 'phone') : 'takeaway', // use takeaway to match walk-in page
-                        p_order_source: isPhoneOrder ? 'phone' : 'pos'
-                    });
-
-                    if (rpcError) throw rpcError;
-
-                    const result = data as any;
-                    if (result.success) {
-                        orderId = result.order_uuid || result.order_id;
-                        setCreatedOrderId(orderId);
-                        setCreatedDailyOrderNumber(result.daily_order_number);
-                        setCartItems([]);
-                        // Fetch the created order so UI updates
-                        const { data: newOrder } = await supabase.from('orders').select('*').eq('id', orderId).single();
-                        if (newOrder) setCurrentOrder(newOrder);
-                        fetchExistingOrder();
-                    }
-                } else {
-                    // Update existing table or walk-in order
-                    await handlePlaceOrder(true); // silent update
-                    orderId = currentOrder?.id || createdOrderId;
-                }
-            } catch (error) {
-                console.error('Failed to save before printing:', error);
-                showAlert('Print Error', 'Failed to save items before printing.', 'error');
-                setLoading(false);
-                return;
-            }
-            setLoading(false);
-        }
-
-        const finalOrderId = orderId || currentOrder?.id || createdOrderId;
-
-        if (!finalOrderId) {
-            showAlert('Print Bill', 'Please add items to the order first.', 'info');
-            return;
-        }
-
-        await receiptService.printOrder(finalOrderId, settings.id, true, undefined, showAlert);
-    };
 
     // Debounced customer search
     useEffect(() => {
@@ -733,7 +657,7 @@ const POSOrderPage: React.FC = () => {
                 p_user_id: finalCustomerId,
                 p_discount_type: discountType || null,
                 p_discount_amount: discountAmount || 0,
-                p_payment_method: method,
+                p_payment_method: method === 'unpaid' ? null : method,
                 p_payment_transaction_id: transactionId || null,
                 p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
                 p_customer_postcode: customerPostcode || null,
@@ -1328,14 +1252,6 @@ const POSOrderPage: React.FC = () => {
                             title="Cancel Order"
                         >
                             <Trash2 className="h-6 w-6" />
-                        </button>
-                        <button
-                            onClick={handlePrintBill}
-                            disabled={cartItems.length === 0 && !currentOrder}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center min-w-[56px] h-full"
-                            title="Print Bill"
-                        >
-                            <Printer className="h-6 w-6" />
                         </button>
                         <button
                             onClick={handleHoldOrder}

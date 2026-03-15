@@ -164,47 +164,25 @@ const POSPhoneOrderSetupPage: React.FC = () => {
         const date = orderType === 'delivery' ? (deliveryDate || today) : (localDate || today);
         const time = orderType === 'delivery' ? (deliveryTime || 'ASAP') : (localTime || 'ASAP');
 
-        try {
-            // Check capacity in the same way `OrderPage.tsx` does
-            const { data, error } = await supabase.rpc('check_timeslot_capacity', {
-                p_restaurant_id: settings?.id,
-                p_date: date,
-                p_time: time,
-                p_order_type: orderType
-            });
+        // Bypassing check_timeslot_capacity as date/time selection is hidden for POS phone orders
+        const timeslot = { date, time };
+        const updatedCustomer = {
+            ...customer,
+            postcode: orderType === 'delivery' ? postcode : customer?.postcode,
+            address: orderType === 'delivery' ? address : customer?.address,
+        };
 
-            if (error) throw error;
-
-            if (data && (data.message === 'slot available' || data.unlimited === true)) {
-                // Forward the settings to POSOrderPage
-                const timeslot = { date, time };
-
-                // Merge new address inputs into customer
-                const updatedCustomer = {
-                    ...customer,
-                    postcode: orderType === 'delivery' ? postcode : customer?.postcode,
-                    address: orderType === 'delivery' ? address : customer?.address,
-                };
-
-                navigate('/pos/order/walk-in', {
-                    state: {
-                        customer: updatedCustomer,
-                        isPhoneOrder: true,
-                        orderType: orderType, // 'delivery' or 'collection'
-                        timeslot: timeslot,
-                        callLogId: callLogId ?? null,
-                        repeatItems: selectedPastItems
-                    }
-                });
-            } else {
-                setCapacityError("Selected time slot is not available. Please choose another time.");
+        navigate('/pos/order/walk-in', {
+            state: {
+                customer: updatedCustomer,
+                isPhoneOrder: true,
+                orderType: orderType,
+                timeslot: timeslot,
+                callLogId: callLogId ?? null,
+                repeatItems: selectedPastItems
             }
-        } catch (error) {
-            console.error("Error checking capacity:", error);
-            setCapacityError("An error occurred. Please try again.");
-        } finally {
-            setIsCheckingCapacity(false);
-        }
+        });
+        setIsCheckingCapacity(false);
     };
 
     const baseButtonClasses = "w-full text-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 shadow-sm";

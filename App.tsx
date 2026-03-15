@@ -48,6 +48,7 @@ import POSCallHistoryPage from './pages/pos/POSCallHistoryPage';
 import POSHistoryPage from './pages/pos/POSHistoryPage';
 import POSPhoneOrderSetupPage from './pages/pos/POSPhoneOrderSetupPage';
 import POSReportsPage from './pages/pos/POSReportsPage';
+import POSReportPrintPage from './pages/pos/POSReportPrintPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { SipProvider } from './context/SipContext';
@@ -242,6 +243,13 @@ function App() {
                     <Route path="order/:tableId" element={<POSOrderPage />} />
                     <Route path="payment/:orderId" element={<POSPaymentPage />} />
                   </Route>
+
+                  {/* Standalone POS Routes (No Layout) */}
+                  <Route path="/pos/print-report" element={
+                    <RequirePOSAuth>
+                      <POSReportPrintPage />
+                    </RequirePOSAuth>
+                  } />
 
                   {/* Public Customer Routes */}
                   <Route path="/menu/:tableId" element={<CustomerMenuPage />} />

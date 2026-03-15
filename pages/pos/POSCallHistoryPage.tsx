@@ -17,7 +17,7 @@ const CUSTOMERS_PER_PAGE = 15;
 const POSCallHistoryPage: React.FC = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
 
     const formatDate = (dateString: string | null | undefined, formatStr: string) => {
         if (!dateString) return 'N/A';
@@ -48,7 +48,7 @@ const POSCallHistoryPage: React.FC = () => {
     const [markingComplete, setMarkingComplete] = useState<string | null>(null); // order id being marked
 
     // History filtering & pagination
-    const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'custom' | 'all'>('all');
+    const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'custom' | 'all'>('today');
     const [historyPage, setHistoryPage] = useState(1);
     const [historyTotal, setHistoryTotal] = useState(0);
     const [customDate, setCustomDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -238,30 +238,31 @@ const POSCallHistoryPage: React.FC = () => {
         e.stopPropagation(); // don't open the detail modal
         const label = order.order_type === 'delivery' ? 'Delivered' : 'Completed';
         
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Complete',
             `Mark order ${order.readable_id || (order.daily_order_number ? '#' + order.daily_order_number : '')} as ${label}?\n\nThis will move it to the completed history.`,
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    setMarkingComplete(order.id);
-                    const { error } = await supabase
-                        .from('orders')
-                        .update({ status: 'completed' })
-                        .eq('id', order.id);
-                    if (!error) {
-                        // Move locally: remove from active, add to completed
-                        setPhoneOrders(prev => prev.filter(o => o.id !== order.id));
-                        setCompletedOrders(prev => [
-                            { ...order, status: 'completed' },
-                            ...prev
-                        ]);
-                    }
-                    setMarkingComplete(null);
-                }
-            }
+            'warning'
         );
+
+        if (!confirmed) return;
+
+        setMarkingComplete(order.id);
+        const { error } = await supabase
+            .from('orders')
+            .update({ status: 'completed' })
+            .eq('id', order.id);
+            
+        if (!error) {
+            // Move locally: remove from active, add to completed
+            setPhoneOrders(prev => prev.filter(o => o.id !== order.id));
+            setCompletedOrders(prev => [
+                { ...order, status: 'completed' },
+                ...prev
+            ]);
+        } else {
+            showAlert('Error', 'Failed to update order status. Please try again.', 'danger');
+        }
+        setMarkingComplete(null);
     };
 
     const getStatusColor = (status: string) => {
@@ -429,13 +430,18 @@ const POSCallHistoryPage: React.FC = () => {
                                                         <div className="flex items-start justify-between mb-3">
                                                             <div>
                                                                 <div className="font-bold text-gray-900 dark:text-white text-base">
-                                                                    {order.readable_id}
-                                                                    {order.daily_order_number && (
-                                                                        <span className="text-xs text-gray-400 font-normal ml-1">
-                                                                            (#{order.daily_order_number})
-                                                                        </span>
+                                                                    {order.daily_order_number ? (
+                                                                        <>
+                                                                            #{order.daily_order_number}
+                                                                            {order.readable_id && (
+                                                                                <span className="text-xs text-gray-400 font-normal ml-1">
+                                                                                    ({order.readable_id})
+                                                                                </span>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        order.readable_id || `#${order.id.slice(0, 6)}`
                                                                     )}
-                                                                    {!order.readable_id && !order.daily_order_number && `#${order.id.slice(0, 6)}`}
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-0.5">
                                                                     {formatDate(order.created_at, 'MMM d, h:mm a')}
@@ -571,7 +577,18 @@ const POSCallHistoryPage: React.FC = () => {
                                                         <div className="flex items-start justify-between mb-3">
                                                             <div>
                                                                 <div className="font-bold text-gray-900 dark:text-white text-base group-hover:text-[var(--theme-color)] transition-colors">
-                                                                    {order.readable_id || (order.daily_order_number ? order.daily_order_number : `#${order.id.slice(0, 6)}`)}
+                                                                    {order.daily_order_number ? (
+                                                                        <>
+                                                                            #{order.daily_order_number}
+                                                                            {order.readable_id && (
+                                                                                <span className="text-xs text-gray-400 font-normal ml-1">
+                                                                                    ({order.readable_id})
+                                                                                </span>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        order.readable_id || `#${order.id.slice(0, 6)}`
+                                                                    )}
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                                                                     {formatDate(order.created_at, 'MMM d, h:mm a')}

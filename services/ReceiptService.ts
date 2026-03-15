@@ -145,6 +145,29 @@ class ReceiptService {
         }
     }
 
+    /**
+     * Print X or Z Report
+     */
+    async printReport(type: 'x' | 'z', restaurantId: string) {
+        const url = `#/pos/print-report?type=${type}&restaurant_id=${restaurantId}`;
+        const width = 400;
+        const height = 800;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+
+        const windowName = `${type.toUpperCase()}_Report_${new Date().toISOString().split('T')[0]}`;
+
+        const popup = window.open(
+            url,
+            windowName,
+            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
+        );
+
+        if (popup) {
+            popup.focus();
+        }
+    }
+
     private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string) {
         // Open the public receipt page in a popup window
         let url = `#/r/${orderId}?${autoPrint ? 'autoprint=true' : ''}`;

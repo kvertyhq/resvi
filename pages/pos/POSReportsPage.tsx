@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
-import { Clock, Filter, Eye, X, ArrowLeft, RefreshCcw, Search, Calendar, DollarSign, ShoppingBag, BarChart3, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Clock, Filter, Eye, X, ArrowLeft, RefreshCcw, Search, Calendar, DollarSign, ShoppingBag, BarChart3, ChevronDown, ChevronRight, Loader2, Printer } from 'lucide-react';
+import { receiptService } from '../../services/ReceiptService';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfDay, startOfMonth, endOfDay, endOfMonth, isWithinInterval, parseISO, subDays } from 'date-fns';
 
@@ -227,6 +228,23 @@ const POSReportsPage: React.FC = () => {
                                 onChange={(e) => setEndDate(e.target.value)}
                                 className="bg-transparent border-none text-sm text-gray-700 dark:text-gray-200 focus:ring-0 px-2 py-1 outline-none"
                             />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => settings?.id && receiptService.printReport('x', settings.id)}
+                                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                <Printer size={16} />
+                                X Report
+                            </button>
+                            <button
+                                onClick={() => settings?.id && receiptService.printReport('z', settings.id)}
+                                className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-black transition-colors"
+                            >
+                                <Printer size={16} />
+                                Z Report
+                            </button>
                         </div>
 
                         <button

@@ -49,6 +49,7 @@ import POSHistoryPage from './pages/pos/POSHistoryPage';
 import POSPhoneOrderSetupPage from './pages/pos/POSPhoneOrderSetupPage';
 import POSReportsPage from './pages/pos/POSReportsPage';
 import POSReportPrintPage from './pages/pos/POSReportPrintPage';
+import POSPrintLocalPage from './pages/pos/POSPrintLocalPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { SipProvider } from './context/SipContext';
@@ -248,6 +249,11 @@ function App() {
                   <Route path="/pos/print-report" element={
                     <RequirePOSAuth>
                       <POSReportPrintPage />
+                    </RequirePOSAuth>
+                  } />
+                  <Route path="/pos/print-local" element={
+                    <RequirePOSAuth>
+                      <POSPrintLocalPage />
                     </RequirePOSAuth>
                   } />
 

@@ -63,9 +63,9 @@ class ReceiptService {
     /**
      * Helper to dispatch print job to the correct driver
      */
-    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any) {
+    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, round?: number) {
         if (settings.type === 'browser') {
-            await this.printBrowser(orderId, true, stationId);
+            await this.printBrowser(orderId, true, stationId, round);
         } else if (settings.type === 'bluetooth') {
             await this.printBluetooth(orderId, stationId, showAlert);
         } else if (settings.type === 'network') {
@@ -146,6 +146,25 @@ class ReceiptService {
     }
 
     /**
+     * Prints only kitchen/station tickets (KOT)
+     */
+    async printKitchenTickets(orderId: string, restaurantId: string, round?: number, showAlert?: any) {
+        const settings = this.getSettings();
+        const { data: stations } = await supabase
+            .from('stations')
+            .select('id, type')
+            .eq('restaurant_id', restaurantId);
+
+        if (stations && stations.length > 0) {
+            for (const station of stations) {
+                // We could filter station type here if we only want to print to certain stations
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await this.printToDriver(orderId, settings, station.id, showAlert, round);
+            }
+        }
+    }
+
+    /**
      * Print X or Z Report
      */
     async printReport(type: 'x' | 'z', restaurantId: string) {
@@ -168,11 +187,41 @@ class ReceiptService {
         }
     }
 
-    private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string) {
+    async printLocalOrder(restaurantId: string, orderData: any) {
+        // Save temporary data to localStorage for the print page to read
+        localStorage.setItem('pos_temp_print_data', JSON.stringify({
+            ...orderData,
+            restaurant_id: restaurantId,
+            printed_at: new Date().toISOString()
+        }));
+
+        const url = `#/pos/print-local`;
+        const width = 400;
+        const height = 800;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+
+        const windowName = `Local_Print_${Date.now()}`;
+
+        const popup = window.open(
+            url,
+            windowName,
+            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
+        );
+
+        if (popup) {
+            popup.focus();
+        }
+    }
+
+    private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string, round?: number) {
         // Open the public receipt page in a popup window
         let url = `#/r/${orderId}?${autoPrint ? 'autoprint=true' : ''}`;
         if (stationId) {
             url += `&station_id=${stationId}`;
+        }
+        if (round !== undefined) {
+            url += `&round=${round}`;
         }
 
         const width = 400;

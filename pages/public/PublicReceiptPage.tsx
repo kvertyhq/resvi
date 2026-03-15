@@ -12,13 +12,16 @@ const PublicReceiptPage: React.FC = () => {
     const [settings, setSettings] = useState<any>(null);
     const [receiptSettings, setReceiptSettings] = useState<any>(null);
     const [stationName, setStationName] = useState<string>('');
+    const [round, setRound] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (orderId) {
             fetchOrderData();
         }
-    }, [orderId]);
+        const r = searchParams.get('round');
+        if (r) setRound(parseInt(r));
+    }, [orderId, searchParams]);
 
     useEffect(() => {
         if (stationId && order?.restaurant_id) {
@@ -47,7 +50,8 @@ const PublicReceiptPage: React.FC = () => {
                         name_snapshot,
                         price_snapshot,
                         selected_addons,
-                        station_id
+                        station_id,
+                        round_number
                     )
                 `)
                 .eq('id', orderId)
@@ -80,10 +84,12 @@ const PublicReceiptPage: React.FC = () => {
     if (loading) return <div className="flex justify-center p-10">Loading Receipt...</div>;
     if (!order) return <div className="flex justify-center p-10 text-red-500">Receipt not found.</div>;
 
-    // Filter items if stationId is present
-    const displayedItems = stationId
-        ? order.order_items.filter((item: any) => item.station_id === stationId)
-        : order.order_items;
+    // Filter items if stationId or round is present
+    const displayedItems = order.order_items.filter((item: any) => {
+        const stationMatch = !stationId || item.station_id === stationId;
+        const roundMatch = round === null || item.round_number === round;
+        return stationMatch && roundMatch;
+    });
 
     if (stationId && displayedItems.length === 0) {
         return <div className="flex justify-center p-10 text-gray-500">No items for this station.</div>;

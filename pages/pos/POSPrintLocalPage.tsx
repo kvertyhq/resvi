@@ -122,7 +122,11 @@ const POSPrintLocalPage: React.FC = () => {
                             </div>
                             {item.modifiers?.map((mod: any, j: number) => (
                                 <div key={j} className="flex justify-between text-xs pl-4 italic">
-                                    <span>+ {mod.name}</span>
+                                    <span>
+                                        + {mod.name} 
+                                        {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
+                                        {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
+                                    </span>
                                     {mod.price > 0 && <span>{settings?.currency || '£'}{mod.price.toFixed(2)}</span>}
                                 </div>
                             ))}

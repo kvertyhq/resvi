@@ -9,6 +9,13 @@ export default {
         "./App.tsx",
     ],
     darkMode: 'class',
+    safelist: [
+        'bg-green-500', 'text-green-500',
+        'bg-blue-500', 'text-blue-500',
+        'bg-purple-500', 'text-purple-500',
+        'bg-orange-500', 'text-orange-500',
+        'bg-brand-gold', 'text-brand-gold',
+    ],
     theme: {
         extend: {
             fontFamily: {

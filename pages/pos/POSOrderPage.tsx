@@ -363,11 +363,11 @@ const POSOrderPage: React.FC = () => {
                 return false;
             }
 
-            // Compare each modifier
-            const cartModifierIds = cartItem.modifiers.map(m => m.id).sort();
-            const newModifierIds = modifiers.map(m => m.id).sort();
+            // Compare each modifier (including location and intensity for uniqueness)
+            const cartModifiers = cartItem.modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
+            const newModifiers = modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
 
-            return JSON.stringify(cartModifierIds) === JSON.stringify(newModifierIds);
+            return JSON.stringify(cartModifiers) === JSON.stringify(newModifiers);
         });
 
         if (existingItemIndex !== -1) {
@@ -1150,7 +1150,15 @@ const POSOrderPage: React.FC = () => {
                                         {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                             <div className="text-xs text-gray-500 mt-1 pl-2 border-l-2 border-gray-300">
                                                 {item.selected_modifiers.map((m: any, i: number) => (
-                                                    <div key={i}>+ {m.name}</div>
+                                                    <div key={i} className="flex gap-1 flex-wrap">
+                                                        <span>+ {m.name}</span>
+                                                        {m.location && m.location !== 'whole' && (
+                                                            <span className="text-[10px] bg-gray-100 px-1 rounded uppercase font-bold text-gray-400">({m.location})</span>
+                                                        )}
+                                                        {m.intensity && m.intensity !== 'normal' && (
+                                                            <span className="text-[10px] bg-gray-100 px-1 rounded uppercase font-bold text-gray-400">({m.intensity})</span>
+                                                        )}
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
@@ -1207,11 +1215,23 @@ const POSOrderPage: React.FC = () => {
                                         </div>
 
                                         {item.modifiers && item.modifiers.length > 0 && (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5 border-t border-gray-300 dark:border-gray-600 pt-1">
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1 border-t border-gray-300 dark:border-gray-600 pt-1">
                                                 {item.modifiers.map((mod, idx) => (
-                                                    <div key={idx} className="flex justify-between">
-                                                        <span>+ {mod.name}</span>
-                                                        {Number(mod.price) > 0 && <span>{settings?.currency || '$'}{Number(mod.price).toFixed(2)}</span>}
+                                                    <div key={idx} className="flex justify-between items-center">
+                                                        <div className="flex gap-1 flex-wrap">
+                                                            <span className="font-medium text-gray-700 dark:text-gray-300">+ {mod.name}</span>
+                                                            {mod.location && mod.location !== 'whole' && (
+                                                                <span className="text-[9px] bg-gray-200 dark:bg-gray-600 px-1 rounded uppercase font-bold">({mod.location})</span>
+                                                            )}
+                                                            {mod.intensity && mod.intensity !== 'normal' && (
+                                                                <span className="text-[9px] bg-gray-200 dark:bg-gray-600 px-1 rounded uppercase font-bold">({mod.intensity})</span>
+                                                            )}
+                                                        </div>
+                                                        {Number(mod.price) > 0 && (
+                                                            <span className="font-mono text-gray-400">
+                                                                {settings?.currency || '$'}{Number(mod.price).toFixed(2)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

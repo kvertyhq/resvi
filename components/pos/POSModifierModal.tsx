@@ -6,6 +6,7 @@ interface ModifierItem {
     id: string;
     name: string;
     price_adjustment: number;
+    price_matrix?: Record<string, number>;
 }
 
 interface ModifierGroup {
@@ -16,6 +17,16 @@ interface ModifierGroup {
     min_selection: number;
     max_selection: number;
     items: ModifierItem[];
+}
+
+interface SelectedModifier {
+    modifier_group_id: string;
+    modifier_group_name: string;
+    modifier_item_id: string;
+    name: string;
+    price: number;
+    location: 'whole' | 'left' | 'right';
+    intensity: 'light' | 'normal' | 'extra' | 'double';
 }
 
 interface POSModifierModalProps {
@@ -29,35 +40,68 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
     const { showAlert } = useAlert();
     const [loading, setLoading] = useState(true);
     const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
-    const [selections, setSelections] = useState<Record<string, string[]>>({}); // groupId -> array of itemIds
+    const [selectedVariant, setSelectedVariant] = useState<any>(null);
+    const [selections, setSelections] = useState<Record<string, Record<string, Partial<SelectedModifier>>>>({}); // groupId -> itemId -> modifierData
     const [totalPrice, setTotalPrice] = useState(0);
 
     useEffect(() => {
         if (isOpen && menuItem) {
             fetchModifiers();
-            setTotalPrice(menuItem.price || 0);
+            
+            // Handle Price Variants (Sizes)
+            const variants = menuItem.price_variants || [];
+            if (variants.length > 0) {
+                // If there's a default or just pick first
+                setSelectedVariant(variants[0]);
+                setTotalPrice(Number(variants[0].price || 0));
+            } else {
+                setSelectedVariant(null);
+                setTotalPrice(Number(menuItem.price || 0));
+            }
+            
             setSelections({});
         }
     }, [isOpen, menuItem]);
 
-    // Recalculate total when selections change
+    // Recalculate total when selections or variant change
     useEffect(() => {
         if (!menuItem) return;
-        let newTotal = Number(menuItem.price || 0);
+        
+        let basePrice = selectedVariant ? Number(selectedVariant.price) : Number(menuItem.price || 0);
+        let modifiersTotal = 0;
 
         Object.keys(selections).forEach(groupId => {
             const group = modifierGroups.find(g => g.id === groupId);
             if (group) {
-                selections[groupId].forEach(itemId => {
+                Object.keys(selections[groupId]).forEach(itemId => {
+                    const modifier = selections[groupId][itemId];
                     const item = group.items.find(i => i.id === itemId);
-                    if (item) {
-                        newTotal += Number(item.price_adjustment);
+                    if (item && modifier) {
+                        let itemPrice = Number(item.price_adjustment || 0);
+                        
+                        // Use price matrix if variant is selected
+                        if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                            itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                        }
+
+                        // Fractional pricing for halves
+                        if (modifier.location !== 'whole') {
+                            itemPrice = itemPrice / 2;
+                        }
+
+                        // Intensity multipliers (example logic)
+                        if (modifier.intensity === 'extra') itemPrice *= 1.5;
+                        if (modifier.intensity === 'double') itemPrice *= 2;
+                        if (modifier.intensity === 'light') itemPrice *= 0.5;
+
+                        modifiersTotal += itemPrice;
                     }
                 });
             }
         });
-        setTotalPrice(newTotal);
-    }, [selections, modifierGroups, menuItem]);
+        
+        setTotalPrice(basePrice + modifiersTotal);
+    }, [selections, modifierGroups, menuItem, selectedVariant]);
 
     const fetchModifiers = async () => {
         setLoading(true);
@@ -113,24 +157,57 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
 
     const toggleSelection = (groupId: string, itemId: string, isMultiple: boolean) => {
         setSelections(prev => {
-            const current = prev[groupId] || [];
-            if (current.includes(itemId)) {
+            const groupSelections = prev[groupId] || {};
+            
+            if (groupSelections[itemId]) {
                 // Remove
-                return { ...prev, [groupId]: current.filter(id => id !== itemId) };
+                const updatedGroup = { ...groupSelections };
+                delete updatedGroup[itemId];
+                return { ...prev, [groupId]: updatedGroup };
             } else {
-                // Add
+                // Add default
+                const group = modifierGroups.find(g => g.id === groupId);
+                const item = group?.items.find(i => i.id === itemId);
+                
+                const newModifier: Partial<SelectedModifier> = {
+                    modifier_group_id: groupId,
+                    modifier_group_name: group?.name,
+                    modifier_item_id: itemId,
+                    name: item?.name,
+                    location: 'whole',
+                    intensity: 'normal'
+                };
+
                 if (!isMultiple) {
-                    return { ...prev, [groupId]: [itemId] }; // Replace
+                    return { ...prev, [groupId]: { [itemId]: newModifier } };
                 }
-                return { ...prev, [groupId]: [...current, itemId] };
+                return { ...prev, [groupId]: { ...groupSelections, [itemId]: newModifier } };
             }
+        });
+    };
+
+    const updateModifierDetail = (groupId: string, itemId: string, field: 'location' | 'intensity', value: any) => {
+        setSelections(prev => {
+            const groupSelections = prev[groupId] || {};
+            if (!groupSelections[itemId]) return prev;
+            
+            return {
+                ...prev,
+                [groupId]: {
+                    ...groupSelections,
+                    [itemId]: {
+                        ...groupSelections[itemId],
+                        [field]: value
+                    }
+                }
+            };
         });
     };
 
     const handleConfirm = () => {
         // Validation
         for (const group of modifierGroups) {
-            const selectedCount = (selections[group.id] || []).length;
+            const selectedCount = Object.keys(selections[group.id] || {}).length;
             if (group.is_required && selectedCount < (group.min_selection || 1)) {
                 showAlert('Selection Required', `Please select options for ${group.name}`, 'warning');
                 return;
@@ -146,22 +223,32 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
         Object.keys(selections).forEach(groupId => {
             const group = modifierGroups.find(g => g.id === groupId);
             if (group) {
-                selections[groupId].forEach(itemId => {
+                Object.keys(selections[groupId]).forEach(itemId => {
+                    const modifier = selections[groupId][itemId];
                     const item = group.items.find(i => i.id === itemId);
-                    if (item) {
+                    
+                    if (item && modifier) {
+                        let itemPrice = Number(item.price_adjustment || 0);
+                        if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                            itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                        }
+                        
+                        // We store the full modifier object with location and intensity
                         flatModifiers.push({
-                            modifier_group_id: groupId,
-                            modifier_group_name: group.name,
-                            modifier_item_id: item.id,
-                            name: item.name,
-                            price: item.price_adjustment
+                            ...modifier,
+                            price: itemPrice // This is the base adjustment, calculation happens in cart/display
                         });
                     }
                 });
             }
         });
 
-        onAddToCart(menuItem, flatModifiers, totalPrice);
+        // If a variant is selected, we might want to override the name
+        const finalMenuItem = selectedVariant 
+            ? { ...menuItem, name: `${menuItem.name} (${selectedVariant.name})`, price: selectedVariant.price }
+            : menuItem;
+
+        onAddToCart(finalMenuItem, flatModifiers, totalPrice);
         onClose();
     };
 
@@ -180,13 +267,37 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {/* Variants / Sizes */}
+                    {menuItem?.price_variants?.length > 0 && (
+                        <div className="border-b border-gray-700 pb-6">
+                            <h3 className="font-bold text-lg text-white mb-3">Select Size</h3>
+                            <div className="flex gap-2">
+                                {menuItem.price_variants.map((v: any) => (
+                                    <button
+                                        key={v.name}
+                                        onClick={() => setSelectedVariant(v)}
+                                        className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold ${
+                                            selectedVariant?.name === v.name
+                                                ? 'bg-opacity-20 text-white'
+                                                : 'bg-gray-700 border-transparent text-gray-400'
+                                        }`}
+                                        style={selectedVariant?.name === v.name ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}
+                                    >
+                                        <div className="text-sm uppercase">{v.name}</div>
+                                        <div className="text-lg">${Number(v.price).toFixed(2)}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="text-center text-gray-400 py-8">Loading modifiers...</div>
                     ) : modifierGroups.length === 0 ? (
                         <div className="text-center text-gray-400 py-8">No options available. Add to cart?</div>
                     ) : (
                         modifierGroups.map(group => (
-                            <div key={group.id} className="border-b border-gray-700 pb-4 last:border-0">
+                            <div key={group.id} className="border-b border-gray-700 pb-6 last:border-0">
                                 <div className="flex justify-between items-center mb-3">
                                     <h3 className="font-bold text-lg" style={{ color: 'var(--theme-color)' }}>{group.name}</h3>
                                     <span className="text-xs text-gray-500 uppercase font-semibold">
@@ -195,31 +306,79 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-2">
+                                <div className="grid grid-cols-1 gap-3">
                                     {group.items.map(item => {
-                                        const isSelected = (selections[group.id] || []).includes(item.id);
+                                        const modifier = (selections[group.id] || {})[item.id];
+                                        const isSelected = !!modifier;
+                                        
+                                        let displayPrice = Number(item.price_adjustment || 0);
+                                        if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                                            displayPrice = Number(item.price_matrix[selectedVariant.name]);
+                                        }
+
                                         return (
-                                            <button
-                                                key={item.id}
-                                                onClick={() => toggleSelection(group.id, item.id, group.is_multiple)}
-                                                className={`
-                                                    flex justify-between items-center p-3 rounded-lg border transition-all text-left
-                                                    ${isSelected
-                                                        ? 'bg-opacity-20 text-white'
-                                                        : 'bg-gray-700 border-transparent text-gray-300 hover:bg-gray-600'}
-                                                `}
-                                                style={isSelected ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}
-                                            >
-                                                <span>{item.name}</span>
-                                                <div className="flex items-center gap-3">
-                                                    {Number(item.price_adjustment) > 0 && (
-                                                        <span className="text-sm opacity-80">+${item.price_adjustment}</span>
-                                                    )}
-                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? '' : 'border-gray-500'}`} style={isSelected ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}>
-                                                        {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                            <div key={item.id} className="space-y-2">
+                                                <button
+                                                    onClick={() => toggleSelection(group.id, item.id, group.is_multiple)}
+                                                    className={`
+                                                        w-full flex justify-between items-center p-3 rounded-lg border transition-all text-left
+                                                        ${isSelected
+                                                            ? 'bg-opacity-10 text-white'
+                                                            : 'bg-gray-700 border-transparent text-gray-300 hover:bg-gray-600'}
+                                                    `}
+                                                    style={isSelected ? { borderColor: 'var(--theme-color)' } : {}}
+                                                >
+                                                    <span className="font-semibold">{item.name}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        {displayPrice > 0 && (
+                                                            <span className="text-sm opacity-80">+${displayPrice.toFixed(2)}</span>
+                                                        )}
+                                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? '' : 'border-gray-500'}`} style={isSelected ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}>
+                                                            {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </button>
+                                                </button>
+
+                                                {isSelected && (
+                                                    <div className="flex gap-4 p-2 bg-gray-900 rounded-lg animate-in slide-in-from-top-1 duration-200">
+                                                        {/* Location / Coverage */}
+                                                        <div className="flex-1">
+                                                            <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Coverage</div>
+                                                            <div className="flex bg-gray-800 rounded-md p-1">
+                                                                {['whole', 'left', 'right'].map((loc) => (
+                                                                    <button
+                                                                        key={loc}
+                                                                        onClick={() => updateModifierDetail(group.id, item.id, 'location', loc)}
+                                                                        className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${
+                                                                            modifier.location === loc ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                        }`}
+                                                                    >
+                                                                        {loc}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Intensity */}
+                                                        <div className="flex-[1.5]">
+                                                            <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Intensity</div>
+                                                            <div className="flex bg-gray-800 rounded-md p-1">
+                                                                {['light', 'normal', 'extra', 'double'].map((int) => (
+                                                                    <button
+                                                                        key={int}
+                                                                        onClick={() => updateModifierDetail(group.id, item.id, 'intensity', int)}
+                                                                        className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${
+                                                                            modifier.intensity === int ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                        }`}
+                                                                    >
+                                                                        {int}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         );
                                     })}
                                 </div>

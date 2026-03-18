@@ -49,7 +49,7 @@ const PublicReceiptPage: React.FC = () => {
                         quantity,
                         name_snapshot,
                         price_snapshot,
-                        selected_addons,
+                        selected_modifiers,
                         station_id,
                         round_number
                     )
@@ -138,10 +138,14 @@ const PublicReceiptPage: React.FC = () => {
                                     <span>{item.quantity}x {item.name_snapshot}</span>
                                     <span>{stationId ? '' : `£${(item.price_snapshot * item.quantity).toFixed(2)}`}</span>
                                 </div>
-                                {item.selected_addons?.map((addon: any, j: number) => (
-                                    <div key={j} className="flex justify-between text-xs text-gray-500 pl-4">
-                                        <span>+ {addon.name}</span>
-                                        <span>{stationId ? '' : `£${addon.price.toFixed(2)}`}</span>
+                                {item.selected_modifiers?.map((mod: any, j: number) => (
+                                    <div key={j} className="flex justify-between text-xs text-gray-500 pl-4 italic">
+                                        <span>
+                                            + {mod.name}
+                                            {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
+                                            {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
+                                        </span>
+                                        <span>{stationId ? '' : `£${mod.price.toFixed(2)}`}</span>
                                     </div>
                                 ))}
                             </div>

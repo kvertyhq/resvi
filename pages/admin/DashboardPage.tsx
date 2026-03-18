@@ -107,31 +107,31 @@ const DashboardPage: React.FC = () => {
             title: 'Total Revenue (Month)',
             value: `£${stats.revenue.toFixed(2)}`,
             icon: DollarSign,
-            color: 'bg-green-500'
+            color: '#22c55e', // green-500
         },
         {
             title: 'Active Orders',
             value: stats.activeOrders.toString(),
             icon: ShoppingBag,
-            color: 'bg-blue-500'
+            color: '#3b82f6', // blue-500
         },
         {
             title: 'Bookings Today',
             value: stats.bookingsToday.toString(),
             icon: Users,
-            color: 'bg-purple-500'
+            color: '#a855f7', // purple-500
         },
         {
             title: 'Avg. Order Value',
             value: `£${stats.avgOrderValue.toFixed(2)}`,
             icon: TrendingUp,
-            color: 'bg-orange-500'
+            color: '#f97316', // orange-500
         },
         {
             title: 'SMS Credits',
             value: stats.smsCredits.toString(),
             icon: MessageSquare,
-            color: 'bg-brand-gold',
+            color: '#c9a96e', // brand-gold
             link: '/admin/credits'
         }
     ];
@@ -152,8 +152,8 @@ const DashboardPage: React.FC = () => {
                                 onClick={() => stat.link && navigate(stat.link)}
                             >
                                 <div className="flex items-center justify-between mb-4">
-                                    <div className={`p-3 rounded-full ${stat.color} bg-opacity-10`}>
-                                        <stat.icon className={`h-6 w-6 ${stat.color.replace('bg-', 'text-')}`} />
+                                    <div className="p-3 rounded-full" style={{ backgroundColor: `${stat.color}1a` }}>
+                                        <stat.icon className="h-6 w-6" style={{ color: stat.color }} />
                                     </div>
                                     {stat.link && <div className="text-xs text-gray-400">View &rarr;</div>}
                                 </div>

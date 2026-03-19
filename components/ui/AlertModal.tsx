@@ -32,10 +32,14 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
     return (
       <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
         <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-full max-w-md transform transition-all animate-slide-up">
-          <div className={`flex flex-col items-center text-center p-8 ${config.bg}`}>
+          <div className="flex flex-col items-center text-center p-8 bg-gray-900">
             <div className="text-6xl mb-4">{config.icon}</div>
-            <h3 className="text-3xl font-black uppercase tracking-wider text-white mb-2">{title}</h3>
-            {message && <p className="text-gray-400 text-lg leading-relaxed">{message}</p>}
+            <h3 className={`text-3xl font-black uppercase tracking-wider mb-2 ${
+                type === 'error' ? 'text-red-400' :
+                type === 'warning' ? 'text-yellow-400' :
+                type === 'success' ? 'text-green-400' : 'text-blue-400'
+              }`}>{title}</h3>
+            {message && <p className="text-gray-300 text-lg leading-relaxed">{message}</p>}
           </div>
           <div className="p-4 bg-gray-800 flex gap-4">
             {isConfirm ? (

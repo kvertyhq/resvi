@@ -84,14 +84,23 @@ const OrderSummary: React.FC = () => {
                                         <span className="text-sm font-bold">{item.quantity}</span>
                                         <button onClick={() => updateQuantity(item.cartId, item.quantity + 1)} className="h-5 w-5 border rounded-full text-gray-500">+</button>
                                     </div>
-                                    {item.selectedAddons && item.selectedAddons.length > 0 && (
-                                        <div className="text-xs text-brand-mid-gray mt-1">
-                                            {item.selectedAddons.map(addon => addon.name).join(', ')}
+                                    {(item.modifiers?.length > 0 || item.selectedAddons?.length > 0) && (
+                                        <div className="text-xs text-brand-mid-gray mt-1 space-y-0.5">
+                                            {item.modifiers?.map((m: any, i: number) => {
+                                                const parts = [];
+                                                if (m.location && m.location !== 'whole') parts.push(m.location);
+                                                if (m.intensity && m.intensity !== 'normal') parts.push(m.intensity);
+                                                const prefix = parts.length > 0 ? `(${parts.join(' ')}) ` : '';
+                                                return <div key={i} className="capitalize">{prefix}{m.name}</div>;
+                                            })}
+                                            {item.selectedAddons?.map((addon: any, i: number) => (
+                                                <div key={`addon-${i}`}>{addon.name}</div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-semibold text-brand-dark-gray">{settings?.currency}{((item.price + item.selectedAddons.reduce((sum, a) => sum + a.price, 0)) * item.quantity).toFixed(2)}</p>
+                                    <p className="font-semibold text-brand-dark-gray">{settings?.currency}{((item.price + (item.selectedAddons?.reduce((sum, a) => sum + a.price, 0) || 0) + (item.modifiers?.reduce((sum: number, m: any) => sum + (m.price || 0), 0) || 0)) * item.quantity).toFixed(2)}</p>
                                     <button onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-700 mt-1"><TrashIcon /></button>
                                 </div>
                             </div>

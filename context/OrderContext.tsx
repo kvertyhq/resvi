@@ -37,6 +37,8 @@ export interface CartItem extends MenuItemData {
   cartId: string; // Unique ID for this specific cart entry (item + addons)
   quantity: number;
   selectedAddons: Addon[];
+  selected_variant?: any;
+  modifiers?: any[];
 }
 
 type OrderType = 'delivery' | 'collection';
@@ -68,7 +70,7 @@ interface OrderContextType extends OrderState {
   getAddressList: (postcode: string) => Promise<string[]>;
   setCollectionSlot: (date: string, time: string) => void;
   setDeliverySlot: (date: string, time: string) => void;
-  addToCart: (item: MenuItemData, addons?: Addon[]) => void;
+  addToCart: (item: MenuItemData, addons?: Addon[], modifiers?: any[]) => void;
   updateQuantity: (cartId: string, quantity: number) => void;
   removeFromCart: (cartId: string) => void;
   clearCart: () => void;
@@ -386,15 +388,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setState(s => ({ ...s, deliveryDate: date, deliveryTime: time }));
   };
 
-  const addToCart = (itemToAdd: MenuItemData, addons: Addon[] = []) => {
+  const addToCart = (itemToAdd: MenuItemData, addons: Addon[] = [], modifiers: any[] = []) => {
     setState(s => {
-      // Create a unique key based on item ID and sorted addon IDs
+      // Create a unique key based on item ID and customizations
       const addonIds = addons.map(a => a.id).sort().join(',');
+      const modifiersHash = JSON.stringify(modifiers);
+      const variantHash = (itemToAdd as any).selected_variant ? (itemToAdd as any).selected_variant.name : '';
 
       // Check if exact same item configuration exists
       const existingItemIndex = s.cart.findIndex(
         item => item.id === itemToAdd.id &&
-          item.selectedAddons.map(a => a.id).sort().join(',') === addonIds
+          item.selectedAddons.map(a => a.id).sort().join(',') === addonIds &&
+          JSON.stringify(item.modifiers || []) === modifiersHash &&
+          (item.selected_variant?.name || '') === variantHash
       );
 
       if (existingItemIndex > -1) {
@@ -408,7 +414,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ...itemToAdd,
         cartId: `${itemToAdd.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         quantity: 1,
-        selectedAddons: addons
+        selectedAddons: addons,
+        modifiers: modifiers
       };
 
       return { ...s, cart: [...s.cart, newItem] };
@@ -446,7 +453,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (finalOrderType === 'delivery' && state.deliverySettings) {
       const cartValue = state.cart.reduce((total, item) => {
         const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
-        return total + (item.price + addonsPrice) * item.quantity;
+        const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
+        return total + (item.price + addonsPrice + modifiersPrice) * item.quantity;
       }, 0);
 
       if (state.deliverySettings.delivery_minimum > 0 && cartValue < state.deliverySettings.delivery_minimum) {
@@ -522,9 +530,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         p_items: state.cart.map(item => ({
           menu_item_id: item.id,
           quantity: item.quantity,
-          price: item.price,
+          price: item.price + (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0),
           name: item.name,
-          selected_addons: item.selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price }))
+          selected_addons: item.selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price })),
+          modifiers: item.modifiers || []
         })),
         p_mark_payment_completed: isCardPayment, // Mark paid if card (since creating order after successful stripe flow)
         p_name: orderDetails.name,
@@ -569,7 +578,8 @@ Notes: ${orderDetails.notes}
   const cartTotal = useMemo(() => {
     return state.cart.reduce((total, item) => {
       const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
-      return total + (item.price + addonsPrice) * item.quantity;
+      const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
+      return total + (item.price + addonsPrice + modifiersPrice) * item.quantity;
     }, 0);
   }, [state.cart]);
 

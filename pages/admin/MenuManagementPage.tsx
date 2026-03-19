@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils } from 'lucide-react';
-import { Station, StationService } from '../../services/StationService'; // Added import
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
+import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
 interface MenuCategory {
@@ -47,10 +47,30 @@ interface MenuItemAddon {
     order_index: number;
 }
 
+interface ModifierGroup {
+    id: string;
+    restaurant_id: string;
+    name: string;
+    is_required: boolean;
+    is_multiple: boolean;
+    min_selection: number;
+    max_selection: number | null;
+    items?: ModifierItem[];
+}
+
+interface ModifierItem {
+    id: string;
+    modifier_group_id: string;
+    name: string;
+    price_adjustment: number;
+    price_matrix: Record<string, number>;
+    is_available: boolean;
+}
+
 const MenuManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
-    const { showAlert } = useAlert();
-    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons'>('items');
+    const { showAlert, showConfirm } = useAlert();
+    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers'>('items');
     const [loading, setLoading] = useState(false);
 
     // Pagination State
@@ -66,7 +86,33 @@ const MenuManagementPage: React.FC = () => {
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
     const [addons, setAddons] = useState<Addon[]>([]);
-    const [stations, setStations] = useState<Station[]>([]); // Added stations state
+    const [stations, setStations] = useState<Station[]>([]);
+    const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+    const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+
+    // Modifier Group Modal State
+    const [isModifierGroupModalOpen, setIsModifierGroupModalOpen] = useState(false);
+    const [editingModifierGroup, setEditingModifierGroup] = useState<ModifierGroup | null>(null);
+    const [modifierGroupForm, setModifierGroupForm] = useState<Partial<ModifierGroup>>({
+        name: '', is_required: false, is_multiple: true, min_selection: 0, max_selection: null
+    });
+
+    // Modifier Item Modal State
+    const [isModifierItemModalOpen, setIsModifierItemModalOpen] = useState(false);
+    const [editingModifierItem, setEditingModifierItem] = useState<ModifierItem | null>(null);
+    const [modifierItemForm, setModifierItemForm] = useState<Partial<ModifierItem>>({
+        name: '', price_adjustment: 0, is_available: true, price_matrix: {}
+    });
+    const [modifierItemGroupId, setModifierItemGroupId] = useState<string>('');
+
+    // For size-based price matrix input (variant names derived from item being edited)
+    const [priceMatrixVariants, setPriceMatrixVariants] = useState<string[]>([]);
+
+    // Linked modifier groups for an item being edited
+    const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<Set<string>>(new Set());
+
+    // Size variants state for item edit modal
+    const [priceVariants, setPriceVariants] = useState<{name: string; price: number}[]>([]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -143,7 +189,7 @@ const MenuManagementPage: React.FC = () => {
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchItems(), fetchAddons(), fetchStations()]); // Added fetchStations
+        await Promise.all([fetchCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups()]);
         setLoading(false);
     };
 
@@ -154,6 +200,108 @@ const MenuManagementPage: React.FC = () => {
             setStations(data);
         } catch (error) {
             console.error('Error fetching stations:', error);
+        }
+    };
+
+    const fetchModifierGroups = async () => {
+        if (!selectedRestaurantId) return;
+        try {
+            const { data: groups } = await supabase
+                .from('menu_modifiers')
+                .select('*')
+                .eq('restaurant_id', selectedRestaurantId)
+                .order('name');
+
+            if (groups) {
+                // Load items for each group
+                const { data: allItems } = await supabase
+                    .from('menu_modifier_items')
+                    .select('*')
+                    .in('modifier_group_id', groups.map(g => g.id));
+
+                const groupsWithItems = groups.map(g => ({
+                    ...g,
+                    items: (allItems || []).filter(i => i.modifier_group_id === g.id)
+                }));
+                setModifierGroups(groupsWithItems);
+            }
+        } catch (error) {
+            console.error('Error fetching modifier groups:', error);
+        }
+    };
+
+    const openModifierGroupModal = (group?: ModifierGroup) => {
+        if (group) {
+            setEditingModifierGroup(group);
+            setModifierGroupForm(group);
+        } else {
+            setEditingModifierGroup(null);
+            setModifierGroupForm({ name: '', is_required: false, is_multiple: true, min_selection: 0, max_selection: null });
+        }
+        setIsModifierGroupModalOpen(true);
+    };
+
+    const handleModifierGroupSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedRestaurantId) return;
+        const payload = { ...modifierGroupForm, restaurant_id: selectedRestaurantId };
+        if (editingModifierGroup) {
+            await supabase.from('menu_modifiers').update(payload).eq('id', editingModifierGroup.id);
+        } else {
+            await supabase.from('menu_modifiers').insert([payload]);
+        }
+        setIsModifierGroupModalOpen(false);
+        fetchModifierGroups();
+    };
+
+    const handleDeleteModifierGroup = async (id: string) => {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'This will delete the group and ALL its items. Continue?',
+            'warning'
+        );
+        if (confirmed) {
+            await supabase.from('menu_modifiers').delete().eq('id', id);
+            fetchModifierGroups();
+        }
+    };
+
+    const openModifierItemModal = (groupId: string, item?: ModifierItem, variantNames?: string[]) => {
+        setModifierItemGroupId(groupId);
+        setPriceMatrixVariants(variantNames || []);
+        if (item) {
+            setEditingModifierItem(item);
+            setModifierItemForm(item);
+        } else {
+            setEditingModifierItem(null);
+            const emptyMatrix: Record<string, number> = {};
+            (variantNames || []).forEach(v => { emptyMatrix[v] = 0; });
+            setModifierItemForm({ name: '', price_adjustment: 0, is_available: true, price_matrix: emptyMatrix });
+        }
+        setIsModifierItemModalOpen(true);
+    };
+
+    const handleModifierItemSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = { ...modifierItemForm, modifier_group_id: modifierItemGroupId };
+        if (editingModifierItem) {
+            await supabase.from('menu_modifier_items').update(payload).eq('id', editingModifierItem.id);
+        } else {
+            await supabase.from('menu_modifier_items').insert([payload]);
+        }
+        setIsModifierItemModalOpen(false);
+        fetchModifierGroups();
+    };
+
+    const handleDeleteModifierItem = async (id: string) => {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'Delete this modifier item?',
+            'warning'
+        );
+        if (confirmed) {
+            await supabase.from('menu_modifier_items').delete().eq('id', id);
+            fetchModifierGroups();
         }
     };
 
@@ -248,18 +396,15 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteCategory = async (id: string) => {
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Delete',
             'Are you sure? This might affect items linked to this category.',
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    await supabase.from('menu_categories').delete().eq('id', id);
-                    fetchCategories();
-                }
-            }
+            'warning'
         );
+        if (confirmed) {
+            await supabase.from('menu_categories').delete().eq('id', id);
+            fetchCategories();
+        }
     };
 
     // --- Handlers for Items ---
@@ -314,20 +459,38 @@ const MenuManagementPage: React.FC = () => {
         setAiCheckStatus('idle');
         setAiFeedback('');
         setSelectedAddonIds(new Set());
+        setSelectedModifierGroupIds(new Set());
+        setPriceVariants([]);
 
         if (item) {
             setEditingItem(item);
             setItemForm(item);
             setImagePreview(item.image_url || '');
 
+            // Use item.price_variants if available (we need to cast or access it if added to interface)
+            const itemWithVariants = item as any;
+            if (itemWithVariants.price_variants && Array.isArray(itemWithVariants.price_variants)) {
+                setPriceVariants(itemWithVariants.price_variants);
+            }
+
             // Fetch linked addons
-            const { data } = await supabase
+            const { data: addonsData } = await supabase
                 .from('menu_item_addons')
                 .select('addon_id')
                 .eq('menu_item_id', item.id);
 
-            if (data) {
-                setSelectedAddonIds(new Set(data.map(a => a.addon_id)));
+            if (addonsData) {
+                setSelectedAddonIds(new Set(addonsData.map(a => a.addon_id)));
+            }
+
+            // Fetch linked modifier groups
+            const { data: modsData } = await supabase
+                .from('menu_item_modifiers')
+                .select('modifier_group_id')
+                .eq('menu_item_id', item.id);
+
+            if (modsData) {
+                setSelectedModifierGroupIds(new Set(modsData.map(m => m.modifier_group_id)));
             }
         } else {
             setEditingItem(null);
@@ -374,7 +537,8 @@ const MenuManagementPage: React.FC = () => {
             ...itemForm,
             image_url: imageUrl,
             restaurant_id: selectedRestaurantId,
-            station_id: itemForm.station_id === '' ? null : itemForm.station_id // Handle empty string
+            station_id: itemForm.station_id === '' ? null : itemForm.station_id, // Handle empty string
+            price_variants: priceVariants // Save size variants
         };
 
         let itemId = editingItem?.id;
@@ -386,18 +550,27 @@ const MenuManagementPage: React.FC = () => {
             if (data) itemId = data.id;
         }
 
-        // Update Addons
+        // Update Linking Tables
         if (itemId) {
-            // Delete existing
+            // Update Addons
             await supabase.from('menu_item_addons').delete().eq('menu_item_id', itemId);
-
-            // Insert new
             if (selectedAddonIds.size > 0) {
                 const addonsToInsert = Array.from(selectedAddonIds).map(addonId => ({
                     menu_item_id: itemId,
                     addon_id: addonId
                 }));
                 await supabase.from('menu_item_addons').insert(addonsToInsert);
+            }
+
+            // Update Modifiers
+            await supabase.from('menu_item_modifiers').delete().eq('menu_item_id', itemId);
+            if (selectedModifierGroupIds.size > 0) {
+                const modifiersToInsert = Array.from(selectedModifierGroupIds).map((groupId, idx) => ({
+                    menu_item_id: itemId,
+                    modifier_group_id: groupId,
+                    order_index: idx
+                }));
+                await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
             }
         }
 
@@ -406,18 +579,15 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteItem = async (id: string) => {
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Delete',
             'Delete this item?',
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    await supabase.from('menu_items').delete().eq('id', id);
-                    fetchItems();
-                }
-            }
+            'warning'
         );
+        if (confirmed) {
+            await supabase.from('menu_items').delete().eq('id', id);
+            fetchItems();
+        }
     };
 
     // --- Handlers for Addons ---
@@ -466,18 +636,15 @@ const MenuManagementPage: React.FC = () => {
     };
 
     const handleDeleteAddon = async (id: string) => {
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Delete',
             'Delete this add-on?',
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    await supabase.from('addons').delete().eq('id', id);
-                    fetchAddons();
-                }
-            }
+            'warning'
         );
+        if (confirmed) {
+            await supabase.from('addons').delete().eq('id', id);
+            fetchAddons();
+        }
     };
 
     if (!selectedRestaurantId) return <div className="text-center py-10 text-gray-500">Select a restaurant context</div>;
@@ -487,11 +654,11 @@ const MenuManagementPage: React.FC = () => {
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-3xl font-serif font-bold text-gray-800">Menu Management</h2>
                 <button
-                    onClick={() => activeTab === 'categories' ? openCategoryModal() : openItemModal()}
+                    onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : openItemModal()}
                     className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
                 >
                     <Plus className="h-5 w-5 mr-2" />
-                    Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : 'Item'}
+                    Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : 'Item'}
                 </button>
             </div>
 
@@ -514,6 +681,12 @@ const MenuManagementPage: React.FC = () => {
                     className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'addons' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     <Plus className="h-4 w-4 mr-2" /> Add-ons
+                </button>
+                <button
+                    onClick={() => setActiveTab('modifiers')}
+                    className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'modifiers' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Settings2 className="h-4 w-4 mr-2" /> Modifiers
                 </button>
             </div>
 
@@ -839,6 +1012,127 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'modifiers' && (
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"></th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Settings</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {modifierGroups.map((group) => (
+                                            <React.Fragment key={group.id}>
+                                                <tr className={expandedGroupId === group.id ? 'bg-gray-50' : ''}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <button 
+                                                            onClick={() => setExpandedGroupId(expandedGroupId === group.id ? null : group.id)}
+                                                            className="text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            {expandedGroupId === group.id ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{group.name}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <div className="flex space-x-2">
+                                                            {group.is_required && <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Required</span>}
+                                                            {group.is_multiple && <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Multiple</span>}
+                                                            {!group.is_multiple && <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">Single</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        {group.items?.length || 0} items
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <button 
+                                                            onClick={() => openModifierItemModal(group.id)} 
+                                                            className="text-green-600 hover:text-green-900 mr-4"
+                                                            title="Add Item"
+                                                        >
+                                                            <Plus className="h-5 w-5" />
+                                                        </button>
+                                                        <button onClick={() => openModifierGroupModal(group)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
+                                                        <button onClick={() => handleDeleteModifierGroup(group.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                    </td>
+                                                </tr>
+                                                {/* Expanded Items Drawer */}
+                                                {expandedGroupId === group.id && (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                                                            <div className="pl-10">
+                                                                {group.items && group.items.length > 0 ? (
+                                                                    <table className="min-w-full divide-y divide-gray-200 bg-white shadow-sm rounded-lg overflow-hidden ring-1 ring-black ring-opacity-5">
+                                                                        <thead className="bg-gray-100">
+                                                                            <tr>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base Price Adj.</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Matrix (Sizes)</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-200">
+                                                                            {group.items.map(item => (
+                                                                                <tr key={item.id} className="hover:bg-gray-50">
+                                                                                    <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
+                                                                                    <td className="px-4 py-2 text-sm text-gray-600">£{(item.price_adjustment || 0).toFixed(2)}</td>
+                                                                                    <td className="px-4 py-2 text-xs text-gray-500">
+                                                                                        {item.price_matrix && Object.keys(item.price_matrix).length > 0 ? (
+                                                                                            <div className="flex flex-wrap gap-1">
+                                                                                                {Object.entries(item.price_matrix).map(([size, price]) => (
+                                                                                                    <span key={size} className="bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                                                        {size}: £{Number(price).toFixed(2)}
+                                                                                                    </span>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <span className="text-gray-400 italic">None</span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 whitespace-nowrap">
+                                                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                                            {item.is_available ? 'Available' : 'Unavailable'}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                                                                        <button 
+                                                                                            onClick={() => openModifierItemModal(group.id, item)} 
+                                                                                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                                                                                        >
+                                                                                            <Edit className="h-4 w-4" />
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={() => handleDeleteModifierItem(item.id)} 
+                                                                                            className="text-red-600 hover:text-red-900"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        </button>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                ) : (
+                                                                    <div className="text-sm text-gray-500 italic py-2">No items in this group. Click + to add some.</div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                        {modifierGroups.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No modifier groups found. Let's create one.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modal */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -973,9 +1267,106 @@ const MenuManagementPage: React.FC = () => {
                                                 </div>
                                             </div>
 
+                                            {/* Size Variants / Price Variants */}
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <label className="block text-sm font-medium text-gray-700">Size Variants (Prices)</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPriceVariants([...priceVariants, { name: '', price: 0 }])}
+                                                        className="text-sm text-brand-gold hover:text-yellow-600 flex items-center"
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-1" /> Add Variant
+                                                    </button>
+                                                </div>
+                                                {priceVariants.length > 0 ? (
+                                                    <div className="space-y-3">
+                                                        {priceVariants.map((variant, index) => (
+                                                            <div key={index} className="flex items-center space-x-3">
+                                                                <div className="flex-1">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Variant Name (e.g. Small)"
+                                                                        value={variant.name}
+                                                                        onChange={(e) => {
+                                                                            const newVariants = [...priceVariants];
+                                                                            newVariants[index].name = e.target.value;
+                                                                            setPriceVariants(newVariants);
+                                                                        }}
+                                                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                                                    />
+                                                                </div>
+                                                                <div className="w-32">
+                                                                    <div className="relative rounded-md shadow-sm">
+                                                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                                            <span className="text-gray-500 sm:text-sm">£</span>
+                                                                        </div>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            value={variant.price}
+                                                                            onChange={(e) => {
+                                                                                const newVariants = [...priceVariants];
+                                                                                newVariants[index].price = parseFloat(e.target.value) || 0;
+                                                                                setPriceVariants(newVariants);
+                                                                            }}
+                                                                            className="block w-full border border-gray-300 rounded-md pl-7 pr-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newVariants = [...priceVariants];
+                                                                        newVariants.splice(index, 1);
+                                                                        setPriceVariants(newVariants);
+                                                                    }}
+                                                                    className="text-red-500 hover:text-red-700"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        <p className="text-xs text-gray-500">Note: If size variants are used, the base Item Price (£{itemForm.price}) will be ignored in POS.</p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 italic">No variants. Uses base price.</p>
+                                                )}
+                                            </div>
+
+                                            {/* Modifier Groups Selection */}
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Modifier Groups (e.g. Toppings, Crust)</label>
+                                                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                                                    {modifierGroups.map(group => (
+                                                        <div key={group.id} className="flex items-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                id={`modgroup-${group.id}`}
+                                                                checked={selectedModifierGroupIds.has(group.id)}
+                                                                onChange={(e) => {
+                                                                    const newSet = new Set(selectedModifierGroupIds);
+                                                                    if (e.target.checked) newSet.add(group.id);
+                                                                    else newSet.delete(group.id);
+                                                                    setSelectedModifierGroupIds(newSet);
+                                                                }}
+                                                                className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
+                                                            />
+                                                            <label htmlFor={`modgroup-${group.id}`} className="ml-2 text-sm text-gray-700 flex flex-col">
+                                                                <span>{group.name}</span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {group.is_required ? 'Required' : 'Optional'}, {group.is_multiple ? 'Multi' : 'Single'}
+                                                                </span>
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                    {modifierGroups.length === 0 && <p className="text-sm text-gray-500 col-span-2">No modifier groups created.</p>}
+                                                </div>
+                                            </div>
+
                                             {/* Add-ons Selection */}
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Available Add-ons</label>
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Simple Add-ons</label>
                                                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
                                                     {addons.map(addon => (
                                                         <div key={addon.id} className="flex items-center">
@@ -1061,6 +1452,238 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Modifier Group Modal */}
+            {isModifierGroupModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {editingModifierGroup ? 'Edit Modifier Group' : 'Add Modifier Group'}
+                            </h3>
+                            <button onClick={() => setIsModifierGroupModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <form onSubmit={handleModifierGroupSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={modifierGroupForm.name || ''} 
+                                        onChange={e => setModifierGroupForm({...modifierGroupForm, name: e.target.value})} 
+                                        required 
+                                        placeholder="e.g. Pizza Toppings, Crust Size"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            id="mg_required" 
+                                            checked={modifierGroupForm.is_required || false} 
+                                            onChange={e => setModifierGroupForm({...modifierGroupForm, is_required: e.target.checked})} 
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                        />
+                                        <label htmlFor="mg_required" className="ml-2 block text-sm text-gray-900">Required Selection</label>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            id="mg_multiple" 
+                                            checked={modifierGroupForm.is_multiple || false} 
+                                            onChange={e => setModifierGroupForm({...modifierGroupForm, is_multiple: e.target.checked})} 
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                        />
+                                        <label htmlFor="mg_multiple" className="ml-2 block text-sm text-gray-900">Allow Multiple</label>
+                                    </div>
+                                </div>
+                                {modifierGroupForm.is_multiple && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Min Selection</label>
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                value={modifierGroupForm.min_selection !== undefined ? modifierGroupForm.min_selection : 0} 
+                                                onChange={e => setModifierGroupForm({...modifierGroupForm, min_selection: parseInt(e.target.value) || 0})} 
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Max Selection (optional)</label>
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                value={modifierGroupForm.max_selection || ''} 
+                                                onChange={e => setModifierGroupForm({...modifierGroupForm, max_selection: e.target.value ? parseInt(e.target.value) : null})} 
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button type="button" onClick={() => setIsModifierGroupModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Group</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modifier Item Modal */}
+            {isModifierItemModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {editingModifierItem ? 'Edit Modifier Item' : 'Add Modifier Item'}
+                            </h3>
+                            <button onClick={() => setIsModifierItemModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <form onSubmit={handleModifierItemSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={modifierItemForm.name || ''} 
+                                        onChange={e => setModifierItemForm({...modifierItemForm, name: e.target.value})} 
+                                        required 
+                                        placeholder="e.g. Pepperoni, Extra Cheese"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price Adjustment (£)</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        value={modifierItemForm.price_adjustment !== undefined ? modifierItemForm.price_adjustment : 0} 
+                                        onChange={e => setModifierItemForm({...modifierItemForm, price_adjustment: parseFloat(e.target.value) || 0})} 
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Default price added. Ex: 1.50</p>
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Per-Size Price Matrix (Optional)</label>
+                                    <p className="text-xs text-gray-500 mb-3">If this modifier costs different amounts for different item sizes (e.g. Small vs Large pizza), add sizes below.</p>
+                                    
+                                    <div className="space-y-3">
+                                        {Object.entries(modifierItemForm.price_matrix || {}).map(([sizeName, price]) => (
+                                            <div key={sizeName} className="flex items-center space-x-3">
+                                                <div className="flex-1 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 text-sm">
+                                                    {sizeName}
+                                                </div>
+                                                <div className="w-32">
+                                                    <div className="relative rounded-md shadow-sm">
+                                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                            <span className="text-gray-500 sm:text-sm">£</span>
+                                                        </div>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={price}
+                                                            onChange={(e) => {
+                                                                setModifierItemForm({
+                                                                    ...modifierItemForm,
+                                                                    price_matrix: {
+                                                                        ...(modifierItemForm.price_matrix || {}),
+                                                                        [sizeName]: parseFloat(e.target.value) || 0
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="block w-full border border-gray-300 rounded-md pl-7 pr-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newMatrix = { ...modifierItemForm.price_matrix };
+                                                        delete newMatrix[sizeName];
+                                                        setModifierItemForm({ ...modifierItemForm, price_matrix: newMatrix });
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {/* Add new size to matrix */}
+                                        <div className="flex items-center space-x-2 mt-2">
+                                            <input 
+                                                type="text" 
+                                                id="new_matrix_size"
+                                                placeholder="New Size (e.g. Medium)"
+                                                className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const val = e.currentTarget.value.trim();
+                                                        if (val && !modifierItemForm.price_matrix?.[val]) {
+                                                            setModifierItemForm({
+                                                                ...modifierItemForm,
+                                                                price_matrix: {
+                                                                    ...(modifierItemForm.price_matrix || {}),
+                                                                    [val]: 0
+                                                                }
+                                                            });
+                                                            e.currentTarget.value = '';
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    const input = document.getElementById('new_matrix_size') as HTMLInputElement;
+                                                    const val = input.value.trim();
+                                                    if (val && !modifierItemForm.price_matrix?.[val]) {
+                                                        setModifierItemForm({
+                                                            ...modifierItemForm,
+                                                            price_matrix: {
+                                                                ...(modifierItemForm.price_matrix || {}),
+                                                                [val]: 0
+                                                            }
+                                                        });
+                                                        input.value = '';
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 bg-gray-100 border border-gray-300 text-sm font-medium rounded hover:bg-gray-200"
+                                            >
+                                                Add Size
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center pt-2 border-t border-gray-200">
+                                    <input 
+                                        type="checkbox" 
+                                        id="mi_available" 
+                                        checked={modifierItemForm.is_available !== false} 
+                                        onChange={e => setModifierItemForm({...modifierItemForm, is_available: e.target.checked})} 
+                                        className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                    />
+                                    <label htmlFor="mi_available" className="ml-2 block text-sm text-gray-900">Available</label>
+                                </div>
+                                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                                    <button type="button" onClick={() => setIsModifierItemModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Item</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

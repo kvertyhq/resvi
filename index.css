@@ -6,6 +6,14 @@
 @layer base {
     body {
         @apply bg-white font-sans;
+        /* Disable horizontal swipe-to-navigate gestures on touchscreen POS devices */
+        overscroll-behavior-x: none;
+        touch-action: pan-y;
+    }
+
+    #root {
+        height: 100%;
+        width: 100%;
     }
 }
 

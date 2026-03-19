@@ -12,12 +12,16 @@
         height: 100%;
         overflow-x: hidden;
         position: relative;
-        /* Disable horizontal swipe-to-navigate gestures and horizontal "rubber-banding" */
-        overscroll-behavior-x: none;
-        overscroll-behavior-y: auto;
+        /* Disable all browser-level overscroll/rubber-banding on both axes */
+        overscroll-behavior: none;
         touch-action: pan-y;
         -webkit-overflow-scrolling: touch;
     }
+
+    .touch-none {
+        touch-action: none !important;
+    }
+
 
 
     #root {

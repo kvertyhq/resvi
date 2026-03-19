@@ -64,7 +64,8 @@ const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () 
                 border-2 shadow-lg cursor-pointer transition-colors
                 ${statusColor}
                 ${table.shape === 'circle' ? 'rounded-full' : 'rounded-lg'}
-                ${isEditMode ? 'cursor-move ring-2 ring-orange-500' : 'hover:brightness-110'}
+                ${isEditMode ? 'cursor-move ring-2 ring-orange-500 touch-none' : 'hover:brightness-110'}
+
             `}
         >
             <span className="font-bold text-lg">{table.table_name}</span>

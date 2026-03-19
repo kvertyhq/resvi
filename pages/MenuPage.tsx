@@ -237,7 +237,18 @@ const MenuPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const categories = useMemo(() => categoryMeta.map(c => c.name), [categoryMeta]);
+  const categories = useMemo(() => {
+    return categoryMeta
+      .filter(c => {
+        // Hide "Pizza Collection Deal" if the customer chose Delivery
+        if (orderType === 'delivery' && c.name === 'Pizza Collection Deal') {
+          return false;
+        }
+        return true;
+      })
+      .map(c => c.name);
+  }, [categoryMeta, orderType]);
+
   const filteredItems = useMemo(() => (activeCategory ? groupedMenu[activeCategory] ?? [] : []), [
     activeCategory,
     groupedMenu,
@@ -303,11 +314,11 @@ const MenuPage: React.FC = () => {
       </div >
 
 
-      <CustomerModifierModal 
-        menuItem={selectedItem} 
-        isOpen={isModalOpen && selectedItem !== null} 
-        onClose={() => setIsModalOpen(false)} 
-        onAddToCart={handleModalAddToCart} 
+      <CustomerModifierModal
+        menuItem={selectedItem}
+        isOpen={isModalOpen && selectedItem !== null}
+        onClose={() => setIsModalOpen(false)}
+        onAddToCart={handleModalAddToCart}
       />
     </div >
   );

@@ -95,7 +95,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
               </button>
               <button
                 onClick={onConfirm}
-                style={{ backgroundColor: 'var(--theme-color)' }}
+                style={{ backgroundColor: 'var(--theme-color, #c9a96e)' }}
                 className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none"
               >
                 Confirm
@@ -104,7 +104,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
           ) : (
             <button
               onClick={onClose}
-              style={{ backgroundColor: 'var(--theme-color)' }}
+              style={{ backgroundColor: 'var(--theme-color, #c9a96e)' }}
               className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
               Close

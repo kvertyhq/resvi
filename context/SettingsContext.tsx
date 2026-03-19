@@ -83,9 +83,18 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         const data = await res.json();
+        const settingsData = data?.data;
 
-        setSettings(data?.data);
-        document.title = data?.data?.name;
+        setSettings(settingsData);
+        document.title = settingsData?.name || 'Restaurant';
+
+        // Apply theme color globally
+        if (settingsData?.theme_color) {
+          document.documentElement.style.setProperty('--theme-color', settingsData.theme_color);
+        } else {
+          // Fallback to brand-gold if not set in DB
+          document.documentElement.style.setProperty('--theme-color', '#c9a96e');
+        }
 
         // Update favicon
         if (data?.data?.logo_url) {

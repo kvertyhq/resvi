@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAlert } from '../../context/AlertContext';
+import { useMenu } from '../../context/MenuContext';
 
 interface ModifierItem {
     id: string;
@@ -38,16 +38,30 @@ interface POSModifierModalProps {
 
 const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart }) => {
     const { showAlert } = useAlert();
-    const [loading, setLoading] = useState(true);
-    const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+    const { modifierGroups: allGroups, modifierItems: allItems, menuItemModifiers: allLinks, loading: menuLoading } = useMenu();
+    
     const [selectedVariant, setSelectedVariant] = useState<any>(null);
     const [selections, setSelections] = useState<Record<string, Record<string, Partial<SelectedModifier>>>>({}); // groupId -> itemId -> modifierData
     const [totalPrice, setTotalPrice] = useState(0);
 
+    // Filter and assemble groups for the current item locally
+    const modifierGroups = useMemo(() => {
+        if (!menuItem || !allLinks || !allGroups || !allItems) return [];
+
+        const groupIds = allLinks
+            .filter(l => l.menu_item_id === menuItem.id)
+            .map(l => l.modifier_group_id);
+
+        return allGroups
+            .filter(g => groupIds.includes(g.id))
+            .map(g => ({
+                ...g,
+                items: allItems.filter(i => i.modifier_group_id === g.id)
+            }));
+    }, [menuItem, allLinks, allGroups, allItems]);
+
     useEffect(() => {
         if (isOpen && menuItem) {
-            fetchModifiers();
-            
             // Handle Price Variants (Sizes)
             const variants = menuItem.price_variants || [];
             if (variants.length > 0) {
@@ -103,57 +117,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
         setTotalPrice(basePrice + modifiersTotal);
     }, [selections, modifierGroups, menuItem, selectedVariant]);
 
-    const fetchModifiers = async () => {
-        setLoading(true);
-        try {
-            // 1. Get links
-            const { data: links } = await supabase
-                .from('menu_item_modifiers')
-                .select('modifier_group_id')
-                .eq('menu_item_id', menuItem.id);
-
-            if (!links || links.length === 0) {
-                // No modifiers, auto-add? Validation could be done in parent, 
-                // but if we are here we might checking. 
-                // For now, let's just show empty states.
-                setModifierGroups([]);
-                setLoading(false);
-                return;
-            }
-
-            const groupIds = links.map(l => l.modifier_group_id);
-
-            // 2. Get Groups
-            const { data: groups } = await supabase
-                .from('menu_modifiers')
-                .select('*')
-                .in('id', groupIds);
-
-            if (!groups) {
-                setModifierGroups([]);
-                return;
-            }
-
-            // 3. Get Items for these groups
-            const { data: items } = await supabase
-                .from('menu_modifier_items')
-                .select('*')
-                .in('modifier_group_id', groupIds)
-                .eq('is_available', true);
-
-            // 4. Assemble
-            const assembledGroups = groups.map(g => ({
-                ...g,
-                items: (items || []).filter(i => i.modifier_group_id === g.id)
-            }));
-
-            setModifierGroups(assembledGroups);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const loading = menuLoading;
 
     const toggleSelection = (groupId: string, itemId: string, isMultiple: boolean) => {
         setSelections(prev => {
@@ -233,17 +197,15 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                             itemPrice = Number(item.price_matrix[selectedVariant.name]);
                         }
                         
-                        // We store the full modifier object with location and intensity
                         flatModifiers.push({
                             ...modifier,
-                            price: itemPrice // This is the base adjustment, calculation happens in cart/display
+                            price: itemPrice
                         });
                     }
                 });
             }
         });
 
-        // If a variant is selected, we might want to override the name
         const finalMenuItem = selectedVariant 
             ? { ...menuItem, name: `${menuItem.name} (${selectedVariant.name})`, price: selectedVariant.price }
             : menuItem;
@@ -307,7 +269,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-3">
-                                    {group.items.map(item => {
+                                    {group.items.map((item: any) => {
                                         const modifier = (selections[group.id] || {})[item.id];
                                         const isSelected = !!modifier;
                                         
@@ -341,7 +303,6 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
 
                                                 {isSelected && (
                                                     <div className="flex gap-4 p-2 bg-gray-900 rounded-lg animate-in slide-in-from-top-1 duration-200">
-                                                        {/* Location / Coverage */}
                                                         <div className="flex-1">
                                                             <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Coverage</div>
                                                             <div className="flex bg-gray-800 rounded-md p-1">
@@ -359,7 +320,6 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                             </div>
                                                         </div>
                                                         
-                                                        {/* Intensity */}
                                                         <div className="flex-[1.5]">
                                                             <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Intensity</div>
                                                             <div className="flex bg-gray-800 rounded-md p-1">

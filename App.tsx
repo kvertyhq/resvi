@@ -4,6 +4,8 @@ import React, { useEffect } from 'react';
 import { OrderProvider } from './context/OrderContext';
 import { SettingsProvider, useSettings } from "./context/SettingsContext";
 import { AdminProvider } from './context/AdminContext';
+import { MenuProvider } from './context/MenuContext';
+
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -129,7 +131,9 @@ function App() {
     <HashRouter>
       <AuthCallbackHandler />
       <AdminProvider>
-        <OrderProvider>
+        <MenuProvider>
+          <OrderProvider>
+
           <GoogleAnalyticsTracker />
           <POSProvider>
             <SipProvider>
@@ -267,7 +271,8 @@ function App() {
               </OfflineProvider>
             </SipProvider>
           </POSProvider>
-        </OrderProvider>
+          </OrderProvider>
+        </MenuProvider>
       </AdminProvider>
     </HashRouter>
   );

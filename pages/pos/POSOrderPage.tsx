@@ -5,7 +5,9 @@ import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
 import { useAdmin } from '../../context/AdminContext';
 import { usePOS } from '../../context/POSContext';
+import { useMenu } from '../../context/MenuContext';
 import { useOffline } from '../../context/OfflineContext';
+
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
@@ -52,13 +54,12 @@ const POSOrderPage: React.FC = () => {
     // Check if this is a walk-in order
     const isWalkIn = tableId === 'walk-in';
 
-    const [categories, setCategories] = useState<any[]>([]);
-    const [menuItems, setMenuItems] = useState<any[]>([]);
-    const [itemModifiersMap, setItemModifiersMap] = useState<Set<string>>(new Set()); // Set of itemIds that have modifiers
-
+    const { categories, menuItems, itemModifiersMap, loading: menuLoading, isSyncing } = useMenu();
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Action loading state
     const [tableName, setTableName] = useState('');
+
+
 
     // Walk-in/Phone customer selection
     const [customerSearch, setCustomerSearch] = useState('');
@@ -120,14 +121,12 @@ const POSOrderPage: React.FC = () => {
     const [notificationMessage, setNotificationMessage] = useState('');
 
     useEffect(() => {
-        if (settings?.id) {
-            fetchData();
-        }
         // Initialize Stripe
         if (settings?.payment_settings?.stripe_config?.publishable_key) {
             setStripePromise(loadStripe(settings.payment_settings.stripe_config.publishable_key));
         }
     }, [settings?.id]);
+
 
     useEffect(() => {
         if (tableId && !isWalkIn) {
@@ -185,46 +184,8 @@ const POSOrderPage: React.FC = () => {
         }
     }, [location.state]);
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            // Categories
-            const { data: catData } = await supabase
-                .from('menu_categories')
-                .select('*')
-                .eq('restaurant_id', settings?.id)
-                .order('order_index');
-            if (catData) setCategories(catData);
+    // fetchData has been moved to MenuContext
 
-            // Menu Items
-            const { data: itemData } = await supabase
-                .from('menu_items')
-                .select('*')
-                .eq('restaurant_id', settings?.id)
-                .eq('is_available', true);
-
-            if (itemData) {
-                setMenuItems(itemData);
-
-                // Check which items have modifiers
-                const itemIds = itemData.map(i => i.id);
-                const { data: modLinks } = await supabase
-                    .from('menu_item_modifiers')
-                    .select('menu_item_id')
-                    .in('menu_item_id', itemIds);
-
-                if (modLinks) {
-                    const modSet = new Set(modLinks.map(l => l.menu_item_id));
-                    setItemModifiersMap(modSet as any); // TS nuance
-                }
-            }
-
-        } catch (error) {
-            console.error('Error fetching POS data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     // Search for customers (for walk-in orders)
     const searchCustomers = async (query: string) => {
@@ -973,7 +934,14 @@ const POSOrderPage: React.FC = () => {
                                 <span className="md:hidden text-xs font-normal text-gray-500">
                                     ({filteredItems.length} items)
                                 </span>
+                                {isSyncing && (
+                                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-blue-500 animate-pulse bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800">
+                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                        SYNCING
+                                    </span>
+                                )}
                             </h2>
+
                         </div>
                         {isWalkIn && (
                             <div className="relative">
@@ -1070,13 +1038,22 @@ const POSOrderPage: React.FC = () => {
                     onSelect={setSelectedCategory}
                 />
 
-                {loading ? (
+               {/* Re-render when menu data syncs */}
+               {/* (using context values directly in render) */}
+
+                {menuLoading && categories.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center text-gray-500">Loading Menu...</div>
                 ) : (
-                    <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0">
+                    <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0 relative">
+                        {loading && (
+                            <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
+                            </div>
+                        )}
                         <POSMenuGrid items={filteredItems} onItemClick={handleItemClick} />
                     </div>
                 )}
+
             </div>
 
             {/* Right Side: Cart Panel */}

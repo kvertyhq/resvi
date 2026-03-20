@@ -11,7 +11,7 @@ const TrashIcon = () => (
 );
 
 const OrderSummary: React.FC = () => {
-    const { cart, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder, deliveryFee, deliverySettings } = useOrder();
+    const { cart, cartSubtotal, cartTax, cartTotal, updateQuantity, removeFromCart, orderType, postcode, deliveryDistance, collectionDate, collectionTime, submitOrder, deliveryFee, deliverySettings } = useOrder();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -19,13 +19,13 @@ const OrderSummary: React.FC = () => {
     const [resultMessage, setResultMessage] = useState('');
     const [orderResultId, setOrderResultId] = useState<string | undefined>(undefined);
 
-    const subtotal = cartTotal;
     const deliveryFeeDisplay = orderType === 'delivery' ? deliveryFee : 0;
-    const total = subtotal + deliveryFeeDisplay;
+    const finalTotal = cartTotal + deliveryFeeDisplay;
 
     // Check Max Order Value
     const maxOrderValue = deliverySettings?.max_delivery_order_value || 0;
-    const isOverMaxOrderValue = orderType === 'delivery' && maxOrderValue > 0 && subtotal > maxOrderValue;
+    const isOverMaxOrderValue = orderType === 'delivery' && maxOrderValue > 0 && cartSubtotal > maxOrderValue;
+
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -112,8 +112,14 @@ const OrderSummary: React.FC = () => {
                     <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
                         <div className="flex justify-between">
                             <span className="text-brand-mid-gray">Subtotal</span>
-                            <span className="font-semibold text-brand-dark-gray">{settings?.currency}{subtotal.toFixed(2)}</span>
+                            <span className="font-semibold text-brand-dark-gray">{settings?.currency}{cartSubtotal.toFixed(2)}</span>
                         </div>
+                        {cartTax > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-brand-mid-gray">Tax</span>
+                                <span className="font-semibold text-brand-dark-gray">{settings?.currency}{cartTax.toFixed(2)}</span>
+                            </div>
+                        )}
                         {orderType === 'delivery' && (
                             <div className="flex justify-between">
                                 <span className="text-brand-mid-gray">Delivery Fee</span>
@@ -122,7 +128,7 @@ const OrderSummary: React.FC = () => {
                         )}
                         <div className="flex justify-between text-lg pt-2 border-t border-gray-100">
                             <span className="text-brand-dark-gray font-bold">TOTAL</span>
-                            <span className="font-bold text-brand-dark-gray">{settings?.currency}{total.toFixed(2)}</span>
+                            <span className="font-bold text-brand-dark-gray">{settings?.currency}{finalTotal.toFixed(2)}</span>
                         </div>
                     </div>
                 )}

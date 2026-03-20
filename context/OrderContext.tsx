@@ -28,7 +28,10 @@ export interface MenuItemData {
   description: string;
   price: number;
   category: string;
+  category_id?: string;
+  tax_rate?: number;
   tags?: string[];
+
   image_url?: string;
   is_available?: boolean;
 }
@@ -76,7 +79,10 @@ interface OrderContextType extends OrderState {
   clearCart: () => void;
   submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any; orderId?: string }>;
   cartCount: number;
+  cartSubtotal: number;
+  cartTax: number;
   cartTotal: number;
+
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -575,13 +581,28 @@ Notes: ${orderDetails.notes}
     return state.cart.reduce((total, item) => total + item.quantity, 0);
   }, [state.cart]);
 
-  const cartTotal = useMemo(() => {
+  const cartSubtotal = useMemo(() => {
     return state.cart.reduce((total, item) => {
       const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
       const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
       return total + (item.price + addonsPrice + modifiersPrice) * item.quantity;
     }, 0);
   }, [state.cart]);
+
+  const cartTax = useMemo(() => {
+    return state.cart.reduce((total, item) => {
+      const rate = item.tax_rate || 0;
+      const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+      const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
+      const itemPrice = item.price + addonsPrice + modifiersPrice;
+      return total + (itemPrice * item.quantity * (rate / 100));
+    }, 0);
+  }, [state.cart]);
+
+  const cartTotal = useMemo(() => {
+    return cartSubtotal + cartTax;
+  }, [cartSubtotal, cartTax]);
+
 
   return (
     <OrderContext.Provider
@@ -598,7 +619,10 @@ Notes: ${orderDetails.notes}
         clearCart,
         submitOrder,
         cartCount,
+        cartSubtotal,
+        cartTax,
         cartTotal,
+
         validateOrderPrerequisites,
       }}
     >

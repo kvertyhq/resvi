@@ -11,7 +11,9 @@ interface MenuCategory {
     name: string;
     description: string;
     order_index: number;
-    station_id?: string; // Added station_id
+    tax_rate: number;
+    station_id?: string;
+
     created_at?: string;
     updated_at?: string;
 }
@@ -126,7 +128,9 @@ const MenuManagementPage: React.FC = () => {
         name: '',
         description: '',
         order_index: 0,
-        station_id: '' // Added station_id
+        tax_rate: 0,
+        station_id: ''
+
     });
 
     const [itemForm, setItemForm] = useState<Partial<MenuItem>>({
@@ -362,8 +366,9 @@ const MenuManagementPage: React.FC = () => {
         const { name, value, type } = e.target;
         setCategoryForm(prev => ({
             ...prev,
-            [name]: type === 'number' ? parseInt(value) : value
+            [name]: type === 'number' ? (name === 'tax_rate' ? parseFloat(value) : parseInt(value)) : value
         }));
+
     };
 
     const openCategoryModal = (category?: MenuCategory) => {
@@ -372,10 +377,11 @@ const MenuManagementPage: React.FC = () => {
             setCategoryForm(category);
         } else {
             setEditingCategory(null);
-            setCategoryForm({ name: '', description: '', order_index: categories.length, station_id: '' }); // Added station_id
+            setCategoryForm({ name: '', description: '', order_index: categories.length, tax_rate: 0, station_id: '' });
         }
         setIsModalOpen(true);
     };
+
 
     const handleCategorySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -703,7 +709,10 @@ const MenuManagementPage: React.FC = () => {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Tax %</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Station</th>
                                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -711,14 +720,16 @@ const MenuManagementPage: React.FC = () => {
                                             <tr key={cat.id}>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cat.order_index}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cat.name}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">{cat.description}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{cat.description}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 text-center font-mono">{cat.tax_rate || 0}%</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">{stations.find(s => s.id === cat.station_id)?.name || 'Default'}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <button onClick={() => openCategoryModal(cat)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
                                                     <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
                                                 </td>
                                             </tr>
                                         ))}
-                                        {categories.length === 0 && <tr><td colSpan={4} className="px-6 py-4 text-center text-gray-500">No categories found.</td></tr>}
+                                        {categories.length === 0 && <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">No categories found.</td></tr>}
                                     </tbody>
                                 </table>
                             </div>
@@ -1166,7 +1177,11 @@ const MenuManagementPage: React.FC = () => {
                                                 <input type="number" name="order_index" value={categoryForm.order_index} onChange={handleCategoryInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Station</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                                                <input type="number" name="tax_rate" step="0.1" value={categoryForm.tax_rate} onChange={handleCategoryInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" placeholder="e.g. 10" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Target Station (Optional)</label>
                                                 <select
                                                     name="station_id"
                                                     value={categoryForm.station_id || ''}

@@ -3,11 +3,13 @@ import { useSettings } from '../../context/SettingsContext';
 
 interface MenuItem {
     id: string;
+    category_id: string;
     name: string;
     description: string;
     price: number;
     image_url?: string;
 }
+
 
 interface POSMenuGridProps {
     items: MenuItem[];

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
@@ -34,7 +35,9 @@ interface CartItem {
     course: string; // 'Starter', 'Main', 'Dessert', 'Drink'
     isMiscellaneous?: boolean; // Flag for custom items
     station_id?: string; // Target station for this item
+    category_id?: string; // Add this for tax calculation
 }
+
 
 const COURSES = ['Starter', 'Main', 'Dessert', 'Drink'];
 
@@ -101,7 +104,6 @@ const POSOrderPage: React.FC = () => {
 
     // Payment Modal
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [isHoldingOrder, setIsHoldingOrder] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
     const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
     const [showCashDrawerButton, setShowCashDrawerButton] = useState(false);
@@ -113,12 +115,47 @@ const POSOrderPage: React.FC = () => {
     // Held Orders
     const [heldOrders, setHeldOrders] = useState<any[]>([]);
     const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
+    const [isHoldingOrder, setIsHoldingOrder] = useState(false);
+
+    // Totals Calculation
+    const subtotal = useMemo(() => {
+        return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    }, [cartItems]);
+
+    const discountAmount = useMemo(() => {
+        if (discountValue <= 0) return 0;
+        let amt = 0;
+        if (discountType === 'flat') {
+            amt = discountValue;
+        } else {
+            amt = subtotal * (discountValue / 100);
+        }
+        return Math.min(amt, subtotal);
+    }, [subtotal, discountValue, discountType]);
+
+    const tax = useMemo(() => {
+        const discountFactor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
+        let t = 0;
+        cartItems.forEach(item => {
+            const category = categories.find(c => c.id === item.category_id);
+            const taxPercent = category?.tax_rate || 0;
+            const itemTotal = item.price * item.quantity;
+            const itemTaxable = itemTotal * discountFactor;
+            t += itemTaxable * (taxPercent / 100);
+        });
+        return t;
+    }, [cartItems, categories, subtotal, discountAmount]);
+
+    const total = useMemo(() => {
+        return (subtotal - discountAmount) + tax;
+    }, [subtotal, discountAmount, tax]);
 
     // Notification Modal
     const [showNotification, setShowNotification] = useState(false);
     const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('success');
     const [notificationTitle, setNotificationTitle] = useState('');
     const [notificationMessage, setNotificationMessage] = useState('');
+
 
     useEffect(() => {
         // Initialize Stripe
@@ -349,8 +386,10 @@ const POSOrderPage: React.FC = () => {
                 quantity: 1,
                 modifiers: modifiers,
                 course: 'Main', // Default
-                station_id: item.station_id
+                station_id: item.station_id,
+                category_id: (item as any).category_id
             };
+
             setCartItems(prev => [...prev, newItem]);
         }
     };
@@ -623,7 +662,14 @@ const POSOrderPage: React.FC = () => {
                 p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
                 p_customer_postcode: customerPostcode || null,
                 p_order_type: isPhoneOrder ? (phoneOrderType || 'takeaway') : 'takeaway',
-                p_order_source: isPhoneOrder ? 'phone' : 'pos'
+                p_order_source: isPhoneOrder ? 'phone' : 'pos',
+                p_metadata: {
+                    subtotal: subtotal,
+                    tax: tax,
+                    discount_amount: discountAmount,
+                    discount_type: discountType
+                }
+
             });
 
 
@@ -718,7 +764,13 @@ const POSOrderPage: React.FC = () => {
                             staff_id: staff?.id,
                             discount_amount: discountAmount,
                             discount_type: discountType,
-                            user_id: null
+                            user_id: null,
+                            metadata: {
+                                subtotal: subtotal,
+                                tax: tax,
+                                discount_amount: discountAmount,
+                                discount_type: discountType
+                            }
                         })
                         .select()
                         .single();
@@ -733,25 +785,21 @@ const POSOrderPage: React.FC = () => {
                 currentRound = currentMaxRound + 1;
                 setUpdateModalTitle(`Order Updated! (Round ${currentRound} sent)`);
                 // 2. Update Existing Order Total
-                // Calculate new items total (with tax logic matching main render)
-                const cartSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                // Use dynamic tax and total from useMemo (calculated per item category)
+                const newTotal = (currentOrder.total_amount || 0) + total;
 
-                // Discount logic for cart items?
-                // Assuming discount is applied globally or per transaction. 
-                // For simplicity in Append mode, we apply tax to the new items directly without new discounts unless specified.
-                // Replicating Line 253 logic:
-                // Note: If we want to support discounts on add-ons, we need more complex logic.
-                // For now, let's assume no new discount on add-ons or simple tax.
-                const cartTax = cartSubtotal * 0.10;
-                const cartTotal = cartSubtotal + cartTax;
-
-                const newTotal = (currentOrder.total_amount || 0) + cartTotal;
 
                 const { error: updateError } = await supabase
                     .from('orders')
                     .update({
                         total_amount: newTotal,
+                        metadata: {
+                            ...(currentOrder.metadata || {}),
+                            subtotal: (currentOrder.metadata?.subtotal || 0) + subtotal,
+                            tax: (currentOrder.metadata?.tax || 0) + tax
+                        }
                     })
+
                     .eq('id', orderId);
 
                 if (currentOrder.daily_order_number) {
@@ -867,23 +915,8 @@ const POSOrderPage: React.FC = () => {
         );
     };
 
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    // Calculate Discount
-    let discountAmount = 0;
-    if (discountValue > 0) {
-        if (discountType === 'flat') {
-            discountAmount = discountValue;
-        } else {
-            discountAmount = subtotal * (discountValue / 100);
-        }
-    }
-    // ensure discount doesn't exceed subtotal
-    discountAmount = Math.min(discountAmount, subtotal);
 
-    const taxableAmount = Math.max(0, subtotal - discountAmount);
-    const tax = taxableAmount * 0.10; // 10% tax on discounted amount
-    const total = taxableAmount + tax;
 
     const filteredItems = selectedCategory === 'all'
         ? menuItems
@@ -1255,7 +1288,8 @@ const POSOrderPage: React.FC = () => {
                     )}
 
                     <div className="flex justify-between text-gray-500 dark:text-gray-400 text-sm">
-                        <span>Tax (10%)</span>
+                        <span>Tax</span>
+
                         <span>{settings?.currency || '$'}{tax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-gray-900 dark:text-white font-bold text-xl pt-2 border-t border-gray-200 dark:border-gray-800">

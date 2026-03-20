@@ -84,7 +84,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             // 1. Categories & Items (Parallel)
             const [catRes, itemRes] = await Promise.all([
-                supabase.from('menu_categories').select('*').eq('restaurant_id', restaurantId).order('order_index'),
+                supabase.from('menu_categories').select('id, name, description, order_index, tax_rate').eq('restaurant_id', restaurantId).order('order_index'),
                 supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).eq('is_available', true)
             ]);
 

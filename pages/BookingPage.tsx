@@ -11,17 +11,30 @@ const formatItemsToMarkdown = (items: { item: MenuItemData; quantity: number }[]
     if (!items || items.length === 0) return '';
 
     let markdown = "### Pre-ordered Items\n\n";
-    let total = 0;
+    let subtotal = 0;
+    let totalTax = 0;
 
     items.forEach(({ item, quantity }) => {
-        const itemTotal = item.price * quantity;
-        total += itemTotal;
-        markdown += `- **${quantity}x ${item.name}** (${currency}${item.price.toFixed(2)}) = ${currency}${itemTotal.toFixed(2)}\n`;
+        const itemSubtotal = item.price * quantity;
+        const rate = item.tax_rate || 0;
+        const itemTax = itemSubtotal * (rate / 100);
+        
+        subtotal += itemSubtotal;
+        totalTax += itemTax;
+        
+        markdown += `- **${quantity}x ${item.name}** (${currency}${item.price.toFixed(2)}) = ${currency}${itemSubtotal.toFixed(2)}\n`;
     });
 
-    markdown += `\n**Total Value: ${currency}${total.toFixed(2)}**`;
+    const total = subtotal + totalTax;
+
+    markdown += `\n**Subtotal: ${currency}${subtotal.toFixed(2)}**\n`;
+    if (totalTax > 0) {
+        markdown += `**Tax: ${currency}${totalTax.toFixed(2)}**\n`;
+    }
+    markdown += `**Total Value: ${currency}${total.toFixed(2)}**`;
     return markdown;
 };
+
 
 // Icons for calendar navigation
 const ChevronLeftIcon = () => (

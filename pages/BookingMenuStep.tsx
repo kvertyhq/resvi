@@ -55,8 +55,11 @@ const BookingMenuStep: React.FC<BookingMenuStepProps> = ({ onNext, onPrev, selec
                             description: mi.description,
                             price: mi.price,
                             category: catName,
+                            category_id: catObj.id,
+                            tax_rate: catObj.tax_rate,
                             image_url: mi.image_url,
                             is_available: mi.is_available
+
                         }));
                     }
                 }
@@ -97,7 +100,13 @@ const BookingMenuStep: React.FC<BookingMenuStepProps> = ({ onNext, onPrev, selec
     };
 
     const currentItems = activeCategory ? groupedMenu[activeCategory] || [] : [];
-    const totalAmount = selectedItems.reduce((sum, current) => sum + (current.item.price * current.quantity), 0);
+    const subtotal = selectedItems.reduce((sum, current) => sum + (current.item.price * current.quantity), 0);
+    const tax = selectedItems.reduce((sum, current) => {
+        const rate = current.item.tax_rate || 0;
+        return sum + (current.item.price * current.quantity * (rate / 100));
+    }, 0);
+    const totalAmount = subtotal + tax;
+
 
     // In strict mode we might pass these in, but for now I'll just hardcode 3/4 if this component is mounted
     // because it ONLY mounts when there are 4 steps total.
@@ -155,10 +164,23 @@ const BookingMenuStep: React.FC<BookingMenuStepProps> = ({ onNext, onPrev, selec
                 )}
             </div>
 
-            <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200 flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Pre-order Value:</span>
-                <span className="font-bold text-lg text-brand-dark-gray">{settings?.currency}{totalAmount.toFixed(2)}</span>
+            <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200 space-y-2">
+                <div className="flex justify-between items-center text-sm text-gray-600">
+                    <span>Subtotal:</span>
+                    <span>{settings?.currency}{subtotal.toFixed(2)}</span>
+                </div>
+                {tax > 0 && (
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                        <span>Tax:</span>
+                        <span>{settings?.currency}{tax.toFixed(2)}</span>
+                    </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <span className="font-bold">Total Pre-order Value:</span>
+                    <span className="font-bold text-lg text-brand-dark-gray">{settings?.currency}{totalAmount.toFixed(2)}</span>
+                </div>
             </div>
+
 
             <div className="flex justify-between mt-6">
                 <button onClick={onPrev} className="px-8 py-3 bg-gray-300 text-brand-dark-gray font-bold uppercase text-sm tracking-wider hover:bg-gray-400 transition-colors">

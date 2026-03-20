@@ -184,33 +184,37 @@ const MenuPage: React.FC = () => {
 
           for (const catObj of data) {
             const catName = String(catObj.name ?? 'Uncategorized');
-            meta.push({
-              id: String(catObj.id ?? ''),
-              name: catName,
-              description: catObj.description ?? undefined,
-              order_index: typeof catObj.order_index === 'number' ? catObj.order_index : undefined,
-            });
+                meta.push({
+                  id: String(catObj.id ?? ''),
+                  name: catName,
+                  description: catObj.description ?? undefined,
+                  order_index: typeof catObj.order_index === 'number' ? catObj.order_index : undefined,
+                  tax_rate: typeof catObj.tax_rate === 'number' ? catObj.tax_rate : 0,
+                } as any);
 
-            const items = Array.isArray(catObj.menu_items) ? catObj.menu_items : [];
+                const items = Array.isArray(catObj.menu_items) ? catObj.menu_items : [];
 
-            grouped[catName] = items.map((mi: any) => {
-              // Map fields to MenuItemData shape; keep extra fields attached if needed
-              const mapped: MenuItemData & { [k: string]: any } = {
-                id: mi.id,
-                name: mi.name,
-                description: mi.description ?? '',
-                price: typeof mi.price === 'number' ? mi.price : Number(mi.price ?? 0),
-                category: catName,
-                tags: Array.isArray(mi.tags) ? mi.tags : mi.tags ? [String(mi.tags)] : undefined,
-                // extra fields appended so UI can use them (image_url, vegetarian, spicy_level, is_available)
-                image_url: mi.image_url,
-                vegetarian: mi.vegetarian,
-                spicy_level: mi.spicy_level,
-                is_available: typeof mi.is_available === 'boolean' ? mi.is_available : true,
-                price_variants: mi.price_variants,
-              };
-              return mapped;
-            });
+                grouped[catName] = items.map((mi: any) => {
+                  // Map fields to MenuItemData shape; keep extra fields attached if needed
+                  const mapped: MenuItemData & { [k: string]: any } = {
+                    id: mi.id,
+                    name: mi.name,
+                    description: mi.description ?? '',
+                    price: typeof mi.price === 'number' ? mi.price : Number(mi.price ?? 0),
+                    category: catName,
+                    category_id: catObj.id,
+                    tax_rate: catObj.tax_rate,
+                    tags: Array.isArray(mi.tags) ? mi.tags : mi.tags ? [String(mi.tags)] : undefined,
+                    // extra fields appended so UI can use them (image_url, vegetarian, spicy_level, is_available)
+                    image_url: mi.image_url,
+                    vegetarian: mi.vegetarian,
+                    spicy_level: mi.spicy_level,
+                    is_available: typeof mi.is_available === 'boolean' ? mi.is_available : true,
+                    price_variants: mi.price_variants,
+                  };
+                  return mapped;
+                });
+
           }
         }
 

@@ -57,7 +57,7 @@ DECLARE
   _rid UUID;
 BEGIN
   SELECT role, restaurant_id INTO _role, _rid FROM profiles WHERE id = auth.uid();
-  RETURN (_role = 'restaurant_admin' OR _role = 'super_admin') AND (_rid = target_restaurant_id OR _role = 'super_admin');
+  RETURN (_role = 'admin' OR _role = 'restaurant_admin' OR _role = 'super_admin') AND (_rid = target_restaurant_id OR _role = 'super_admin');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

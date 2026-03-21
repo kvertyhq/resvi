@@ -18,6 +18,10 @@ BEGIN
     RETURN TRUE;
   END IF;
 
+  IF _role = 'admin' THEN
+    RETURN TRUE;
+  END IF;
+
   -- Allow if Admin/Restaurant Admin AND Restaurant IDs match
   -- We handle potential NULLs safely
   IF (_role = 'admin' OR _role = 'restaurant_admin') AND _rid IS NOT NULL AND target_restaurant_id IS NOT NULL AND _rid = target_restaurant_id THEN

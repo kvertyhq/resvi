@@ -305,31 +305,45 @@ class ReceiptService {
                 return;
             }
 
-            // Generate ESC/POS buffer
+            // 0. Logo (Dynamic from URL)
+            if (receiptSettings?.show_logo) {
+                const logoUrl = receiptSettings.logo_url || restaurant?.logo_url || restaurant?.logo;
+                if (logoUrl) {
+                    try {
+                        console.log('Printing dynamic logo from URL:', logoUrl);
+                        await invoke('print_logo_to_network', {
+                            ip: ip,
+                            port: 9100,
+                            url: logoUrl
+                        });
+                        // Add a small delay for the printer to process the image
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (logoErr) {
+                        console.error('Failed to print dynamic logo:', logoErr);
+                    }
+                }
+            }
+
+            // Init data for text
             const encoder = new TextEncoder();
             let data: number[] = [
                 ...[27, 64], // Init
                 ...[27, 97, 1], // Center
             ];
 
-            // 0. Logo (NV Graphics slot 1)
-            if (receiptSettings?.show_logo) {
-                data = [
-                    ...data,
-                    ...ESC_POS_COMMANDS.PRINT_NV_LOGO,
-                    ...encoder.encode("\n")
-                ];
-            }
-
             // 1. Restaurant Header
             if (restaurant) {
                 const rName = (restaurant.restaurant_name || restaurant.name || 'RESVI').toUpperCase();
+                const addr1 = restaurant.address_line1 || restaurant.address || '';
+                const addr2 = restaurant.address_line2 || '';
+                
                 data = [
                     ...data,
                     ...[27, 33, 48], // Double width & height
                     ...encoder.encode(`${rName}\n`),
                     ...[27, 33, 0], // Normal size
-                    ...encoder.encode(`${restaurant.address || ''}\n`),
+                    ...encoder.encode(`${addr1}${addr1 ? '\n' : ''}`),
+                    ...encoder.encode(`${addr2}${addr2 ? '\n' : ''}`),
                     ...encoder.encode(`${restaurant.phone || ''}\n`),
                 ];
             }

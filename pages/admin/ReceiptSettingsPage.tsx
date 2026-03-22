@@ -27,7 +27,9 @@ const ReceiptSettingsPage: React.FC = () => {
         footer_text: '',
         show_logo: true,
         logo_url: '',
-        custom_css: ''
+        custom_css: '',
+        print_mode: 'manual',
+        show_cash_drawer_button: false
     });
 
     useEffect(() => {
@@ -47,7 +49,9 @@ const ReceiptSettingsPage: React.FC = () => {
                     footer_text: data.footer_text || '',
                     show_logo: data.show_logo ?? true,
                     logo_url: data.logo_url || '',
-                    custom_css: data.custom_css || ''
+                    custom_css: data.custom_css || '',
+                    print_mode: data.print_mode || 'manual',
+                    show_cash_drawer_button: data.show_cash_drawer_button ?? false
                 });
             }
         } catch (err: any) {
@@ -74,13 +78,16 @@ const ReceiptSettingsPage: React.FC = () => {
         setMessage(null);
 
         try {
-            const { error } = await supabase
-                .from('receipt_settings')
-                .upsert({
-                    restaurant_id: selectedRestaurantId,
-                    ...formData,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'restaurant_id' });
+            const { error } = await supabase.rpc('upsert_receipt_settings', {
+                p_restaurant_id: selectedRestaurantId,
+                p_header_text: formData.header_text,
+                p_footer_text: formData.footer_text,
+                p_show_logo: formData.show_logo,
+                p_logo_url: formData.logo_url,
+                p_custom_css: formData.custom_css,
+                p_print_mode: formData.print_mode,
+                p_show_cash_drawer_button: formData.show_cash_drawer_button
+            });
 
             if (error) throw error;
             setMessage({ type: 'success', text: 'Receipt settings saved!' });
@@ -172,6 +179,38 @@ const ReceiptSettingsPage: React.FC = () => {
                                 placeholder="https://..."
                             />
                             <p className="text-xs text-gray-500 mt-1">If blank, standard restaurant logo is used.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-bold text-gray-700 border-b pb-2">Printing Behavior</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Print Mode</label>
+                                <select
+                                    name="print_mode"
+                                    value={formData.print_mode}
+                                    onChange={handleChange}
+                                    className="w-full p-2 border rounded-md font-sans"
+                                >
+                                    <option value="manual">Manual (Print button only)</option>
+                                    <option value="auto_no_drawer">Auto Print (New items automatically)</option>
+                                    <option value="auto_with_drawer">Auto Print + Open Drawer (on Cash)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="checkbox"
+                                    id="show_cash_drawer_button"
+                                    name="show_cash_drawer_button"
+                                    checked={formData.show_cash_drawer_button}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, show_cash_drawer_button: e.target.checked }))}
+                                    className="h-4 w-4 text-brand-gold rounded border-gray-300 focus:ring-brand-gold"
+                                />
+                                <label htmlFor="show_cash_drawer_button" className="text-sm font-medium text-gray-700">Show Open Cash Drawer Button</label>
+                            </div>
                         </div>
                     </div>
                 </div>

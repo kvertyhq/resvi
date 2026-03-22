@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { invoke } from '@tauri-apps/api/core';
 
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
@@ -259,11 +260,81 @@ class ReceiptService {
             else console.error('No Printer IP configured.');
             return;
         }
+        
         console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId})`);
-        // In a real app, we would send different content based on stationId.
-        const msg = `Network print sent to ${ip}${stationId ? ` (Station ID: ${stationId})` : ''}`;
-        if (showAlert) showAlert('Network Print', msg, 'success');
-        else console.log(msg);
+        
+        try {
+            // Fetch order and items for printing
+            const { data: order, error: orderError } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    table_info:table_id(table_name)
+                `)
+                .eq('id', orderId)
+                .single();
+
+            if (orderError) throw orderError;
+
+            let query = supabase
+                .from('order_items')
+                .select('*')
+                .eq('order_id', orderId);
+            
+            if (stationId) {
+                query = query.eq('station_id', stationId);
+            }
+
+            const { data: items, error: itemsError } = await query;
+            if (itemsError) throw itemsError;
+
+            if (!items || items.length === 0) {
+                console.log('No items for this station, skipping print.');
+                return;
+            }
+
+            // Generate simple ESC/POS buffer
+            const encoder = new TextEncoder();
+            let data: number[] = [
+                ...[27, 64], // Init
+                ...[27, 97, 1], // Center
+                ...encoder.encode("RESVI RESTAURANT\n"),
+                ...encoder.encode("--------------------------------\n"),
+                ...[27, 97, 0], // Left
+                ...encoder.encode(`Table: ${order.table_info?.table_name || 'Quick Order'}\n`),
+                ...encoder.encode(`Order: ${orderId.slice(0, 8)}\n`),
+                ...encoder.encode(`Date: ${new Date().toLocaleString()}\n`),
+                ...encoder.encode("--------------------------------\n"),
+            ];
+
+            items.forEach((item: any) => {
+                const line = `${item.quantity}x ${item.name.padEnd(20)} ${item.price.toFixed(2)}\n`;
+                data = [...data, ...encoder.encode(line)];
+            });
+
+            data = [
+                ...data,
+                ...encoder.encode("--------------------------------\n"),
+                ...[27, 97, 2], // Right
+                ...encoder.encode(`TOTAL: $${order.total_amount.toFixed(2)}\n`),
+                ...[27, 97, 1], // Center
+                ...encoder.encode("\nThank you!\n"),
+                ...encoder.encode("\n\n\n"),
+                ...[29, 86, 66, 0] // Cut
+            ];
+
+            // Send to Tauri
+            await invoke('print_raw_to_network', {
+                ip: ip,
+                port: 9100,
+                data: Array.from(new Uint8Array(data))
+            });
+
+            if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
+        } catch (error: any) {
+            console.error('Network print failed:', error);
+            if (showAlert) showAlert('Printer Error', `Failed to print to ${ip}: ${error.message || error}`, 'error');
+        }
     }
 }
 

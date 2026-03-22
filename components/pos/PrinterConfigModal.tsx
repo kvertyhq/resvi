@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Printer, Bluetooth, Wifi, Monitor } from 'lucide-react';
+import { X, Save, Printer, Bluetooth, Wifi, Monitor, Search, Loader2, RefreshCw } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
@@ -18,6 +19,9 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
         networkIp: '',
         paperWidth: '80mm'
     });
+    const [discoveredPrinters, setDiscoveredPrinters] = useState<{ ip: string, port: number }[]>([]);
+    const [isScanning, setIsScanning] = useState(false);
+    const [isPrintingTest, setIsPrintingTest] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -35,6 +39,47 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     const handleSave = () => {
         localStorage.setItem('pos_printer_settings', JSON.stringify(settings));
         onClose();
+    };
+
+    const handleScan = async () => {
+        setIsScanning(true);
+        try {
+            const printers = await invoke('scan_network_printers') as any[];
+            setDiscoveredPrinters(printers);
+        } catch (error) {
+            console.error('Scan failed:', error);
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleTestPrint = async () => {
+        if (!settings.networkIp) return;
+        setIsPrintingTest(true);
+        try {
+            // Simple ESC/POS Test Receipt
+            const encoder = new TextEncoder();
+            const data = [
+                ...[27, 64], // Initialize
+                ...[27, 97, 1], // Center
+                ...encoder.encode("RESVI TEST PRINT\n"),
+                ...encoder.encode("--------------------------------\n"),
+                ...encoder.encode("If you see this, your\n"),
+                ...encoder.encode("LAN printer is working!\n"),
+                ...encoder.encode("\n\n\n"), // Feed
+                ...[29, 86, 66, 0] // Cut
+            ];
+
+            await invoke('print_raw_to_network', { 
+                ip: settings.networkIp, 
+                port: 9100, 
+                data: Array.from(new Uint8Array(data)) 
+            });
+        } catch (error) {
+            console.error('Test print failed:', error);
+        } finally {
+            setIsPrintingTest(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -115,17 +160,59 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
 
                         {/* Network IP Input */}
                         {settings.type === 'network' && (
-                            <div className="animate-fadeIn">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Printer IP Address</label>
-                                <input
-                                    type="text"
-                                    value={settings.networkIp}
-                                    onChange={(e) => setSettings(s => ({ ...s, networkIp: e.target.value }))}
-                                    placeholder="192.168.1.200"
-                                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                />
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                                    Note: Direct IP printing from browser requires a local proxy or a printer supporting WebSockets.
+                            <div className="animate-fadeIn space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Printer IP Address</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.networkIp}
+                                            onChange={(e) => setSettings(s => ({ ...s, networkIp: e.target.value }))}
+                                            placeholder="192.168.1.200"
+                                            className="flex-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        />
+                                        <button
+                                            onClick={handleScan}
+                                            disabled={isScanning}
+                                            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            {isScanning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                            Scan
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {discoveredPrinters.length > 0 && (
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700 max-h-32 overflow-y-auto">
+                                        <p className="text-xs font-bold text-gray-500 mb-2">Discovered Printers:</p>
+                                        <div className="space-y-1">
+                                            {discoveredPrinters.map(p => (
+                                                <button
+                                                    key={p.ip}
+                                                    onClick={() => setSettings(s => ({ ...s, networkIp: p.ip }))}
+                                                    className="w-full text-left text-sm p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded flex justify-between items-center"
+                                                >
+                                                    <span className="font-mono">{p.ip}</span>
+                                                    <span className="text-[10px] bg-green-100 text-green-800 px-1.5 rounded">Port 9100</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="pt-2">
+                                    <button
+                                        onClick={handleTestPrint}
+                                        disabled={isPrintingTest || !settings.networkIp}
+                                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-brand-gold hover:text-brand-gold transition-all"
+                                    >
+                                        {isPrintingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                        Run Test Print
+                                    </button>
+                                </div>
+
+                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 italic">
+                                    Make sure your printer is on the same network and port 9100 is open.
                                 </p>
                             </div>
                         )}

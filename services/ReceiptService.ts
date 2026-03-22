@@ -308,7 +308,9 @@ class ReceiptService {
             ];
 
             items.forEach((item: any) => {
-                const line = `${item.quantity}x ${item.name.padEnd(20)} ${item.price.toFixed(2)}\n`;
+                const itemName = item.name_snapshot || item.name || 'Unknown Item';
+                const itemPrice = item.price_snapshot || item.price || 0;
+                const line = `${item.quantity}x ${itemName.padEnd(20).slice(0, 20)} ${itemPrice.toFixed(2)}\n`;
                 data = [...data, ...encoder.encode(line)];
             });
 

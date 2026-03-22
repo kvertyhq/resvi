@@ -11,6 +11,7 @@ type PrintMode = 'auto_with_drawer' | 'auto_no_drawer' | 'manual';
 
 const ESC_POS_COMMANDS = {
     DRAWER_KICK: [27, 112, 0, 25, 250], // ESC p 0 25 250
+    PRINT_NV_LOGO: [28, 112, 1, 0],    // FS p 1 0 (Print first NV logo)
 };
 
 class ReceiptService {
@@ -276,6 +277,17 @@ class ReceiptService {
 
             if (orderError) throw orderError;
 
+            // Fetch restaurant and receipt settings
+            const { data: restaurant } = await supabase
+                .from('restaurant_settings')
+                .select('*')
+                .eq('id', order.restaurant_id)
+                .single();
+
+            const { data: receiptSettings } = await supabase.rpc('get_receipt_settings', {
+                p_restaurant_id: order.restaurant_id
+            });
+
             let query = supabase
                 .from('order_items')
                 .select('*')
@@ -293,32 +305,97 @@ class ReceiptService {
                 return;
             }
 
-            // Generate simple ESC/POS buffer
+            // Generate ESC/POS buffer
             const encoder = new TextEncoder();
             let data: number[] = [
                 ...[27, 64], // Init
                 ...[27, 97, 1], // Center
-                ...encoder.encode("RESVI RESTAURANT\n"),
-                ...encoder.encode("--------------------------------\n"),
-                ...[27, 97, 0], // Left
-                ...encoder.encode(`Table: ${order.table_info?.table_name || 'Quick Order'}\n`),
-                ...encoder.encode(`Order: ${orderId.slice(0, 8)}\n`),
-                ...encoder.encode(`Date: ${new Date().toLocaleString()}\n`),
-                ...encoder.encode("--------------------------------\n"),
             ];
 
-            items.forEach((item: any) => {
-                const itemName = item.name_snapshot || item.name || 'Unknown Item';
-                const itemPrice = item.price_snapshot || item.price || 0;
-                const line = `${item.quantity}x ${itemName.padEnd(20).slice(0, 20)} ${itemPrice.toFixed(2)}\n`;
-                data = [...data, ...encoder.encode(line)];
-            });
+            // 0. Logo (NV Graphics slot 1)
+            if (receiptSettings?.show_logo) {
+                data = [
+                    ...data,
+                    ...ESC_POS_COMMANDS.PRINT_NV_LOGO,
+                    ...encoder.encode("\n")
+                ];
+            }
+
+            // 1. Restaurant Header
+            if (restaurant) {
+                data = [
+                    ...data,
+                    ...[27, 33, 48], // Double width & height
+                    ...encoder.encode(`${restaurant.restaurant_name.toUpperCase()}\n`),
+                    ...[27, 33, 0], // Normal size
+                    ...encoder.encode(`${restaurant.address || ''}\n`),
+                    ...encoder.encode(`${restaurant.phone || ''}\n`),
+                ];
+            }
+
+            // 2. Custom Admin Header
+            if (receiptSettings?.header_text) {
+                data = [
+                    ...data,
+                    ...encoder.encode("--------------------------------\n"),
+                    ...encoder.encode(`${receiptSettings.header_text}\n`),
+                ];
+            }
 
             data = [
                 ...data,
                 ...encoder.encode("--------------------------------\n"),
+                ...[27, 97, 0], // Left
+                ...encoder.encode(`Table: ${order.table_info?.table_name || 'Quick Order'}\n`),
+                ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
+                ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`),
+                ...encoder.encode("--------------------------------\n"),
+            ];
+
+            // 3. Items
+            items.forEach((item: any) => {
+                const itemName = item.name_snapshot || item.name || 'Unknown Item';
+                const itemPrice = item.price_snapshot || item.price || 0;
+                
+                // Format: Qty x Name (pad to fill space) Price
+                const line = `${item.quantity}x ${itemName.padEnd(20).slice(0, 20)} ${itemPrice.toFixed(2)}\n`;
+                data = [...data, ...encoder.encode(line)];
+                
+                // Modifiers / Addons if any
+                const modifiers = item.selected_modifiers || item.selected_addons || [];
+                if (Array.isArray(modifiers) && modifiers.length > 0) {
+                    modifiers.forEach((mod: any) => {
+                        const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
+                        if (modName) {
+                            data = [...data, ...encoder.encode(`  + ${modName}\n`)];
+                        }
+                    });
+                }
+            });
+
+            // 4. Totals
+            data = [
+                ...data,
+                ...encoder.encode("--------------------------------\n"),
                 ...[27, 97, 2], // Right
+                ...[27, 33, 16], // Double height
                 ...encoder.encode(`TOTAL: $${order.total_amount.toFixed(2)}\n`),
+                ...[27, 33, 0], // Normal size
+            ];
+
+            // 5. Custom Admin Footer
+            if (receiptSettings?.footer_text) {
+                data = [
+                    ...data,
+                    ...[27, 97, 1], // Center
+                    ...encoder.encode("\n"),
+                    ...encoder.encode(`${receiptSettings.footer_text}\n`),
+                ];
+            }
+
+            // 6. Finishing
+            data = [
+                ...data,
                 ...[27, 97, 1], // Center
                 ...encoder.encode("\nThank you!\n"),
                 ...encoder.encode("\n\n\n"),

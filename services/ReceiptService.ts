@@ -323,10 +323,11 @@ class ReceiptService {
 
             // 1. Restaurant Header
             if (restaurant) {
+                const rName = (restaurant.restaurant_name || restaurant.name || 'RESVI').toUpperCase();
                 data = [
                     ...data,
                     ...[27, 33, 48], // Double width & height
-                    ...encoder.encode(`${restaurant.restaurant_name.toUpperCase()}\n`),
+                    ...encoder.encode(`${rName}\n`),
                     ...[27, 33, 0], // Normal size
                     ...encoder.encode(`${restaurant.address || ''}\n`),
                     ...encoder.encode(`${restaurant.phone || ''}\n`),
@@ -379,7 +380,7 @@ class ReceiptService {
                 ...encoder.encode("--------------------------------\n"),
                 ...[27, 97, 2], // Right
                 ...[27, 33, 16], // Double height
-                ...encoder.encode(`TOTAL: $${order.total_amount.toFixed(2)}\n`),
+                ...encoder.encode(`TOTAL: $${(order.total_amount || 0).toFixed(2)}\n`),
                 ...[27, 33, 0], // Normal size
             ];
 

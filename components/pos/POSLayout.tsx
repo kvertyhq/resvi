@@ -4,13 +4,13 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
 import { useSettings } from '../../context/SettingsContext';
-import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User } from 'lucide-react';
+import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User, Settings as SettingsIcon } from 'lucide-react';
 import PrinterConfigModal from './PrinterConfigModal';
 import { IncomingCallModal } from './IncomingCallModal';
 import VirtualKeyboard from './VirtualKeyboard';
 const POSLayout: React.FC = () => {
     const { user, loading: adminLoading } = useAdmin();
-    const { staff, logout, loading: posLoading, clockIn, clockOut, activeShift } = usePOS();
+    const { staff, logout, loading: posLoading, clockIn, clockOut, activeShift, uiFontScale } = usePOS();
     const { isOnline, queueLength, sync } = useOffline();
     const { settings } = useSettings();
     const navigate = useNavigate();
@@ -37,11 +37,15 @@ const POSLayout: React.FC = () => {
             localStorage.setItem('pos-theme', 'light');
         }
 
+        // Apply UI font scale
+        root.style.fontSize = `${16 * uiFontScale}px`;
+
         // Cleanup on unmount (ensure admin is not affected)
         return () => {
             root.classList.remove('dark');
+            root.style.fontSize = '16px';
         };
-    }, [isDarkMode]);
+    }, [isDarkMode, uiFontScale]);
 
     const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
@@ -65,9 +69,9 @@ const POSLayout: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white overflow-hidden font-sans transition-colors duration-300" style={{ '--theme-color': themeColor } as React.CSSProperties}>
+        <div className="pos-root flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white overflow-hidden font-sans transition-colors duration-300" style={{ '--theme-color': themeColor } as React.CSSProperties}>
             {/* POS Sidebar (Desktop) */}
-            <aside className="hidden md:flex w-24 bg-white dark:bg-gray-900 flex-col items-center py-6 border-r border-gray-200 dark:border-gray-800 relative transition-colors duration-300 z-20">
+            <aside className="hidden md:flex w-24 bg-white dark:bg-gray-900 flex-col items-center py-6 border-r border-gray-200 dark:border-gray-800 relative transition-colors duration-300 z-20 overflow-y-auto hide-scrollbar select-none">
                 {!isOnline && (
                     <div className="absolute top-0 left-0 w-full bg-red-600 text-white text-[10px] text-center py-1 font-bold animate-pulse">
                         OFFLINE
@@ -158,9 +162,9 @@ const POSLayout: React.FC = () => {
                             <button
                                 onClick={() => setShowPrinterModal(true)}
                                 className="p-3 bg-gray-800 rounded-xl text-gray-400 hover:text-white transition-all mt-4 hover:bg-gray-700"
-                                title="Printer Settings"
+                                title="POS Settings"
                             >
-                                <Printer size={24} />
+                                <SettingsIcon size={24} />
                             </button>
 
                             <button
@@ -280,8 +284,8 @@ const POSLayout: React.FC = () => {
                                 }}
                                 className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all shadow-sm border border-gray-100 dark:border-gray-700/50"
                             >
-                                <Printer size={28} className="mb-2" />
-                                <span className="font-bold text-sm">Printers</span>
+                                <SettingsIcon size={28} className="mb-2" />
+                                <span className="font-bold text-sm">Settings</span>
                             </button>
 
                             <button

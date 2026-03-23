@@ -1,7 +1,7 @@
 {
   "name": "kverty-bistro",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,8 +12,9 @@
     "save:mobile:admin": "rm -rf ios-admin && cp -R ios ios-admin && rm -rf android-admin && cp -R android android-admin",
     "save:mobile:pos": "rm -rf ios-pos && cp -R ios ios-pos && rm -rf android-pos && cp -R android android-pos",
     "preview": "vite preview",
-    "tauri:dev": "npx @tauri-apps/cli dev",
-    "tauri:build": "npx @tauri-apps/cli build"
+    "tauri:dev": "npm run sync-version && npx @tauri-apps/cli dev",
+    "tauri:build": "npm run sync-version && npx @tauri-apps/cli build",
+    "sync-version": "node scripts/sync-version.js"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
@@ -27,6 +28,8 @@
     "@stripe/stripe-js": "^8.5.3",
     "@supabase/supabase-js": "^2.78.0",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.554.0",
     "qrcode.react": "^4.2.0",

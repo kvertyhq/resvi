@@ -8,6 +8,8 @@ pub fn run() {
       printer::print_raw_to_network,
       printer::print_logo_to_network,
     ])
+    .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_process::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

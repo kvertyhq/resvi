@@ -19,6 +19,8 @@ interface POSContextType {
     clockOut: () => Promise<void>;
     activeShift: any;
     loading: boolean;
+    uiFontScale: number;
+    setUIFontScale: (scale: number) => void;
 }
 
 const POSContext = createContext<POSContextType>({
@@ -30,6 +32,8 @@ const POSContext = createContext<POSContextType>({
     clockIn: async () => { },
     clockOut: async () => { },
     activeShift: null,
+    uiFontScale: 1,
+    setUIFontScale: () => { }
 });
 
 export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,6 +42,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [staff, setStaff] = useState<any>(null);
     const [activeShift, setActiveShift] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [uiFontScale, setUIFontScaleState] = useState<number>(() => {
+        const saved = localStorage.getItem('pos-font-scale');
+        return saved ? parseFloat(saved) : 1;
+    });
+
+    const setUIFontScale = (scale: number) => {
+        setUIFontScaleState(scale);
+        localStorage.setItem('pos-font-scale', scale.toString());
+    };
 
     // Persist login via localStorage for page refreshes (optional, but good for UX)
     useEffect(() => {
@@ -139,7 +152,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     return (
-        <POSContext.Provider value={{ staff, isAuthenticated: !!staff, loading, login, logout, clockIn, clockOut, activeShift }}>
+        <POSContext.Provider value={{ staff, isAuthenticated: !!staff, loading, login, logout, clockIn, clockOut, activeShift, uiFontScale, setUIFontScale }}>
             {!loading && children}
         </POSContext.Provider>
     );

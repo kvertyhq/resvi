@@ -18,6 +18,20 @@
         overscroll-behavior: none;
         touch-action: pan-y;
         -webkit-overflow-scrolling: touch;
+        --pos-font-scale: 1;
+    }
+
+    .pos-root {
+        font-size: calc(1rem * var(--pos-font-scale));
+    }
+
+    .pos-root * {
+        font-size: inherit;
+    }
+    
+    /* Reset for specific elements that shouldn't scale or need manual adjustment */
+    .pos-root svg {
+        font-size: initial;
     }
 
     .touch-none {

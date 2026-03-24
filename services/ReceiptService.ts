@@ -261,9 +261,9 @@ class ReceiptService {
             else console.error('No Printer IP configured.');
             return;
         }
-        
+
         console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId})`);
-        
+
         try {
             // Fetch order and items for printing
             const { data: order, error: orderError } = await supabase
@@ -292,7 +292,7 @@ class ReceiptService {
                 .from('order_items')
                 .select('*')
                 .eq('order_id', orderId);
-            
+
             if (stationId) {
                 query = query.eq('station_id', stationId);
             }
@@ -336,7 +336,7 @@ class ReceiptService {
                 const rName = (restaurant.restaurant_name || restaurant.name || 'RESVI').toUpperCase();
                 const addr1 = restaurant.address_line1 || restaurant.address || '';
                 const addr2 = restaurant.address_line2 || '';
-                
+
                 data = [
                     ...data,
                     ...[27, 33, 48], // Double width & height
@@ -370,31 +370,57 @@ class ReceiptService {
             // 3. Items
             items.forEach((item: any) => {
                 const itemName = item.name_snapshot || item.name || 'Unknown Item';
-                const itemPrice = item.price_snapshot || item.price || 0;
-                
+                const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
+
                 // Format: Qty x Name (pad to fill space) Price
-                const line = `${item.quantity}x ${itemName.padEnd(20).slice(0, 20)} ${itemPrice.toFixed(2)}\n`;
-                data = [...data, ...encoder.encode(line)];
-                
-                // Modifiers / Addons if any
+                // Qty (4) + Name (18) + Price (10) = 32 chars
+                const qtyStr = `${item.quantity}x `.padEnd(4);
+                const nameStr = itemName.slice(0, 18).padEnd(18);
+                const priceStr = itemPrice.toFixed(2).padStart(10);
+
+                data = [...data, ...encoder.encode(`${qtyStr}${nameStr}${priceStr}\n`)];
+
+                // Modifiers / Addons
                 const modifiers = item.selected_modifiers || item.selected_addons || [];
                 if (Array.isArray(modifiers) && modifiers.length > 0) {
                     modifiers.forEach((mod: any) => {
                         const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
+                        const modPrice = mod.price || 0;
                         if (modName) {
-                            data = [...data, ...encoder.encode(`  + ${modName}\n`)];
+                            const modQtyStr = "    "; // indent
+                            const modNameStr = `+ ${modName}`.slice(0, 18).padEnd(18);
+                            const modPriceStr = modPrice > 0 ? modPrice.toFixed(2).padStart(10) : "".padStart(10);
+                            data = [...data, ...encoder.encode(`${modQtyStr}${modNameStr}${modPriceStr}\n`)];
                         }
                     });
                 }
             });
 
-            // 4. Totals
+            // 4. Totals Breakdown
+            const subtotal = order.metadata?.subtotal || 0;
+            const tax = order.metadata?.tax || 0;
+            const deliveryFee = order.metadata?.delivery_fee || 0;
+
             data = [
                 ...data,
                 ...encoder.encode("--------------------------------\n"),
                 ...[27, 97, 2], // Right
+                ...encoder.encode(`Subtotal: ${restaurant.currency || '£'}${subtotal.toFixed(2)}\n`),
+            ];
+
+            if (tax > 0) {
+                data.push(...encoder.encode(`Tax: ${restaurant.currency || '£'}${tax.toFixed(2)}\n`));
+            }
+
+            if (deliveryFee > 0) {
+                data.push(...encoder.encode(`Delivery Fee: ${restaurant.currency || '£'}${deliveryFee.toFixed(2)}\n`));
+            }
+
+            data = [
+                ...data,
+                ...[27, 97, 2], // Right
                 ...[27, 33, 16], // Double height
-                ...encoder.encode(`TOTAL: ${restaurant.currency || '$'}${(order.total_amount || 0).toFixed(2)}\n`),
+                ...encoder.encode(`TOTAL: ${restaurant.currency || '£'}${(order.total_amount || 0).toFixed(2)}\n`),
                 ...[27, 33, 0], // Normal size
             ];
 

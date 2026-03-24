@@ -5,7 +5,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { usePOS } from '../../context/POSContext';
 import { Type, Minus, Plus, Info, CheckCircle2, AlertTriangle, Download, LogOut } from 'lucide-react';
 import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { relaunch, exit } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAlert } from '../../context/AlertContext';
 import pkg from '../../package.json';
@@ -167,9 +167,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
 
     const handleExitApp = async () => {
         try {
-            // @ts-ignore
-            const appWindow = getCurrentWindow();
-            await appWindow.destroy();
+            await exit(0);
         } catch (err) {
             console.error("Failed to close window:", err);
         }

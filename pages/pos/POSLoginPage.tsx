@@ -3,6 +3,7 @@ import { usePOS } from '../../context/POSContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { exit } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
 import { LogOut } from 'lucide-react';
 import pkg from '../../package.json';
@@ -121,7 +122,7 @@ const POSLoginPage: React.FC = () => {
                     {/* @ts-ignore */}
                     {(window as any).__TAURI_INTERNALS__ && (
                         <button
-                            onClick={() => getCurrentWindow().destroy()}
+                            onClick={() => exit(0)}
                             className="flex items-center gap-2 text-red-500 hover:text-red-400 font-bold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
                         >
                             <LogOut className="w-5 h-5" />

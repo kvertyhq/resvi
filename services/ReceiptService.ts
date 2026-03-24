@@ -323,11 +323,14 @@ class ReceiptService {
                     }
                 }
             }
-
             // Init data for text
             const encoder = new TextEncoder();
+            const currency = restaurant.currency || '£';
+            const currencyByte = currency === '£' ? 0x9C : (currency === '€' ? 0xD5 : 0x24); // 0x9C=£ in PC858, 0xD5=€ in PC858, 0x24=$
+
             let data: number[] = [
                 ...[27, 64], // Init
+                ...[27, 116, 19], // Select PC858 (Euro / UK pound support)
                 ...[27, 97, 1], // Center
             ];
 
@@ -372,13 +375,18 @@ class ReceiptService {
                 const itemName = item.name_snapshot || item.name || 'Unknown Item';
                 const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
 
-                // Format: Qty x Name (pad to fill space) Price
-                // Qty (4) + Name (18) + Price (10) = 32 chars
+                // Format: Qty(4) + Name(18) + Sym(1) + Price(9) = 32 chars
                 const qtyStr = `${item.quantity}x `.padEnd(4);
                 const nameStr = itemName.slice(0, 18).padEnd(18);
-                const priceStr = itemPrice.toFixed(2).padStart(10);
+                const priceValStr = itemPrice.toFixed(2).padStart(9);
 
-                data = [...data, ...encoder.encode(`${qtyStr}${nameStr}${priceStr}\n`)];
+                data = [
+                    ...data,
+                    ...encoder.encode(qtyStr),
+                    ...encoder.encode(nameStr),
+                    currencyByte,
+                    ...encoder.encode(`${priceValStr}\n`)
+                ];
 
                 // Modifiers / Addons
                 const modifiers = item.selected_modifiers || item.selected_addons || [];
@@ -387,10 +395,19 @@ class ReceiptService {
                         const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
                         const modPrice = mod.price || 0;
                         if (modName) {
-                            const modQtyStr = "    "; // indent
+                            // Indent(4) + Name(18) + Sym(1) + Price(9)
+                            const modQtyStr = "    ";
                             const modNameStr = `+ ${modName}`.slice(0, 18).padEnd(18);
-                            const modPriceStr = modPrice > 0 ? modPrice.toFixed(2).padStart(10) : "".padStart(10);
-                            data = [...data, ...encoder.encode(`${modQtyStr}${modNameStr}${modPriceStr}\n`)];
+                            const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
+
+                            data.push(...encoder.encode(modQtyStr));
+                            data.push(...encoder.encode(modNameStr));
+                            if (modPrice > 0) {
+                                data.push(currencyByte);
+                                data.push(...encoder.encode(`${modPriceValStr}\n`));
+                            } else {
+                                data.push(...encoder.encode(" ".repeat(10) + "\n"));
+                            }
                         }
                     });
                 }
@@ -405,26 +422,34 @@ class ReceiptService {
                 ...data,
                 ...encoder.encode("--------------------------------\n"),
                 ...[27, 97, 2], // Right
-                ...encoder.encode(`Subtotal: ${restaurant.currency || '£'}${subtotal.toFixed(2)}\n`),
+                ...encoder.encode("Subtotal: "),
+                currencyByte,
+                ...encoder.encode(`${subtotal.toFixed(2)}\n`),
             ];
 
             if (tax > 0) {
-                data.push(...encoder.encode(`Tax: ${restaurant.currency || '£'}${tax.toFixed(2)}\n`));
+                data.push(...encoder.encode("Tax: "));
+                data.push(currencyByte);
+                data.push(...encoder.encode(`${tax.toFixed(2)}\n`));
             }
 
             if (deliveryFee > 0) {
-                data.push(...encoder.encode(`Delivery Fee: ${restaurant.currency || '£'}${deliveryFee.toFixed(2)}\n`));
+                data.push(...encoder.encode("Delivery Fee: "));
+                data.push(currencyByte);
+                data.push(...encoder.encode(`${deliveryFee.toFixed(2)}\n`));
             }
 
+            // Big Total
             data = [
                 ...data,
-                ...[27, 97, 2], // Right
                 ...[27, 33, 16], // Double height
-                ...encoder.encode(`TOTAL: ${restaurant.currency || '£'}${(order.total_amount || 0).toFixed(2)}\n`),
+                ...encoder.encode("TOTAL: "),
+                currencyByte,
+                ...encoder.encode(`${(order.total_amount || 0).toFixed(2)}\n`),
                 ...[27, 33, 0], // Normal size
             ];
 
-            // 5. Custom Admin Footer
+            // 5. Custom Admin Footer (includes Thank You if configured)
             if (receiptSettings?.footer_text) {
                 data = [
                     ...data,
@@ -432,13 +457,18 @@ class ReceiptService {
                     ...encoder.encode("\n"),
                     ...encoder.encode(`${receiptSettings.footer_text}\n`),
                 ];
+            } else {
+                // Default footer if no custom one
+                data = [
+                    ...data,
+                    ...[27, 97, 1], // Center
+                    ...encoder.encode("\nThank you for choosing us!\n"),
+                ];
             }
 
             // 6. Finishing
             data = [
                 ...data,
-                ...[27, 97, 1], // Center
-                ...encoder.encode("\nThank you!\n"),
                 ...encoder.encode("\n\n\n"),
                 ...[29, 86, 66, 0] // Cut
             ];

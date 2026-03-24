@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -267,6 +267,59 @@ const MenuManagementPage: React.FC = () => {
         if (confirmed) {
             await supabase.from('menu_modifiers').delete().eq('id', id);
             fetchModifierGroups();
+        }
+    };
+
+    const handleDuplicateModifierGroup = async (group: ModifierGroup) => {
+        if (!selectedRestaurantId) return;
+
+        const newName = window.prompt('Enter name for the duplicated copy:', `${group.name} (Copy)`);
+        if (!newName) return;
+
+        try {
+            // 1. Insert the new group
+            const groupPayload = {
+                restaurant_id: selectedRestaurantId,
+                name: newName,
+                is_required: group.is_required,
+                is_multiple: group.is_multiple,
+                min_selection: group.min_selection,
+                max_selection: group.max_selection
+            };
+
+            const { data: newGroupData, error: groupError } = await supabase
+                .from('menu_modifiers')
+                .insert([groupPayload])
+                .select()
+                .single();
+
+            if (groupError) throw groupError;
+            if (!newGroupData) throw new Error('Failed to create new group');
+
+            const newGroupId = newGroupData.id;
+
+            // 2. Insert the copied items associated with the group
+            if (group.items && group.items.length > 0) {
+                const itemsPayload = group.items.map(item => ({
+                    modifier_group_id: newGroupId,
+                    name: item.name,
+                    price_adjustment: item.price_adjustment,
+                    price_matrix: item.price_matrix,
+                    is_available: item.is_available
+                }));
+
+                const { error: itemsError } = await supabase
+                    .from('menu_modifier_items')
+                    .insert(itemsPayload);
+
+                if (itemsError) throw itemsError;
+            }
+
+            showAlert('Success', 'Modifier group duplicated successfully.', 'success');
+            fetchModifierGroups();
+        } catch (error) {
+            console.error('Error duplicating modifier group:', error);
+            showAlert('Error', 'Failed to duplicate modifier group.', 'error');
         }
     };
 
@@ -596,6 +649,75 @@ const MenuManagementPage: React.FC = () => {
         }
     };
 
+    const handleDuplicateItem = async (item: MenuItem) => {
+        if (!selectedRestaurantId) return;
+
+        const newName = window.prompt('Enter name for the duplicated copy:', `${item.name} (Copy)`);
+        if (!newName) return;
+
+        try {
+            // First, fetch relations for the item being copied
+            const { data: addonsData } = await supabase.from('menu_item_addons').select('addon_id').eq('menu_item_id', item.id);
+            const { data: modsData } = await supabase.from('menu_item_modifiers').select('modifier_group_id, order_index').eq('menu_item_id', item.id);
+
+            // 1. Insert the new item
+            const itemWithVariants = item as any;
+            
+            const itemPayload = {
+                restaurant_id: selectedRestaurantId,
+                name: newName,
+                description: item.description,
+                price: item.price,
+                category_id: item.category_id,
+                is_available: item.is_available,
+                image_url: item.image_url,
+                tags: item.tags,
+                vegetarian: item.vegetarian,
+                spicy_level: item.spicy_level,
+                station_id: item.station_id,
+                price_variants: itemWithVariants.price_variants || null
+            };
+
+            const { data: newItemData, error: itemError } = await supabase
+                .from('menu_items')
+                .insert([itemPayload])
+                .select()
+                .single();
+
+            if (itemError) throw itemError;
+            if (!newItemData) throw new Error('Failed to create new item');
+
+            const newItemId = newItemData.id;
+
+            // 2. Insert Addons
+            if (addonsData && addonsData.length > 0) {
+                const addonsToInsert = addonsData.map(a => ({
+                    menu_item_id: newItemId,
+                    addon_id: a.addon_id
+                }));
+                const { error: addonsError } = await supabase.from('menu_item_addons').insert(addonsToInsert);
+                if (addonsError) console.error("Error copying addons:", addonsError);
+            }
+
+            // 3. Insert Modifiers
+            if (modsData && modsData.length > 0) {
+                const modifiersToInsert = modsData.map(m => ({
+                    menu_item_id: newItemId,
+                    modifier_group_id: m.modifier_group_id,
+                    order_index: m.order_index
+                }));
+                const { error: modsError } = await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
+                if (modsError) console.error("Error copying modifiers:", modsError);
+            }
+
+            showAlert('Success', 'Menu item duplicated successfully.', 'success');
+            fetchItems();
+        } catch (error) {
+            console.error('Error duplicating menu item:', error);
+            showAlert('Error', 'Failed to duplicate menu item.', 'error');
+        }
+    };
+
     // --- Handlers for Addons ---
 
     const handleAddonInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -841,8 +963,15 @@ const MenuManagementPage: React.FC = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button onClick={() => openItemModal(item)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
-                                                        <button onClick={() => handleDeleteItem(item.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                        <button 
+                                                            onClick={() => handleDuplicateItem(item)} 
+                                                            className="text-blue-600 hover:text-blue-900 mr-4"
+                                                            title="Duplicate Item"
+                                                        >
+                                                            <Copy className="h-5 w-5" />
+                                                        </button>
+                                                        <button onClick={() => openItemModal(item)} className="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit Item"><Edit className="h-5 w-5" /></button>
+                                                        <button onClick={() => handleDeleteItem(item.id)} className="text-red-600 hover:text-red-900" title="Delete Item"><Trash2 className="h-5 w-5" /></button>
                                                     </td>
                                                 </tr>
                                             );
@@ -1067,8 +1196,15 @@ const MenuManagementPage: React.FC = () => {
                                                         >
                                                             <Plus className="h-5 w-5" />
                                                         </button>
-                                                        <button onClick={() => openModifierGroupModal(group)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
-                                                        <button onClick={() => handleDeleteModifierGroup(group.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                        <button 
+                                                            onClick={() => handleDuplicateModifierGroup(group)} 
+                                                            className="text-blue-600 hover:text-blue-900 mr-4"
+                                                            title="Duplicate Group"
+                                                        >
+                                                            <Copy className="h-5 w-5" />
+                                                        </button>
+                                                        <button onClick={() => openModifierGroupModal(group)} className="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit Group"><Edit className="h-5 w-5" /></button>
+                                                        <button onClick={() => handleDeleteModifierGroup(group.id)} className="text-red-600 hover:text-red-900" title="Delete Group"><Trash2 className="h-5 w-5" /></button>
                                                     </td>
                                                 </tr>
                                                 {/* Expanded Items Drawer */}

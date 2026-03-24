@@ -58,7 +58,7 @@ const POSOrderPage: React.FC = () => {
     const isWalkIn = tableId === 'walk-in';
 
     const { categories, menuItems, itemModifiersMap, loading: menuLoading, isSyncing } = useMenu();
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(false); // Action loading state
     const [tableName, setTableName] = useState('');
 
@@ -287,6 +287,13 @@ const POSOrderPage: React.FC = () => {
             fetchExistingOrder();
         }
     }, [tableId, isWalkIn]);
+
+    // Auto-select first category if none selected
+    useEffect(() => {
+        if (categories.length > 0 && !selectedCategory) {
+            setSelectedCategory(categories[0].id);
+        }
+    }, [categories, selectedCategory]);
 
     // Existing Items State
     const [submittedItems, setSubmittedItems] = useState<any[]>([]);
@@ -918,9 +925,7 @@ const POSOrderPage: React.FC = () => {
 
 
 
-    const filteredItems = selectedCategory === 'all'
-        ? menuItems
-        : menuItems.filter(item => item.category_id === selectedCategory);
+    const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
 
     return (
         <div className="flex h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden relative transition-colors duration-300">
@@ -1065,27 +1070,33 @@ const POSOrderPage: React.FC = () => {
                     </div>
                 </div>
 
-                <POSCategoryTabs
-                    categories={categories}
-                    selectedCategory={selectedCategory}
-                    onSelect={setSelectedCategory}
-                />
+                {/* Split View: Categories Sidebar + Menu Grid */}
+                <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
+                    {/* Categories Sidebar (Scrollable wrapper) */}
+                    <div className="md:w-1/4 md:max-w-[240px] flex flex-col h-auto md:h-full overflow-hidden">
+                        <POSCategoryTabs
+                            categories={categories}
+                            selectedCategory={selectedCategory}
+                            onSelect={setSelectedCategory}
+                        />
+                    </div>
 
-               {/* Re-render when menu data syncs */}
-               {/* (using context values directly in render) */}
-
-                {menuLoading && categories.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-gray-500">Loading Menu...</div>
-                ) : (
-                    <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0 relative">
-                        {loading && (
-                            <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
+                    {/* Right: Menu Grid */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {menuLoading && categories.length === 0 ? (
+                            <div className="flex-1 flex items-center justify-center text-gray-500">Loading Menu...</div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0 relative">
+                                {loading && (
+                                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
+                                    </div>
+                                )}
+                                <POSMenuGrid items={filteredItems} onItemClick={handleItemClick} />
                             </div>
                         )}
-                        <POSMenuGrid items={filteredItems} onItemClick={handleItemClick} />
                     </div>
-                )}
+                </div>
 
             </div>
 

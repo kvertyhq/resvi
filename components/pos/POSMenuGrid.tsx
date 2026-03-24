@@ -19,7 +19,7 @@ interface POSMenuGridProps {
 const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick }) => {
     const { settings } = useSettings();
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto pb-20">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 overflow-y-auto pb-20">
             {items.map(item => (
                 <button
                     key={item.id}

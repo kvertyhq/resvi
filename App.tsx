@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import React, { useEffect } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 // Context
 import { OrderProvider } from './context/OrderContext';
 import { SettingsProvider, useSettings } from "./context/SettingsContext";
@@ -116,6 +117,40 @@ const RedirectHandler = () => {
 
 function App() {
   const { settings, loading } = useSettings();
+
+  useEffect(() => {
+    const setupCloseIntercept = async () => {
+      // @ts-ignore
+      if (window.__TAURI_INTERNALS__) {
+        try {
+          const appWindow = getCurrentWindow();
+          const unlisten = await appWindow.onCloseRequested(async (event) => {
+            event.preventDefault();
+            
+            const pwd = window.prompt("Enter System Password to close the application:");
+            const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
+            
+            if (pwd === systemPassword) {
+              await appWindow.destroy();
+            } else if (pwd !== null) {
+              alert("Incorrect password. App will stay open.");
+            }
+          });
+          return unlisten;
+        } catch (err) {
+          console.error("Failed to setup close intercept:", err);
+        }
+      }
+      return undefined;
+    };
+
+    let unlistenFn: (() => void) | undefined;
+    setupCloseIntercept().then(fn => { if (fn) unlistenFn = fn; });
+
+    return () => {
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
 
   useEffect(() => {
     if (settings?.name) {

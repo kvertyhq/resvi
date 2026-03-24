@@ -169,7 +169,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
         const pwd = await showPrompt('System Authorization', 'Enter System Password to exit:', 'warning', 'password');
         const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
         
-        if (pwd === systemPassword) {
+        if (pwd?.trim() === String(systemPassword).trim()) {
             try {
                 // Ignore typescript error if any
                 // @ts-ignore

@@ -132,7 +132,7 @@ function App() {
             const pwd = await showPrompt('System Authorization', 'Enter System Password to close the application:', 'warning', 'password');
             const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
             
-            if (pwd === systemPassword) {
+            if (pwd?.trim() === String(systemPassword).trim()) {
               await appWindow.destroy();
             } else if (pwd !== null) {
               showAlert('Access Denied', 'Incorrect password. App will stay open.', 'error');

@@ -136,7 +136,7 @@ const PublicReceiptPage: React.FC = () => {
                             <div key={i}>
                                 <div className="flex justify-between font-bold">
                                     <span>{item.quantity}x {item.name_snapshot}</span>
-                                    <span>{stationId ? '' : `£${(item.price_snapshot * item.quantity).toFixed(2)}`}</span>
+                                    <span>{stationId ? '' : `${settings?.currency || '£'}${(item.price_snapshot * item.quantity).toFixed(2)}`}</span>
                                 </div>
                                 {item.selected_modifiers?.map((mod: any, j: number) => (
                                     <div key={j} className="flex justify-between text-xs text-gray-500 pl-4 italic">
@@ -145,7 +145,7 @@ const PublicReceiptPage: React.FC = () => {
                                             {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
                                             {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
                                         </span>
-                                        <span>{stationId ? '' : `£${mod.price.toFixed(2)}`}</span>
+                                        <span>{stationId ? '' : `${settings?.currency || '£'}${mod.price.toFixed(2)}`}</span>
                                     </div>
                                 ))}
                             </div>
@@ -156,24 +156,24 @@ const PublicReceiptPage: React.FC = () => {
                     <div className="border-t border-dashed border-gray-400 pt-2 space-y-1">
                         <div className="flex justify-between">
                             <span>Subtotal</span>
-                            <span>£{(order.metadata?.subtotal || 0).toFixed(2)}</span>
+                            <span>{settings?.currency || '£'}{(order.metadata?.subtotal || 0).toFixed(2)}</span>
                         </div>
                         {(order.metadata?.tax || 0) > 0 && (
                             <div className="flex justify-between">
                                 <span>Tax</span>
-                                <span>£{order.metadata.tax.toFixed(2)}</span>
+                                <span>{settings?.currency || '£'}{order.metadata.tax.toFixed(2)}</span>
                             </div>
                         )}
                         {(order.metadata?.delivery_fee || 0) > 0 && (
                             <div className="flex justify-between">
                                 <span>Delivery Fee</span>
-                                <span>£{order.metadata.delivery_fee.toFixed(2)}</span>
+                                <span>{settings?.currency || '£'}{order.metadata.delivery_fee.toFixed(2)}</span>
                             </div>
                         )}
 
                         <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-400 mt-2">
                             <span>TOTAL</span>
-                            <span>£{order.total_amount.toFixed(2)}</span>
+                            <span>{settings?.currency || '£'}{order.total_amount.toFixed(2)}</span>
                         </div>
                     </div>
 

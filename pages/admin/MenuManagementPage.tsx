@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy, Search } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -74,6 +74,7 @@ const MenuManagementPage: React.FC = () => {
     const { showAlert, showConfirm } = useAlert();
     const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers'>('items');
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Pagination State
     const itemsPerPage = 10;
@@ -384,17 +385,32 @@ const MenuManagementPage: React.FC = () => {
         const from = (itemsPage - 1) * itemsPerPage;
         const to = from + itemsPerPage - 1;
 
-        const { data, error, count } = await supabase
+        let query = supabase
             .from('menu_items')
             .select('*', { count: 'exact' })
             .eq('restaurant_id', selectedRestaurantId)
-            .order('name', { ascending: true })
-            .range(from, to);
+            .order('name', { ascending: true });
+
+        if (searchQuery) {
+            query = query.ilike('name', `%${searchQuery}%`);
+        }
+
+        const { data, error, count } = await query.range(from, to);
 
         if (data) setItems(data);
         if (count !== null) setItemsTotalCount(count);
         if (error) console.error('Error fetching items:', error);
     };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (selectedRestaurantId && activeTab === 'items') {
+                setItemsPage(1);
+                fetchItems();
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const fetchAddons = async () => {
         if (!selectedRestaurantId) return;
@@ -781,13 +797,27 @@ const MenuManagementPage: React.FC = () => {
         <div className="max-w-6xl mx-auto pb-10">
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-3xl font-serif font-bold text-gray-800">Menu Management</h2>
-                <button
-                    onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : openItemModal()}
-                    className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
-                >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : 'Item'}
-                </button>
+                <div className="flex items-center gap-4">
+                    {activeTab === 'items' && (
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search items..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-brand-gold focus:border-brand-gold outline-none w-64 transition-all"
+                            />
+                        </div>
+                    )}
+                    <button
+                        onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : openItemModal()}
+                        className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
+                    >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : 'Item'}
+                    </button>
+                </div>
             </div>
 
             {/* Tabs */}

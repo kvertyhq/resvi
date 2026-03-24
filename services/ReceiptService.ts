@@ -394,7 +394,7 @@ class ReceiptService {
                 ...encoder.encode("--------------------------------\n"),
                 ...[27, 97, 2], // Right
                 ...[27, 33, 16], // Double height
-                ...encoder.encode(`TOTAL: $${(order.total_amount || 0).toFixed(2)}\n`),
+                ...encoder.encode(`TOTAL: ${restaurant.currency || '$'}${(order.total_amount || 0).toFixed(2)}\n`),
                 ...[27, 33, 0], // Normal size
             ];
 

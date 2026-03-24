@@ -3,9 +3,10 @@ import { X, Save, Printer, Bluetooth, Wifi, Monitor, Search, Loader2, RefreshCw,
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { usePOS } from '../../context/POSContext';
-import { Type, Minus, Plus, Info, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
+import { Type, Minus, Plus, Info, CheckCircle2, AlertTriangle, Download, LogOut } from 'lucide-react';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAlert } from '../../context/AlertContext';
 import pkg from '../../package.json';
 
@@ -161,6 +162,24 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
             console.error('Update failed:', error);
             showAlert('Update Failed', error.message || 'Could not install update.', 'error');
             setUpdateStatus('error');
+        }
+    };
+
+    const handleExitApp = async () => {
+        const pwd = window.prompt("Enter System Password to exit:");
+        const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
+        
+        if (pwd === systemPassword) {
+            try {
+                // Ignore typescript error if any
+                // @ts-ignore
+                const appWindow = getCurrentWindow();
+                await appWindow.destroy();
+            } catch (err) {
+                console.error("Failed to close window:", err);
+            }
+        } else if (pwd !== null) {
+            showAlert('Access Denied', 'Incorrect system password.', 'error');
         }
     };
 
@@ -413,6 +432,20 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                              <p className="text-xs text-center text-gray-400">
                                 Running in browser mode • v{currentVersion}
                             </p>
+                        </div>
+                    )}
+
+                    {/* Exit Application Button */}
+                    {/* @ts-ignore */}
+                    {(window as any).__TAURI_INTERNALS__ && (
+                        <div className="pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                            <button
+                                onClick={handleExitApp}
+                                className="w-full flex items-center justify-center gap-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 p-3 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-bold text-sm"
+                            >
+                                <LogOut className="w-5 h-5" />
+                                Exit POS Application
+                            </button>
                         </div>
                     )}
                 </div>

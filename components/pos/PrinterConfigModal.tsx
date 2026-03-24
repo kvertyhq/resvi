@@ -23,7 +23,7 @@ interface PrinterConfigModalProps {
 
 const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose }) => {
     const { uiFontScale, setUIFontScale } = usePOS();
-    const { showAlert } = useAlert();
+    const { showAlert, showPrompt } = useAlert();
     const [settings, setSettings] = useState<PrinterSettings>({
         type: 'browser',
         networkIp: '',
@@ -166,7 +166,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     };
 
     const handleExitApp = async () => {
-        const pwd = window.prompt("Enter System Password to exit:");
+        const pwd = await showPrompt('System Authorization', 'Enter System Password to exit:', 'warning', 'password');
         const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
         
         if (pwd === systemPassword) {

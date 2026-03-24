@@ -8,11 +8,24 @@ interface AlertModalProps {
   message: string;
   type: AlertType;
   isConfirm?: boolean;
+  isPrompt?: boolean;
+  inputType?: string;
   onConfirm?: () => void;
+  onPromptConfirm?: (value: string) => void;
   onClose: () => void;
 }
 
-const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, isConfirm, onConfirm, onClose }) => {
+const AlertModal: React.FC<AlertModalProps> = ({ 
+  isOpen, title, message, type, isConfirm, isPrompt, inputType, onConfirm, onPromptConfirm, onClose 
+}) => {
+  const [inputValue, setInputValue] = React.useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setInputValue('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const mode = import.meta.env.VITE_APP_MODE;
@@ -40,9 +53,23 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
                 type === 'success' ? 'text-green-400' : 'text-blue-400'
               }`}>{title}</h3>
             {message && <p className="text-gray-300 text-lg leading-relaxed">{message}</p>}
+            {isPrompt && (
+              <input
+                type={inputType || 'text'}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && onPromptConfirm) {
+                    onPromptConfirm(inputValue);
+                  }
+                }}
+                className="mt-6 w-full bg-gray-800 text-white text-2xl p-4 rounded-xl border border-gray-600 focus:border-[var(--theme-color)] outline-none transition-colors text-center"
+                autoFocus
+              />
+            )}
           </div>
           <div className="p-4 bg-gray-800 flex gap-4">
-            {isConfirm ? (
+            {isConfirm || isPrompt ? (
               <>
                 <button
                   onClick={onClose}
@@ -51,7 +78,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
                   Cancel
                 </button>
                 <button
-                  onClick={onConfirm}
+                  onClick={() => isPrompt && onPromptConfirm ? onPromptConfirm(inputValue) : onConfirm?.()}
                   style={{ backgroundColor: 'var(--theme-color)' }}
                   className="flex-[2] text-white font-bold text-2xl py-4 rounded-xl shadow-lg active:scale-95 transition-all text-center uppercase tracking-wider focus:outline-none"
                 >
@@ -82,10 +109,24 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 break-words">{title}</h3>
             {message && <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{message}</p>}
+            {isPrompt && (
+              <input
+                type={inputType || 'text'}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && onPromptConfirm) {
+                    onPromptConfirm(inputValue);
+                  }
+                }}
+                className="mt-3 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded-md focus:ring-[var(--theme-color)] focus:border-[var(--theme-color)] outline-none"
+                autoFocus
+              />
+            )}
           </div>
         </div>
         <div className="bg-gray-50 dark:bg-gray-900/50 px-5 py-3 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-          {isConfirm ? (
+          {isConfirm || isPrompt ? (
             <>
               <button
                 onClick={onClose}
@@ -94,7 +135,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, title, message, type, i
                 Cancel
               </button>
               <button
-                onClick={onConfirm}
+                onClick={() => isPrompt && onPromptConfirm ? onPromptConfirm(inputValue) : onConfirm?.()}
                 style={{ backgroundColor: 'var(--theme-color, #c9a96e)' }}
                 className="text-white font-medium px-6 py-2 rounded-lg shadow hover:brightness-110 active:scale-95 transition-all focus:outline-none"
               >

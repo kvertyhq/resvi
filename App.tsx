@@ -62,6 +62,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthCallbackHandler from './components/AuthCallbackHandler';
 import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
+import { useAlert } from './context/AlertContext';
 
 const RequirePOSAuth = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated, loading } = usePOS();
@@ -117,6 +118,7 @@ const RedirectHandler = () => {
 
 function App() {
   const { settings, loading } = useSettings();
+  const { showPrompt, showAlert } = useAlert();
 
   useEffect(() => {
     const setupCloseIntercept = async () => {
@@ -127,13 +129,13 @@ function App() {
           const unlisten = await appWindow.onCloseRequested(async (event) => {
             event.preventDefault();
             
-            const pwd = window.prompt("Enter System Password to close the application:");
+            const pwd = await showPrompt('System Authorization', 'Enter System Password to close the application:', 'warning', 'password');
             const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
             
             if (pwd === systemPassword) {
               await appWindow.destroy();
             } else if (pwd !== null) {
-              alert("Incorrect password. App will stay open.");
+              showAlert('Access Denied', 'Incorrect password. App will stay open.', 'error');
             }
           });
           return unlisten;

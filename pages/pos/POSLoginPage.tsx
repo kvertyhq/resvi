@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { usePOS } from '../../context/POSContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getVersion } from '@tauri-apps/api/app';
+import { LogOut } from 'lucide-react';
+import pkg from '../../package.json';
 
 const POSLoginPage: React.FC = () => {
     const [pin, setPin] = useState('');
@@ -13,6 +17,24 @@ const POSLoginPage: React.FC = () => {
     // Default to orange if no theme color set
     const themeColor = settings?.theme_color || '#f97316';
     const [processing, setProcessing] = useState(false);
+    const [currentVersion, setCurrentVersion] = useState<string>('');
+
+    React.useEffect(() => {
+        const fetchVersion = async () => {
+            try {
+                if ((window as any).__TAURI_INTERNALS__) {
+                    const v = await getVersion();
+                    setCurrentVersion(v);
+                } else {
+                    setCurrentVersion(pkg.version);
+                }
+            } catch (err) {
+                console.error('Failed to get version', err);
+                setCurrentVersion(pkg.version);
+            }
+        };
+        fetchVersion();
+    }, []);
 
     const handleNumberClick = (num: number) => {
         if (pin.length < 4) {
@@ -95,8 +117,20 @@ const POSLoginPage: React.FC = () => {
 
                 {processing && <div className="text-gray-500">Verifying...</div>}
 
-                <div className="mt-8 text-xs text-gray-600">
-                    Resvi POS System v1.0
+                <div className="mt-8 flex flex-col items-center gap-4">
+                    {/* @ts-ignore */}
+                    {(window as any).__TAURI_INTERNALS__ && (
+                        <button
+                            onClick={() => getCurrentWindow().destroy()}
+                            className="flex items-center gap-2 text-red-500 hover:text-red-400 font-bold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            Exit Application
+                        </button>
+                    )}
+                    <div className="text-xs text-gray-600">
+                        Resvi POS System v{currentVersion}
+                    </div>
                 </div>
             </div>
         </div>

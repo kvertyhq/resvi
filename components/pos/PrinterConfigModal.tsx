@@ -166,21 +166,12 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     };
 
     const handleExitApp = async () => {
-        const pwd = await showPrompt('System Authorization', 'Enter System Password to exit:', 'warning', 'password');
-        const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
-        alert(pwd?.trim())
-        alert(String(systemPassword).trim())
-        if (pwd?.trim() === String(systemPassword).trim()) {
-            try {
-                // Ignore typescript error if any
-                // @ts-ignore
-                const appWindow = getCurrentWindow();
-                await appWindow.destroy();
-            } catch (err) {
-                console.error("Failed to close window:", err);
-            }
-        } else if (pwd !== null) {
-            showAlert('Access Denied', 'Incorrect system password.', 'error');
+        try {
+            // @ts-ignore
+            const appWindow = getCurrentWindow();
+            await appWindow.destroy();
+        } catch (err) {
+            console.error("Failed to close window:", err);
         }
     };
 

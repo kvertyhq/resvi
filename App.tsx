@@ -120,39 +120,7 @@ function App() {
   const { settings, loading } = useSettings();
   const { showPrompt, showAlert } = useAlert();
 
-  useEffect(() => {
-    const setupCloseIntercept = async () => {
-      // @ts-ignore
-      if (window.__TAURI_INTERNALS__) {
-        try {
-          const appWindow = getCurrentWindow();
-          const unlisten = await appWindow.onCloseRequested(async (event) => {
-            event.preventDefault();
-            
-            const pwd = await showPrompt('System Authorization', 'Enter System Password to close the application:', 'warning', 'password');
-            const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
-            
-            if (pwd?.trim() === String(systemPassword).trim()) {
-              await appWindow.destroy();
-            } else if (pwd !== null) {
-              showAlert('Access Denied', 'Incorrect password. App will stay open.', 'error');
-            }
-          });
-          return unlisten;
-        } catch (err) {
-          console.error("Failed to setup close intercept:", err);
-        }
-      }
-      return undefined;
-    };
 
-    let unlistenFn: (() => void) | undefined;
-    setupCloseIntercept().then(fn => { if (fn) unlistenFn = fn; });
-
-    return () => {
-      if (unlistenFn) unlistenFn();
-    };
-  }, []);
 
   useEffect(() => {
     if (settings?.name) {

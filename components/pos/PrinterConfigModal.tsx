@@ -32,7 +32,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     const [discoveredPrinters, setDiscoveredPrinters] = useState<{ ip: string, port: number }[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isPrintingTest, setIsPrintingTest] = useState(false);
-    
+
     // Update state
     const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'up-to-date' | 'error'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
@@ -104,10 +104,10 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                 ...[29, 86, 66, 0] // Cut
             ];
 
-            await invoke('print_raw_to_network', { 
-                ip: settings.networkIp, 
-                port: 9100, 
-                data: Array.from(new Uint8Array(data)) 
+            await invoke('print_raw_to_network', {
+                ip: settings.networkIp,
+                port: 9100,
+                data: Array.from(new Uint8Array(data))
             });
         } catch (error) {
             console.error('Test print failed:', error);
@@ -168,7 +168,8 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     const handleExitApp = async () => {
         const pwd = await showPrompt('System Authorization', 'Enter System Password to exit:', 'warning', 'password');
         const systemPassword = import.meta.env.VITE_SYSTEM_PASSWORD || '1234';
-        
+        alert(pwd?.trim())
+        alert(String(systemPassword).trim())
         if (pwd?.trim() === String(systemPassword).trim()) {
             try {
                 // Ignore typescript error if any
@@ -204,8 +205,8 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                         <button
                             onClick={() => setSettings(s => ({ ...s, type: 'browser' }))}
                             className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${settings.type === 'browser'
-                                    ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                 }`}
                         >
                             <Monitor className="w-6 h-6 mb-2" />
@@ -214,8 +215,8 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                         <button
                             onClick={() => setSettings(s => ({ ...s, type: 'bluetooth' }))}
                             className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${settings.type === 'bluetooth'
-                                    ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                 }`}
                         >
                             <Bluetooth className="w-6 h-6 mb-2" />
@@ -224,8 +225,8 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                         <button
                             onClick={() => setSettings(s => ({ ...s, type: 'network' }))}
                             className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${settings.type === 'network'
-                                    ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-bold'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                 }`}
                         >
                             <Wifi className="w-6 h-6 mb-2" />
@@ -409,7 +410,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
 
                                 {updateStatus === 'downloading' && (
                                     <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                                        <div 
+                                        <div
                                             className="bg-green-600 h-full transition-all duration-300"
                                             style={{ width: `${downloadProgress}%` }}
                                         />
@@ -429,7 +430,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                     {/* Footnote for web version */}
                     {!(window as any).__TAURI_INTERNALS__ && (
                         <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
-                             <p className="text-xs text-center text-gray-400">
+                            <p className="text-xs text-center text-gray-400">
                                 Running in browser mode • v{currentVersion}
                             </p>
                         </div>

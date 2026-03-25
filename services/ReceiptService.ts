@@ -375,31 +375,33 @@ class ReceiptService {
             data = [
                 ...data,
                 ...encoder.encode(divider),
-                ...[27, 97, 1], // Center the order meta
+                ...[27, 97, 1], // Center
                 ...[27, 33, 16], // Double height for label
-                ...encoder.encode(`${orderTypeLabel}\n`),
+                ...encoder.encode(`${orderTypeLabel.padStart(lineWidth / 2 + orderTypeLabel.length / 2).padEnd(lineWidth).slice(0, lineWidth)}\n`),
                 ...[27, 33, 0], // Normal size
                 ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
                 ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`),
             ];
 
-            // Customer Details (for Delivery/Collection or if available)
+            // Customer Details
             const cName = order.customer?.full_name || order.customer_name || '';
             const cPhone = order.customer?.phone || order.customer_phone || '';
             const cAddress = order.customer?.address || order.customer_address || '';
             const cPostcode = order.customer?.postcode || order.customer_postcode || '';
 
             if (cName || cPhone) {
-                data.push(...encoder.encode(`${cName}${cName && cPhone ? ' - ' : ''}${cPhone}\n`));
+                const customerLine = `${cName}${cName && cPhone ? ' - ' : ''}${cPhone}`.slice(0, lineWidth);
+                data.push(...encoder.encode(`${customerLine}\n`));
             }
             if (orderTypeLabel === 'DELIVERY' && (cAddress || cPostcode)) {
-                data.push(...encoder.encode(`${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}\n`));
+                const addrLine = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`.slice(0, lineWidth);
+                data.push(...encoder.encode(`${addrLine}\n`));
             }
 
             data = [
                 ...data,
                 ...encoder.encode(divider),
-                ...[27, 97, 0], // Left for items
+                // REMOVED [27, 97, 0] - Keep Center for aligned block
             ];
 
             // 3. Items
@@ -456,29 +458,28 @@ class ReceiptService {
                 ...data,
                 ...[27, 97, 1], // Center for divider
                 ...encoder.encode(divider),
-                ...[27, 97, 2], // Right for totals
             ];
 
             if (tax > 0 && restaurant.show_tax !== false) {
-                data.push(...encoder.encode("Tax: "));
-                data.push(currencyByte);
-                data.push(...encoder.encode(`${tax.toFixed(2)}\n`));
+                const taxLine = `Tax: ${tax.toFixed(2)}`.padStart(lineWidth);
+                data.push(...encoder.encode(`${taxLine}\n`));
             }
 
             if (deliveryFee > 0) {
-                data.push(...encoder.encode("Delivery Fee: "));
-                data.push(currencyByte);
-                data.push(...encoder.encode(`${deliveryFee.toFixed(2)}\n`));
+                const deliveryLine = `Delivery Fee: ${deliveryFee.toFixed(2)}`.padStart(lineWidth);
+                data.push(...encoder.encode(`${deliveryLine}\n`));
             }
 
             // Big Total
+            const totalLabel = "TOTAL: ";
+            const totalVal = `${currency}${order.total_amount.toFixed(2)}`;
+            const totalLine = `${totalLabel}${totalVal}`.padStart(lineWidth);
+
             data = [
                 ...data,
                 ...[27, 33, 16], // Double height
-                ...encoder.encode("TOTAL: "),
-                currencyByte,
-                ...encoder.encode(`${(order.total_amount || 0).toFixed(2)}\n`),
-                ...[27, 33, 0], // Normal size
+                ...encoder.encode(`${totalLine}\n`),
+                ...[27, 33, 0], // Reset
             ];
 
             // 5. Custom Admin Footer (includes Thank You if configured)

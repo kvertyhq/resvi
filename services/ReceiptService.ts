@@ -461,26 +461,36 @@ class ReceiptService {
             ];
 
             if (tax > 0 && restaurant.show_tax !== false) {
-                const taxLine = `Tax: ${tax.toFixed(2)}`.padStart(lineWidth);
-                data.push(...encoder.encode(`${taxLine}\n`));
+                const taxLabel = "Tax: ";
+                const taxVal = tax.toFixed(2);
+                const paddingCount = lineWidth - taxLabel.length - taxVal.length - 1;
+                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+                data.push(...encoder.encode(taxLabel));
+                data.push(currencyByte);
+                data.push(...encoder.encode(`${taxVal}\n`));
             }
 
             if (deliveryFee > 0) {
-                const deliveryLine = `Delivery Fee: ${deliveryFee.toFixed(2)}`.padStart(lineWidth);
-                data.push(...encoder.encode(`${deliveryLine}\n`));
+                const deliveryLabel = "Delivery Fee: ";
+                const deliveryVal = deliveryFee.toFixed(2);
+                const paddingCount = lineWidth - deliveryLabel.length - deliveryVal.length - 1;
+                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+                data.push(...encoder.encode(deliveryLabel));
+                data.push(currencyByte);
+                data.push(...encoder.encode(`${deliveryVal}\n`));
             }
 
-            // Big Total
+            // Big Total - Manual right align within block
             const totalLabel = "TOTAL: ";
-            const totalVal = `${currency}${order.total_amount.toFixed(2)}`;
-            const totalLine = `${totalLabel}${totalVal}`.padStart(lineWidth);
+            const totalVal = (order.total_amount || 0).toFixed(2);
+            const paddingCount = lineWidth - totalLabel.length - totalVal.length - 1;
 
-            data = [
-                ...data,
-                ...[27, 33, 16], // Double height
-                ...encoder.encode(`${totalLine}\n`),
-                ...[27, 33, 0], // Reset
-            ];
+            data.push(...[27, 33, 16]); // Double height
+            data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+            data.push(...encoder.encode(totalLabel));
+            data.push(currencyByte);
+            data.push(...encoder.encode(`${totalVal}\n`));
+            data.push(...[27, 33, 0]); // Reset
 
             // 5. Custom Admin Footer (includes Thank You if configured)
             if (receiptSettings?.footer_text) {

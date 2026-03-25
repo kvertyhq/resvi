@@ -40,9 +40,8 @@ export const PrinterService = {
             printer.printerSetTextSize(24);
             printer.printerText("--------------------------------\n");
 
-            // Table Info
+            // Order Info
             printer.printerSetAlignment(0); // Left
-            printer.printerText(`Table: ${order.table_info?.table_name || 'Quick Order'}\n`);
             printer.printerText(`Date: ${new Date().toLocaleString()}\n`);
             printer.printerText(`Order #: ${order.id.slice(0, 8)}\n`);
             printer.printerText("--------------------------------\n");

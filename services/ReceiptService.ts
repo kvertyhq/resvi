@@ -71,7 +71,7 @@ class ReceiptService {
         } else if (settings.type === 'bluetooth') {
             await this.printBluetooth(orderId, stationId, showAlert);
         } else if (settings.type === 'network') {
-            await this.printNetwork(orderId, settings.networkIp, stationId, showAlert);
+            await this.printNetwork(orderId, settings, stationId, showAlert);
         }
     }
 
@@ -255,7 +255,8 @@ class ReceiptService {
         else console.log(msg);
     }
 
-    private async printNetwork(orderId: string, ip?: string, stationId?: string, showAlert?: any) {
+    private async printNetwork(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any) {
+        const ip = settings.networkIp;
         if (!ip) {
             if (showAlert) showAlert('Printer Error', 'No Printer IP configured.', 'error');
             else console.error('No Printer IP configured.');
@@ -328,6 +329,9 @@ class ReceiptService {
             const currency = restaurant.currency || '£';
             const currencyByte = currency === '£' ? 0x9C : (currency === '€' ? 0xD5 : 0x24); // 0x9C=£ in PC858, 0xD5=€ in PC858, 0x24=$
 
+            const lineWidth = settings.paperWidth === '58mm' ? 32 : 42; // Safer 42 for 80mm
+            const divider = "-".repeat(lineWidth) + "\n";
+
             let data: number[] = [
                 ...[27, 64], // Init
                 ...[27, 116, 19], // Select PC858 (Euro / UK pound support)
@@ -355,19 +359,19 @@ class ReceiptService {
             if (receiptSettings?.header_text) {
                 data = [
                     ...data,
-                    ...encoder.encode("--------------------------------\n"),
+                    ...encoder.encode(divider),
                     ...encoder.encode(`${receiptSettings.header_text}\n`),
                 ];
             }
 
             data = [
                 ...data,
-                ...encoder.encode("--------------------------------\n"),
-                ...[27, 97, 0], // Left
-                ...encoder.encode(`Table: ${order.table_info?.table_name || 'Quick Order'}\n`),
+                ...encoder.encode(divider),
+                ...[27, 97, 1], // Center the order meta
                 ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
                 ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`),
-                ...encoder.encode("--------------------------------\n"),
+                ...encoder.encode(divider),
+                ...[27, 97, 0], // Left for items
             ];
 
             // 3. Items
@@ -375,9 +379,10 @@ class ReceiptService {
                 const itemName = item.name_snapshot || item.name || 'Unknown Item';
                 const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
 
-                // Format: Qty(4) + Name(18) + Sym(1) + Price(9) = 32 chars
+                // Format: Qty(4) + Name(X) + Sym(1) + Price(9) = lineWidth
                 const qtyStr = `${item.quantity}x `.padEnd(4);
-                const nameStr = itemName.slice(0, 18).padEnd(18);
+                const nameWidth = lineWidth - 4 - 1 - 9;
+                const nameStr = itemName.slice(0, nameWidth).padEnd(nameWidth);
                 const priceValStr = itemPrice.toFixed(2).padStart(9);
 
                 data = [
@@ -395,9 +400,10 @@ class ReceiptService {
                         const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
                         const modPrice = mod.price || 0;
                         if (modName) {
-                            // Indent(4) + Name(18) + Sym(1) + Price(9)
+                            // Indent(4) + Name(X) + Sym(1) + Price(9)
                             const modQtyStr = "    ";
-                            const modNameStr = `+ ${modName}`.slice(0, 18).padEnd(18);
+                            const nameWidth = lineWidth - 4 - 1 - 9;
+                            const modNameStr = `+ ${modName}`.slice(0, nameWidth).padEnd(nameWidth);
                             const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
 
                             data.push(...encoder.encode(modQtyStr));
@@ -420,7 +426,7 @@ class ReceiptService {
 
             data = [
                 ...data,
-                ...encoder.encode("--------------------------------\n"),
+                ...encoder.encode(divider),
                 ...[27, 97, 2], // Right
                 ...encoder.encode("Subtotal: "),
                 currencyByte,

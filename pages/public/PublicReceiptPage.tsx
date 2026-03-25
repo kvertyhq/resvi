@@ -154,10 +154,6 @@ const PublicReceiptPage: React.FC = () => {
 
                     {/* Totals */}
                     <div className="border-t border-dashed border-gray-400 pt-2 space-y-1">
-                        <div className="flex justify-between">
-                            <span>Subtotal</span>
-                            <span>{settings?.currency || '£'}{(order.metadata?.subtotal || 0).toFixed(2)}</span>
-                        </div>
                         {settings?.show_tax !== false && order.tax_amount > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Tax</span>

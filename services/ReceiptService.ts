@@ -426,11 +426,9 @@ class ReceiptService {
 
             data = [
                 ...data,
+                ...[27, 97, 1], // Center for divider
                 ...encoder.encode(divider),
-                ...[27, 97, 2], // Right
-                ...encoder.encode("Subtotal: "),
-                currencyByte,
-                ...encoder.encode(`${subtotal.toFixed(2)}\n`),
+                ...[27, 97, 2], // Right for totals
             ];
 
             if (tax > 0 && restaurant.show_tax !== false) {

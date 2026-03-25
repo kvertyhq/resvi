@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X, RefreshCcw, Printer } from 'lucide-react';
 import { receiptService } from '../../services/ReceiptService';
+import { useSettings } from '../../context/SettingsContext';
 
 interface OrderItem {
     id: string;
@@ -50,6 +51,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh';
 
 const OrderManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { settings } = useSettings();
     const { showAlert } = useAlert();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -398,7 +400,7 @@ const OrderManagementPage: React.FC = () => {
                                             {order.profiles?.phone && <span className="ml-2 text-gray-500">• {order.profiles.phone}</span>}
                                         </div>
                                         <div>
-                                            <span className="font-semibold">Total: £{order.total_amount.toFixed(2)}</span>
+                                            <span className="font-semibold">Total: {settings?.currency || '£'}{order.total_amount.toFixed(2)}</span>
                                             <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 uppercase">{order.order_type}</span>
                                             {order.payment_method && (
                                                 <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded uppercase border border-blue-100">
@@ -412,9 +414,9 @@ const OrderManagementPage: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            Subtotal: £{(order.metadata?.subtotal || 0).toFixed(2)} •
-                                            Tax: £{(order.metadata?.tax || 0).toFixed(2)}
-                                            {(order.metadata?.delivery_fee || 0) > 0 && ` • Delivery: £${order.metadata.delivery_fee.toFixed(2)}`}
+                                            Subtotal: {settings?.currency || '£'}{(order.metadata?.subtotal || 0).toFixed(2)}
+                                            {settings?.show_tax !== false && order.metadata?.tax > 0 && ` • Tax: ${settings?.currency || '£'}${(order.metadata?.tax || 0).toFixed(2)}`}
+                                            {(order.metadata?.delivery_fee || 0) > 0 && ` • Delivery: ${settings?.currency || '£'}${order.metadata.delivery_fee.toFixed(2)}`}
                                         </div>
 
                                         {/* Order Progress Indicator */}
@@ -650,18 +652,18 @@ const OrderManagementPage: React.FC = () => {
                                                                             {item.selected_addons && item.selected_addons.length > 0 && (
                                                                                 <div className="text-xs text-gray-500 mt-1">
                                                                                     {item.selected_addons.map((addon, i) => (
-                                                                                        <span key={i} className="block">
-                                                                                            + {addon.name} (£{addon.price.toFixed(2)})
+                                                                                                                        <span key={i} className="block">
+                                                                                            + {addon.name} ({settings?.currency || '£'}{addon.price.toFixed(2)})
                                                                                         </span>
                                                                                     ))}
                                                                                 </div>
                                                                             )}
                                                                         </td>
                                                                         <td className="px-4 py-3 text-sm text-gray-500 text-right align-top">
-                                                                            £{item.price_snapshot.toFixed(2)}
+                                                                            {settings?.currency || '£'}{item.price_snapshot.toFixed(2)}
                                                                         </td>
                                                                         <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right align-top">
-                                                                            £{itemTotal.toFixed(2)}
+                                                                            {settings?.currency || '£'}{itemTotal.toFixed(2)}
                                                                         </td>
                                                                     </tr>
                                                                 );
@@ -676,21 +678,23 @@ const OrderManagementPage: React.FC = () => {
                                         <div className="border-t border-gray-200 pt-4">
                                             <div className="flex justify-between text-sm mb-1">
                                                 <span className="text-gray-600">Subtotal</span>
-                                                <span className="font-medium">£{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
+                                                <span className="font-medium">{settings?.currency || '£'}{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
                                             </div>
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-gray-600">Tax</span>
-                                                <span className="font-medium">£{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
-                                            </div>
+                                            {settings?.show_tax !== false && (selectedOrder.metadata?.tax || 0) > 0 && (
+                                                <div className="flex justify-between text-sm mb-1">
+                                                    <span className="text-gray-600">Tax</span>
+                                                    <span className="font-medium">{settings?.currency || '£'}{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
+                                                </div>
+                                            )}
                                             {(selectedOrder.metadata?.delivery_fee || 0) > 0 && (
                                                 <div className="flex justify-between text-sm mb-1">
                                                     <span className="text-gray-600">Delivery Fee</span>
-                                                    <span className="font-medium">£{selectedOrder.metadata.delivery_fee.toFixed(2)}</span>
+                                                    <span className="font-medium">{settings?.currency || '£'}{selectedOrder.metadata.delivery_fee.toFixed(2)}</span>
                                                 </div>
                                             )}
                                             <div className="flex justify-between text-lg font-bold text-gray-900 mt-3 pt-3 border-t border-gray-200">
                                                 <span>Total</span>
-                                                <span>£{selectedOrder.total_amount.toFixed(2)}</span>
+                                                <span>{settings?.currency || '£'}{selectedOrder.total_amount.toFixed(2)}</span>
                                             </div>
                                         </div>
 

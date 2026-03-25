@@ -158,10 +158,10 @@ const PublicReceiptPage: React.FC = () => {
                             <span>Subtotal</span>
                             <span>{settings?.currency || '£'}{(order.metadata?.subtotal || 0).toFixed(2)}</span>
                         </div>
-                        {(order.metadata?.tax || 0) > 0 && (
-                            <div className="flex justify-between">
-                                <span>Tax</span>
-                                <span>{settings?.currency || '£'}{order.metadata.tax.toFixed(2)}</span>
+                        {settings?.show_tax !== false && order.tax_amount > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Tax</span>
+                                <span className="font-medium">{settings?.currency}{order.tax_amount?.toFixed(2)}</span>
                             </div>
                         )}
                         {(order.metadata?.delivery_fee || 0) > 0 && (

@@ -134,6 +134,7 @@ const POSOrderPage: React.FC = () => {
     }, [subtotal, discountValue, discountType]);
 
     const tax = useMemo(() => {
+        if (settings?.show_tax === false) return 0;
         const discountFactor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
         let t = 0;
         cartItems.forEach(item => {
@@ -144,7 +145,7 @@ const POSOrderPage: React.FC = () => {
             t += itemTaxable * (taxPercent / 100);
         });
         return t;
-    }, [cartItems, categories, subtotal, discountAmount]);
+    }, [cartItems, categories, subtotal, discountAmount, settings?.show_tax]);
 
     const total = useMemo(() => {
         return (subtotal - discountAmount) + tax;
@@ -1298,11 +1299,12 @@ const POSOrderPage: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex justify-between text-gray-500 dark:text-gray-400 text-sm">
-                        <span>Tax</span>
-
-                        <span>{settings?.currency || '$'}{tax.toFixed(2)}</span>
-                    </div>
+                    {settings?.show_tax !== false && (
+                        <div className="flex justify-between text-gray-500 dark:text-gray-400 text-sm">
+                            <span>Tax</span>
+                            <span>{settings?.currency || '$'}{tax.toFixed(2)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between text-gray-900 dark:text-white font-bold text-xl pt-2 border-t border-gray-200 dark:border-gray-800">
                         <span>Cart Total</span>
                         <span>{settings?.currency || '$'}{total.toFixed(2)}</span>

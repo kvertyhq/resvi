@@ -427,7 +427,7 @@ class ReceiptService {
                 ...encoder.encode(`${subtotal.toFixed(2)}\n`),
             ];
 
-            if (tax > 0) {
+            if (tax > 0 && restaurant.show_tax !== false) {
                 data.push(...encoder.encode("Tax: "));
                 data.push(currencyByte);
                 data.push(...encoder.encode(`${tax.toFixed(2)}\n`));

@@ -37,6 +37,7 @@ declare
   v_rest_exists int;
   v_user uuid := null;
   v_norm_phone text;
+  v_show_tax boolean;
 begin
   -- required validations
   if p_order_type is null then
@@ -49,9 +50,12 @@ begin
     raise exception 'p_items must be a non-empty JSON array';
   end if;
 
-  -- ensure restaurant exists
-  select count(1) into v_rest_exists from restaurant_settings where id = p_restaurant_id;
-  if v_rest_exists = 0 then
+  -- fetch restaurant settings
+  select coalesce(show_tax, true) into v_show_tax 
+  from restaurant_settings 
+  where id = p_restaurant_id;
+
+  if v_show_tax is null then
     raise exception 'restaurant not found: %', p_restaurant_id::text;
   end if;
 
@@ -99,8 +103,10 @@ begin
     end if;
 
     v_subtotal := v_subtotal + ((v_menu_price + v_addon_total) * v_qty);
-    -- Add tax for this item
-    v_tax_amount := v_tax_amount + (((v_menu_price + v_addon_total) * v_qty) * (v_item_tax_rate / 100));
+    -- Add tax for this item if enabled
+    if v_show_tax then
+      v_tax_amount := v_tax_amount + (((v_menu_price + v_addon_total) * v_qty) * (v_item_tax_rate / 100));
+    end if;
   end loop;
 
   -- Final rounding

@@ -39,6 +39,7 @@ type Settings = {
   google_analytics_id?: string;
   currency?: string;
   bookings_enabled?: boolean;
+  show_tax?: boolean;
 };
 
 interface SettingsContextType {
@@ -83,7 +84,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         const data = await res.json();
-        const settingsData = data?.data;
+        const settingsData = Array.isArray(data) ? data[0] : (data?.data || data);
 
         setSettings(settingsData);
         document.title = settingsData?.name || 'Restaurant';

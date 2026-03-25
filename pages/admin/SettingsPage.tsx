@@ -86,7 +86,8 @@ const SettingsPage: React.FC = () => {
             table_assigned: true
         },
         google_analytics_id: '',
-        bookings_enabled: true
+        bookings_enabled: true,
+        show_tax: true
     });
 
     // New states for advanced settings
@@ -156,7 +157,8 @@ const SettingsPage: React.FC = () => {
                             table_assigned: true
                         },
                         google_analytics_id: settings.google_analytics_id || '',
-                        bookings_enabled: settings.bookings_enabled !== false // Default to true if undefined
+                        bookings_enabled: settings.bookings_enabled !== false, // Default to true if undefined
+                        show_tax: settings.show_tax !== false // Default to true if undefined
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});

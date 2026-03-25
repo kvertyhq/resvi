@@ -319,10 +319,12 @@ const POSHistoryPage: React.FC = () => {
                                     <span>Subtotal</span>
                                     <span>{settings?.currency || '$'}{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                    <span>Tax</span>
-                                    <span>{settings?.currency || '$'}{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
-                                </div>
+                                {settings?.show_tax !== false && (selectedOrder.metadata?.tax || 0) > 0 && (
+                                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>Tax</span>
+                                        <span>{settings?.currency || '$'}{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <span>Total</span>
                                     <span>{settings?.currency || '$'}{selectedOrder.total_amount.toFixed(2)}</span>

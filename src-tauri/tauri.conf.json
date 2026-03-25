@@ -31,7 +31,8 @@
       "endpoints": [
         "https://your-domain.com/updates/{{target}}-{{arch}}.json"
       ]
-    }
+    },
+    "process": {}
   },
   "bundle": {
     "active": true,

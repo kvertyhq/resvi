@@ -34,6 +34,19 @@ const SettingsBasicInfo: React.FC<SettingsBasicInfoProps> = ({ formData, handleC
                     <label className="block text-sm font-medium text-gray-700 mb-1">Currency Symbol</label>
                     <input type="text" name="currency" value={formData.currency} onChange={handleChange} placeholder="e.g. £, $, €" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
+                <div className="flex items-center space-x-3 mt-6">
+                    <input
+                        type="checkbox"
+                        id="show_tax"
+                        name="show_tax"
+                        checked={formData.show_tax}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-brand-gold focus:ring-brand-gold border-gray-300 rounded"
+                    />
+                    <label htmlFor="show_tax" className="text-sm font-medium text-gray-700">
+                        Show Tax Breakdown (Receipts, Checkout, POS)
+                    </label>
+                </div>
             </div>
         </div>
     );

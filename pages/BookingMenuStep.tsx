@@ -101,7 +101,7 @@ const BookingMenuStep: React.FC<BookingMenuStepProps> = ({ onNext, onPrev, selec
 
     const currentItems = activeCategory ? groupedMenu[activeCategory] || [] : [];
     const subtotal = selectedItems.reduce((sum, current) => sum + (current.item.price * current.quantity), 0);
-    const tax = selectedItems.reduce((sum, current) => {
+    const tax = settings?.show_tax === false ? 0 : selectedItems.reduce((sum, current) => {
         const rate = current.item.tax_rate || 0;
         return sum + (current.item.price * current.quantity * (rate / 100));
     }, 0);
@@ -169,7 +169,7 @@ const BookingMenuStep: React.FC<BookingMenuStepProps> = ({ onNext, onPrev, selec
                     <span>Subtotal:</span>
                     <span>{settings?.currency}{subtotal.toFixed(2)}</span>
                 </div>
-                {tax > 0 && (
+                {settings?.show_tax !== false && tax > 0 && (
                     <div className="flex justify-between items-center text-sm text-gray-600">
                         <span>Tax:</span>
                         <span>{settings?.currency}{tax.toFixed(2)}</span>

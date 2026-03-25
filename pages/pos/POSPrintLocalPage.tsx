@@ -141,7 +141,7 @@ const POSPrintLocalPage: React.FC = () => {
                         <span>Subtotal</span>
                         <span>{settings?.currency || '£'}{subtotal.toFixed(2)}</span>
                     </div>
-                    {tax > 0 && (
+                    {settings?.show_tax && tax > 0 && (
                         <div className="flex justify-between">
                             <span>Tax (10%)</span>
                             <span>{settings?.currency || '£'}{tax.toFixed(2)}</span>

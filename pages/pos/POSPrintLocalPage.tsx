@@ -100,13 +100,25 @@ const POSPrintLocalPage: React.FC = () => {
                     )}
                     <h1 className="text-xl font-bold uppercase">{settings?.name || 'Restaurant'}</h1>
                     <div className="border-y border-dashed border-black py-2 my-4">
+                        <div className="mb-2">
+                            <span className="bg-black text-white px-3 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest">
+                                {orderType === 'dine_in' ? 'Dine In' : 
+                                 orderType === 'delivery' ? 'Delivery' : 
+                                 orderType === 'collection' ? 'Collection' : 
+                                 orderType === 'takeaway' ? 'Walk In' : 
+                                 orderType?.replace('_', ' ') || 'Order'}
+                            </span>
+                        </div>
                         <h2 className="text-lg font-black tracking-widest uppercase">{data.type === 'kot' ? 'Kitchen Ticket' : 'Bill Estimate'}</h2>
-                        <p className="text-xs">{tableName || orderType || 'Order'}</p>
+                        {tableName && <p className="text-xs font-bold mt-1">Table: {tableName}</p>}
                     </div>
                     {customer && (
-                        <div className="mb-2">
-                             <p className="font-bold">{customer.full_name || customer.name}</p>
-                             {customer.phone && <p>{customer.phone}</p>}
+                        <div className="mb-4 text-xs italic border-b border-dashed border-black pb-2">
+                             <p className="font-bold text-sm not-italic">{customer.full_name || customer.name}</p>
+                             {customer.phone && <p>Tel: {customer.phone}</p>}
+                             {orderType === 'delivery' && (customer.address || customer.postcode) && (
+                                 <p className="mt-1">{customer.address}{customer.postcode ? `, ${customer.postcode}` : ''}</p>
+                             )}
                         </div>
                     )}
                     <p className="mt-2 text-xs">{format(new Date(), 'PPPP p')}</p>
@@ -118,7 +130,7 @@ const POSPrintLocalPage: React.FC = () => {
                         <div key={i}>
                             <div className="flex justify-between font-bold">
                                 <span>{item.quantity}x {item.name}</span>
-                                <span>{settings?.currency || '£'}{(item.price * item.quantity).toFixed(2)}</span>
+                                <span>{(item.price * item.quantity).toFixed(2)}</span>
                             </div>
                             {item.modifiers?.map((mod: any, j: number) => (
                                 <div key={j} className="flex justify-between text-xs pl-4 italic">
@@ -127,7 +139,7 @@ const POSPrintLocalPage: React.FC = () => {
                                         {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
                                         {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
                                     </span>
-                                    {mod.price > 0 && <span>{settings?.currency || '£'}{mod.price.toFixed(2)}</span>}
+                                    {mod.price > 0 && <span>{mod.price.toFixed(2)}</span>}
                                 </div>
                             ))}
                             {item.notes && <p className="text-xs pl-4 text-gray-600 mt-1 italic">"{item.notes}"</p>}

@@ -45,6 +45,7 @@ const PublicReceiptPage: React.FC = () => {
                 .select(`
                     *,
                     daily_order_number,
+                    customer:user_id(full_name, phone, address, postcode),
                     order_items (
                         quantity,
                         name_snapshot,
@@ -125,9 +126,28 @@ const PublicReceiptPage: React.FC = () => {
                     </div>
 
                     {/* Order Info */}
-                    <div className="mb-4 text-center border-b border-dashed border-gray-300 pb-2">
-                        <p className="font-bold text-lg">Order #{order.daily_order_number || order.readable_id}</p>
-                        <p className="text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
+                    <div className="mb-4 text-center border-b border-dashed border-gray-300 pb-4">
+                        <div className="mb-2">
+                            <span className="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                {order.order_type === 'dine_in' ? 'Dine In' : 
+                                 order.order_type === 'delivery' ? 'Delivery' : 
+                                 order.order_type === 'collection' ? 'Collection' : 
+                                 (order.order_source === 'pos' && order.order_type === 'takeaway') ? 'Walk In' : 
+                                 order.order_type?.replace('_', ' ') || 'Order'}
+                            </span>
+                        </div>
+                        <p className="font-bold text-lg">Order #{order.daily_order_number || order.readable_id || order.id?.slice(0, 8)}</p>
+                        <p className="text-gray-500 text-xs">{new Date(order.created_at).toLocaleString()}</p>
+                        
+                        {(order.customer || order.customer_name || order.customer_phone) && (
+                            <div className="mt-3 text-xs pt-2 border-t border-gray-100 italic">
+                                <p className="font-bold">{order.customer?.full_name || order.customer_name || 'Guest'}</p>
+                                { (order.customer?.phone || order.customer_phone) && <p>{order.customer?.phone || order.customer_phone}</p> }
+                                { order.order_type === 'delivery' && (order.customer?.address || order.customer_address) && (
+                                    <p className="mt-1">{order.customer?.address || order.customer_address}{ (order.customer?.postcode || order.customer_postcode) ? `, ${order.customer?.postcode || order.customer_postcode}` : '' }</p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Items */}
@@ -136,7 +156,7 @@ const PublicReceiptPage: React.FC = () => {
                             <div key={i}>
                                 <div className="flex justify-between font-bold">
                                     <span>{item.quantity}x {item.name_snapshot}</span>
-                                    <span>{stationId ? '' : `${settings?.currency || '£'}${(item.price_snapshot * item.quantity).toFixed(2)}`}</span>
+                                    <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                                 </div>
                                 {item.selected_modifiers?.map((mod: any, j: number) => (
                                     <div key={j} className="flex justify-between text-xs text-gray-500 pl-4 italic">
@@ -145,7 +165,7 @@ const PublicReceiptPage: React.FC = () => {
                                             {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
                                             {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
                                         </span>
-                                        <span>{stationId ? '' : `${settings?.currency || '£'}${mod.price.toFixed(2)}`}</span>
+                                        <span>{stationId ? '' : mod.price.toFixed(2)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -153,25 +173,32 @@ const PublicReceiptPage: React.FC = () => {
                     </div>
 
                     {/* Totals */}
-                    <div className="border-t border-dashed border-gray-400 pt-2 space-y-1">
-                        {settings?.show_tax !== false && order.tax_amount > 0 && (
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Tax</span>
-                                <span className="font-medium">{settings?.currency}{order.tax_amount?.toFixed(2)}</span>
-                            </div>
-                        )}
-                        {(order.metadata?.delivery_fee || 0) > 0 && (
-                            <div className="flex justify-between">
-                                <span>Delivery Fee</span>
-                                <span>{settings?.currency || '£'}{order.metadata.delivery_fee.toFixed(2)}</span>
-                            </div>
-                        )}
+                    {((settings?.show_tax !== false && order.tax_amount > 0) || (order.metadata?.delivery_fee || 0) > 0) ? (
+                        <div className="border-t border-dashed border-gray-400 pt-2 space-y-1">
+                            {settings?.show_tax !== false && order.tax_amount > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Tax</span>
+                                    <span className="font-medium">{settings?.currency}{order.tax_amount?.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {(order.metadata?.delivery_fee || 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span>Delivery Fee</span>
+                                    <span>{settings?.currency || '£'}{order.metadata.delivery_fee.toFixed(2)}</span>
+                                </div>
+                            )}
 
-                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-400 mt-2">
+                            <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-400 mt-2">
+                                <span>TOTAL</span>
+                                <span>{settings?.currency || '£'}{order.total_amount.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-dashed border-gray-400 mt-2">
                             <span>TOTAL</span>
                             <span>{settings?.currency || '£'}{order.total_amount.toFixed(2)}</span>
                         </div>
-                    </div>
+                    )}
 
                     {/* Footer */}
                     {receiptSettings?.footer_text && (

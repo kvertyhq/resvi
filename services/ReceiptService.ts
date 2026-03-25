@@ -271,7 +271,8 @@ class ReceiptService {
                 .from('orders')
                 .select(`
                     *,
-                    table_info:table_id(table_name)
+                    table_info:table_id(table_name),
+                    customer:user_id(full_name, phone, address, postcode)
                 `)
                 .eq('id', orderId)
                 .single();
@@ -364,12 +365,39 @@ class ReceiptService {
                 ];
             }
 
+            // Order Type Label
+            let orderTypeLabel = 'WALK IN';
+            if (order.order_type === 'dine_in') orderTypeLabel = 'DINE IN';
+            else if (order.order_type === 'delivery') orderTypeLabel = 'DELIVERY';
+            else if (order.order_type === 'collection') orderTypeLabel = 'COLLECTION';
+            else if (order.order_source === 'online') orderTypeLabel = order.order_type?.toUpperCase() || 'ONLINE';
+
             data = [
                 ...data,
                 ...encoder.encode(divider),
                 ...[27, 97, 1], // Center the order meta
+                ...[27, 33, 16], // Double height for label
+                ...encoder.encode(`${orderTypeLabel}\n`),
+                ...[27, 33, 0], // Normal size
                 ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
                 ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`),
+            ];
+
+            // Customer Details (for Delivery/Collection or if available)
+            const cName = order.customer?.full_name || order.customer_name || '';
+            const cPhone = order.customer?.phone || order.customer_phone || '';
+            const cAddress = order.customer?.address || order.customer_address || '';
+            const cPostcode = order.customer?.postcode || order.customer_postcode || '';
+
+            if (cName || cPhone) {
+                data.push(...encoder.encode(`${cName}${cName && cPhone ? ' - ' : ''}${cPhone}\n`));
+            }
+            if (orderTypeLabel === 'DELIVERY' && (cAddress || cPostcode)) {
+                data.push(...encoder.encode(`${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}\n`));
+            }
+
+            data = [
+                ...data,
                 ...encoder.encode(divider),
                 ...[27, 97, 0], // Left for items
             ];
@@ -389,7 +417,7 @@ class ReceiptService {
                     ...data,
                     ...encoder.encode(qtyStr),
                     ...encoder.encode(nameStr),
-                    currencyByte,
+                    ...encoder.encode(" "), // Spacer in place of currency byte
                     ...encoder.encode(`${priceValStr}\n`)
                 ];
 
@@ -409,7 +437,7 @@ class ReceiptService {
                             data.push(...encoder.encode(modQtyStr));
                             data.push(...encoder.encode(modNameStr));
                             if (modPrice > 0) {
-                                data.push(currencyByte);
+                                data.push(...encoder.encode(" ")); // Spacer
                                 data.push(...encoder.encode(`${modPriceValStr}\n`));
                             } else {
                                 data.push(...encoder.encode(" ".repeat(10) + "\n"));

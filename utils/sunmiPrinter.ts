@@ -41,14 +41,28 @@ export const PrinterService = {
             printer.printerText("--------------------------------\n");
 
             // Order Info
+            printer.printerSetAlignment(1); // Center label
+            const typeLabel = order.order_type === 'takeaway' ? 'WALK IN' : 
+                             order.order_type === 'delivery' ? 'DELIVERY' : 
+                             order.order_type === 'collection' ? 'COLLECTION' : 
+                             order.order_type?.toUpperCase() || 'ORDER';
+            printer.printerText(`${typeLabel}\n`);
+            
             printer.printerSetAlignment(0); // Left
             printer.printerText(`Date: ${new Date().toLocaleString()}\n`);
             printer.printerText(`Order #: ${order.id.slice(0, 8)}\n`);
+            
+            // Customer
+            const cName = order.customer_name || '';
+            const cPhone = order.customer_phone || '';
+            if (cName || cPhone) {
+                printer.printerText(`${cName} ${cPhone}\n`);
+            }
             printer.printerText("--------------------------------\n");
 
             // Items
             items.forEach((item: any) => {
-                const name = item.name.substring(0, 20).padEnd(20, ' ');
+                const name = item.name.substring(0, 24).padEnd(24, ' ');
                 const qty = item.quantity.toString().padEnd(4, ' ');
                 const price = (item.price * item.quantity).toFixed(2).padStart(8, ' ');
 

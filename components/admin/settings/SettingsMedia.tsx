@@ -174,27 +174,6 @@ const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, h
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                    <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Page URL</label>
-                    <input type="text" name="cover_page_url" value={formData.website_settings?.cover_page_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Menu Section Image URL</label>
-                    <input type="text" name="menu_image_url" value={formData.website_settings?.menu_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Section Image URL</label>
-                    <input type="text" name="delivery_image_url" value={formData.website_settings?.delivery_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Inside Story Image URL</label>
-                    <input type="text" name="inside_story_image_url" value={formData.website_settings?.inside_story_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-
                 {/* Socials */}
                 <div className="col-span-2">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Social Media</h4>

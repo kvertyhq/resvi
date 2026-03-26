@@ -26,6 +26,7 @@ interface TableMapProps {
 }
 
 const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () => void }> = ({ table, isEditMode, onClick }) => {
+    const { settings } = useSettings();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: table.id,
         disabled: !isEditMode,
@@ -95,7 +96,7 @@ const DraggableTable: React.FC<{ table: Table; isEditMode: boolean; onClick: () 
                         </span>
                     )}
                     <span className="text-[10px] font-bold">
-                        ${totalAmount.toFixed(2)}
+                        {settings?.currency || '£'}{totalAmount.toFixed(2)}
                     </span>
                 </div>
             )}
@@ -110,15 +111,31 @@ const TableMap: React.FC<TableMapProps> = ({ tables, onTableUpdate, onTableClick
         // Calculate new position based on delta
         const original = active.data.current as { x: number, y: number };
         if (original) {
-            onTableUpdate(active.id as string, original.x + delta.x, original.y + delta.y);
+            let newX = original.x + delta.x;
+            let newY = original.y + delta.y;
+
+            // Snap to grid (20px)
+            const gridSize = 20;
+            newX = Math.round(newX / gridSize) * gridSize;
+            newY = Math.round(newY / gridSize) * gridSize;
+
+            onTableUpdate(active.id as string, newX, newY);
         }
     };
 
     return (
         <div className="relative w-full h-full min-w-[800px] min-h-[600px] bg-gray-100 dark:bg-gray-800 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner pattern-grid-lg text-gray-500 dark:text-gray-300 transition-colors duration-300">
             {/* Simple grid pattern via CSS class or inline SVG if needed */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none"
-                style={{ backgroundImage: 'radial-gradient(circle, #000000 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+            <div 
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isEditMode ? 'opacity-20' : 'opacity-5'}`}
+                style={{ 
+                    backgroundImage: `
+                        linear-gradient(to right, #000000 1px, transparent 1px),
+                        linear-gradient(to bottom, #000000 1px, transparent 1px)
+                    `,
+                    backgroundSize: '20px 20px' 
+                }}
+            >
             </div>
 
             <DndContext onDragEnd={handleDragEnd}>

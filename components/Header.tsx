@@ -17,6 +17,7 @@ const CloseIcon: React.FC = () => (
 );
 
 const Header: React.FC = () => {
+    const { settings } = useSettings();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const navLinkClasses = "text-gray-300 hover:text-white transition duration-300 uppercase tracking-wider text-sm";
@@ -33,12 +34,11 @@ const Header: React.FC = () => {
             )}
         </>
     );
-    const { settings } = useSettings();
 
     return (
         <header
             className="text-white shadow-md sticky top-0 z-50 transition-colors duration-300"
-            style={{ backgroundColor: settings?.header_color || 'var(--header-color, #333333)' }}
+            style={{ backgroundColor: settings?.theme_settings?.header_color || settings?.header_color || 'var(--header-color, #333333)' }}
         >
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
@@ -67,7 +67,7 @@ const Header: React.FC = () => {
             {isMenuOpen && (
                 <div
                     className="md:hidden transition-colors duration-300"
-                    style={{ backgroundColor: settings?.header_color || 'var(--header-color, #333333)' }}
+                    style={{ backgroundColor: settings?.theme_settings?.header_color || settings?.header_color || 'var(--header-color, #333333)' }}
                 >
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col items-center">
                         <NavLinks onLinkClick={() => setIsMenuOpen(false)} />

@@ -6,10 +6,11 @@ import { useAlert } from '../../../context/AlertContext';
 interface SettingsMediaProps {
     formData: any;
     handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+    handleWebsiteSettingsChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, setFormData }) => {
+const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, handleWebsiteSettingsChange, setFormData }) => {
     const { showAlert } = useAlert();
     const [uploadingPdf, setUploadingPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -178,8 +179,20 @@ const SettingsMedia: React.FC<SettingsMediaProps> = ({ formData, handleChange, s
                     <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
-                    <input type="text" name="cover_image_url" value={formData.cover_image_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Page URL</label>
+                    <input type="text" name="cover_page_url" value={formData.website_settings?.cover_page_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Menu Section Image URL</label>
+                    <input type="text" name="menu_image_url" value={formData.website_settings?.menu_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Section Image URL</label>
+                    <input type="text" name="delivery_image_url" value={formData.website_settings?.delivery_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Inside Story Image URL</label>
+                    <input type="text" name="inside_story_image_url" value={formData.website_settings?.inside_story_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
 
                 {/* Socials */}

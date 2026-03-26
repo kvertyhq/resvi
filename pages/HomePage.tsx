@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { FileText } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
 
 const HomePage: React.FC = () => {
+    const { settings } = useSettings();
     const [menuPdfUrl, setMenuPdfUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -26,7 +28,7 @@ const HomePage: React.FC = () => {
             {/* Hero Section */}
             <section
                 className="relative bg-cover bg-center h-[75vh] flex items-center justify-center text-white"
-                style={{ backgroundImage: "url('https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg')" }}
+                style={{ backgroundImage: `url('${settings?.website_settings?.cover_page_url || settings?.cover_page_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg"}')` }}
             >
                 <div className="absolute inset-0 bg-black opacity-60"></div>
                 <div className="relative z-10 text-center">
@@ -52,8 +54,10 @@ const HomePage: React.FC = () => {
                         )}
                     </div>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-                    <span className="text-9xl md:text-[20rem] font-bold text-white tracking-widest">Daniel Sushi</span>
+                <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none overflow-hidden">
+                    <span className="text-9xl md:text-[20rem] font-bold text-white tracking-widest uppercase">
+                        {settings?.website_settings?.watermark_text || settings?.watermark_text || "Daniel Sushi"}
+                    </span>
                 </div>
             </section>
 
@@ -65,19 +69,19 @@ const HomePage: React.FC = () => {
                             title="OUR MENU"
                             subtitle="View Our Specialities"
                             linkTo="menu"
-                            bgImageUrl="https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg"
+                            bgImageUrl={settings?.website_settings?.menu_image_url || settings?.menu_image_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg"}
                         />
                         <FeatureCard
                             title="DELIVERY"
                             subtitle="Home delivery or take away food"
                             linkTo="order"
-                            bgImageUrl="https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg"
+                            bgImageUrl={settings?.website_settings?.delivery_image_url || settings?.delivery_image_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg"}
                         />
                         <FeatureCard
                             title="INSIDE"
                             subtitle="Our Story"
                             linkTo="about"
-                            bgImageUrl="https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg"
+                            bgImageUrl={settings?.website_settings?.inside_story_image_url || settings?.inside_story_image_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg"}
                         />
                     </div>
                 </div>

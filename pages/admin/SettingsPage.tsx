@@ -68,10 +68,21 @@ const SettingsPage: React.FC = () => {
         tiktok_url: '',
         youtube_url: '',
         logo_url: '',
-        cover_image_url: '',
         theme_color: '#c9a96e',
         header_color: '#333333',
         button_color: '#c9a96e',
+        theme_settings: {
+            header_color: '#333333',
+            button_color: '#c9a96e',
+            theme_color: '#c9a96e'
+        },
+        website_settings: {
+            watermark_text: 'Daniel Sushi',
+            cover_page_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
+            menu_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
+            delivery_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',
+            inside_story_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg'
+        },
         tax_rate: 0,
         max_booking_size: 10,
         opening_hours: {} as Record<string, string[]>,
@@ -141,10 +152,21 @@ const SettingsPage: React.FC = () => {
                         tiktok_url: settings.tiktok_url || '',
                         youtube_url: settings.youtube_url || '',
                         logo_url: settings.logo_url || '',
-                        cover_image_url: settings.cover_image_url || '',
                         theme_color: settings.theme_color || '#c9a96e',
                         header_color: settings.header_color || '#333333',
                         button_color: settings.button_color || settings.theme_color || '#c9a96e',
+                        theme_settings: settings.theme_settings || {
+                            header_color: settings.header_color || '#333333',
+                            button_color: settings.button_color || settings.theme_color || '#c9a96e',
+                            theme_color: settings.theme_color || '#c9a96e'
+                        },
+                        website_settings: settings.website_settings || {
+                            watermark_text: settings.watermark_text || 'Daniel Sushi',
+                            cover_page_url: settings.cover_page_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
+                            menu_image_url: settings.menu_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
+                            delivery_image_url: settings.delivery_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',
+                            inside_story_image_url: settings.inside_story_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg'
+                        },
                         tax_rate: settings.tax_rate || 0,
                         max_booking_size: settings.max_booking_size || 10,
                         opening_hours: settings.opening_hours || {},
@@ -189,6 +211,28 @@ const SettingsPage: React.FC = () => {
         setFormData(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+        }));
+    };
+
+    const handleWebsiteSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            website_settings: {
+                ...prev.website_settings,
+                [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+            }
+        }));
+    };
+
+    const handleThemeSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            theme_settings: {
+                ...prev.theme_settings,
+                [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+            }
         }));
     };
 
@@ -340,13 +384,23 @@ const SettingsPage: React.FC = () => {
                                 
                                 {activeTab === 'theme' && (
                                     <div className="space-y-8 animate-fadeIn">
-                                        <SettingsTheme formData={formData} handleChange={handleChange} />
+                                        <SettingsTheme 
+                                            formData={formData} 
+                                            handleChange={handleChange} 
+                                            handleWebsiteSettingsChange={handleWebsiteSettingsChange}
+                                            handleThemeSettingsChange={handleThemeSettingsChange}
+                                        />
                                     </div>
                                 )}
 
                                 {activeTab === 'media' && (
                                     <div className="space-y-8 animate-fadeIn">
-                                        <SettingsMedia formData={formData} handleChange={handleChange} setFormData={setFormData} />
+                                        <SettingsMedia 
+                                            formData={formData} 
+                                            handleChange={handleChange} 
+                                            handleWebsiteSettingsChange={handleWebsiteSettingsChange}
+                                            setFormData={setFormData} 
+                                        />
                                     </div>
                                 )}
 

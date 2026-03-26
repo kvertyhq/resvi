@@ -48,6 +48,23 @@ type Settings = {
   google_map_url?: string;
   header_color?: string;
   button_color?: string;
+  cover_page_url?: string;
+  watermark_text?: string;
+  menu_image_url?: string;
+  delivery_image_url?: string;
+  inside_story_image_url?: string;
+  theme_settings?: {
+    header_color?: string;
+    button_color?: string;
+    theme_color?: string;
+  };
+  website_settings?: {
+    watermark_text?: string;
+    cover_page_url?: string;
+    menu_image_url?: string;
+    delivery_image_url?: string;
+    inside_story_image_url?: string;
+  };
 };
 
 interface SettingsContextType {
@@ -94,6 +111,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const data = await res.json();
       const settingsData = Array.isArray(data) ? data[0] : (data?.data || data);
+      const themeSettings = settingsData?.theme_settings || {};
+      const websiteSettings = settingsData?.website_settings || {};
 
       setSettings(settingsData);
       document.title = settingsData?.name || 'Restaurant';
@@ -101,23 +120,17 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
       // Apply theme colors globally
       const root = document.documentElement;
 
-      if (settingsData?.theme_color) {
-        root.style.setProperty('--theme-color', settingsData.theme_color);
-      } else {
-        root.style.setProperty('--theme-color', '#c9a96e');
-      }
+      // Theme Color (prioritize theme_settings)
+      const themeColor = themeSettings.theme_color || settingsData?.theme_color || '#c9a96e';
+      root.style.setProperty('--theme-color', themeColor);
 
-      if (settingsData?.header_color) {
-        root.style.setProperty('--header-color', settingsData.header_color);
-      } else {
-        root.style.setProperty('--header-color', '#333333');
-      }
+      // Header Color
+      const headerColor = themeSettings.header_color || settingsData?.header_color || '#333333';
+      root.style.setProperty('--header-color', headerColor);
 
-      if (settingsData?.button_color) {
-        root.style.setProperty('--button-color', settingsData.button_color);
-      } else {
-        root.style.setProperty('--button-color', settingsData?.theme_color || '#c9a96e');
-      }
+      // Button Color
+      const buttonColor = themeSettings.button_color || settingsData?.button_color || themeColor;
+      root.style.setProperty('--button-color', buttonColor);
 
       // Update favicon
       if (settingsData?.logo_url) {

@@ -51,6 +51,7 @@ const PublicReceiptPage: React.FC = () => {
                         name_snapshot,
                         price_snapshot,
                         selected_modifiers,
+                        excluded_toppings,
                         station_id,
                         round_number
                     )
@@ -159,13 +160,25 @@ const PublicReceiptPage: React.FC = () => {
                                     <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                                 </div>
                                 {item.selected_modifiers?.map((mod: any, j: number) => (
-                                    <div key={j} className="flex justify-between text-xs text-gray-500 pl-4 italic">
+                                    <div key={`mod-${j}`} className="flex justify-between text-xs text-gray-500 pl-4 italic">
                                         <span>
-                                            + {mod.name}
+                                            + {mod.name} {mod.modifier_group_name ? `(${mod.modifier_group_name})` : ''}
                                             {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
                                             {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
                                         </span>
-                                        <span>{stationId ? '' : mod.price.toFixed(2)}</span>
+                                        <span>{stationId || !mod.price ? '' : mod.price.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                                {item.excluded_toppings?.map((excl: any, j: number) => (
+                                    <div key={`excl-${j}`} className="flex justify-between text-xs text-red-500 pl-4 italic">
+                                        <span>
+                                            - NO {excl.name} {excl.group_name ? `(${excl.group_name})` : ''}
+                                            {excl.replacement && (
+                                                <span className="text-green-600 ml-1">
+                                                    → {excl.replacement.name} {excl.replacement.group_name ? `(${excl.replacement.group_name})` : ''}
+                                                </span>
+                                            )}
+                                        </span>
                                     </div>
                                 ))}
                             </div>

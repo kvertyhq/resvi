@@ -236,6 +236,7 @@ const POSWalkInPage: React.FC = () => {
                         price_snapshot,
                         name_snapshot,
                         selected_modifiers,
+                        excluded_toppings,
                         notes,
                         menu_item:menu_items ( name )
                     )

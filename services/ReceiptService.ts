@@ -423,30 +423,45 @@ class ReceiptService {
                     ...encoder.encode(`${priceValStr}\n`)
                 ];
 
-                // Modifiers / Addons
-                const modifiers = item.selected_modifiers || item.selected_addons || [];
-                if (Array.isArray(modifiers) && modifiers.length > 0) {
-                    modifiers.forEach((mod: any) => {
-                        const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
-                        const modPrice = mod.price || 0;
-                        if (modName) {
-                            // Indent(4) + Name(X) + Sym(1) + Price(9)
-                            const modQtyStr = "    ";
-                            const nameWidth = lineWidth - 4 - 1 - 9;
-                            const modNameStr = `+ ${modName}`.slice(0, nameWidth).padEnd(nameWidth);
-                            const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
+                    // Modifiers / Addons
+                    const modifiers = item.selected_modifiers || item.selected_addons || [];
+                    if (Array.isArray(modifiers) && modifiers.length > 0) {
+                        modifiers.forEach((mod: any) => {
+                            const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
+                            const modPrice = mod.price || 0;
+                            if (modName) {
+                                // Indent(4) + Name(X) + Sym(1) + Price(9)
+                                const modGroupName = mod.modifier_group_name || mod.group_name;
+                                const fullModName = `+ ${modName}${modGroupName ? ` (${modGroupName})` : ""}`;
+                                const modQtyStr = "    ";
+                                const nameWidth = lineWidth - 4 - 1 - 9;
+                                const modNameStr = fullModName.slice(0, nameWidth).padEnd(nameWidth);
+                                const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
 
-                            data.push(...encoder.encode(modQtyStr));
-                            data.push(...encoder.encode(modNameStr));
-                            if (modPrice > 0) {
-                                data.push(...encoder.encode(" ")); // Spacer
-                                data.push(...encoder.encode(`${modPriceValStr}\n`));
-                            } else {
-                                data.push(...encoder.encode(" ".repeat(10) + "\n"));
+                                data.push(...encoder.encode(modQtyStr));
+                                data.push(...encoder.encode(modNameStr));
+                                if (modPrice > 0) {
+                                    data.push(...encoder.encode(" ")); // Spacer
+                                    data.push(...encoder.encode(`${modPriceValStr}\n`));
+                                } else {
+                                    data.push(...encoder.encode(" ".repeat(10) + "\n"));
+                                }
                             }
-                        }
-                    });
-                }
+                        });
+                    }
+
+                    // Excluded Toppings (New)
+                    const exclusions = item.excluded_toppings || [];
+                    if (Array.isArray(exclusions) && exclusions.length > 0) {
+                        exclusions.forEach((excl: any) => {
+                            const nameWidth = lineWidth - 4;
+                            let exclStr = `  - NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
+                            if (excl.replacement) {
+                                exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
+                            }
+                            data.push(...encoder.encode(exclStr.slice(0, nameWidth).padEnd(nameWidth) + "\n"));
+                        });
+                    }
             });
 
             // 4. Totals Breakdown

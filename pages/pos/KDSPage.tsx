@@ -19,6 +19,7 @@ interface KDSOrderItem {
     notes?: string;
     course_name: string;
     selected_modifiers: any[];
+    excluded_toppings?: any[]; // Added for Pizza Topping Exclusions
     name_snapshot?: string; // For misc items and snapshots
     menu_items: KDSMenuItem;
     station_id?: string; // Added
@@ -272,7 +273,17 @@ const KDSPage: React.FC = () => {
                                                     {item.selected_modifiers && Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 && (
                                                         <div className="text-sm text-gray-500 dark:text-gray-400 pl-4 mt-1">
                                                             {item.selected_modifiers.map((m: any, idx: number) => (
-                                                                <div key={idx}>+ {m.name}</div>
+                                                                <div key={`mod-${idx}`}>+ {m.name} {m.modifier_group_name ? `(${m.modifier_group_name})` : ''}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.excluded_toppings && Array.isArray(item.excluded_toppings) && item.excluded_toppings.length > 0 && (
+                                                        <div className="text-sm text-red-500 dark:text-red-400 pl-4 mt-1 font-bold">
+                                                            {item.excluded_toppings.map((excl: any, idx: number) => (
+                                                                <div key={`excl-${idx}`}>
+                                                                    - NO {excl.name} {excl.group_name ? `(${excl.group_name})` : ''}
+                                                                    {excl.replacement && <span className="text-green-600 dark:text-green-400 ml-1">→ {excl.replacement.name} {excl.replacement.group_name ? `(${excl.replacement.group_name})` : ''}</span>}
+                                                                </div>
                                                             ))}
                                                         </div>
                                                     )}

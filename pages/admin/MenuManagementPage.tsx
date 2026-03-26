@@ -111,8 +111,11 @@ const MenuManagementPage: React.FC = () => {
     // For size-based price matrix input (variant names derived from item being edited)
     const [priceMatrixVariants, setPriceMatrixVariants] = useState<string[]>([]);
 
-    // Linked modifier groups for an item being edited
-    const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<Set<string>>(new Set());
+    // Linked modifier groups: groupId -> order_index
+    const [selectedModifierOrders, setSelectedModifierOrders] = useState<Map<string, number>>(new Map());
+
+    // Default toppings that come pre-loaded with this item (array of modifier_item IDs)
+    const [defaultToppingIds, setDefaultToppingIds] = useState<Set<string>>(new Set());
 
     // Size variants state for item edit modal
     const [priceVariants, setPriceVariants] = useState<{name: string; price: number}[]>([]);
@@ -133,6 +136,8 @@ const MenuManagementPage: React.FC = () => {
         station_id: ''
 
     });
+
+    const [selectedCatModifierOrders, setSelectedCatModifierOrders] = useState<Map<string, number>>(new Map());
 
     const [itemForm, setItemForm] = useState<Partial<MenuItem>>({
         name: '',
@@ -440,10 +445,23 @@ const MenuManagementPage: React.FC = () => {
 
     };
 
-    const openCategoryModal = (category?: MenuCategory) => {
+    const openCategoryModal = async (category?: MenuCategory) => {
+        setSelectedCatModifierOrders(new Map());
         if (category) {
             setEditingCategory(category);
             setCategoryForm(category);
+
+            // Fetch linked modifier groups for category
+            const { data: modsData } = await supabase
+                .from('menu_category_modifiers')
+                .select('modifier_group_id, order_index')
+                .eq('category_id', category.id);
+
+            if (modsData) {
+                const map = new Map<string, number>();
+                modsData.forEach(m => map.set(m.modifier_group_id, m.order_index ?? 0));
+                setSelectedCatModifierOrders(map);
+            }
         } else {
             setEditingCategory(null);
             setCategoryForm({ name: '', description: '', order_index: categories.length, tax_rate: 0, station_id: '' });
@@ -461,11 +479,31 @@ const MenuManagementPage: React.FC = () => {
             station_id: categoryForm.station_id === '' ? null : categoryForm.station_id // Handle empty string
         };
 
+        let catId = editingCategory?.id;
+
         if (editingCategory) {
-            await supabase.from('menu_categories').update(payload).eq('id', editingCategory.id);
+            const { error } = await supabase.from('menu_categories').update(payload).eq('id', editingCategory.id);
+            if (error) console.error("Error updating category:", error);
         } else {
-            await supabase.from('menu_categories').insert([payload]);
+            const { data, error } = await supabase.from('menu_categories').insert([payload]).select().single();
+            if (error) console.error("Error inserting category:", error);
+            if (data) catId = data.id;
         }
+
+        // Update Linking Tables for Category
+        if (catId) {
+            await supabase.from('menu_category_modifiers').delete().eq('category_id', catId);
+            if (selectedCatModifierOrders.size > 0) {
+                const modifiersToInsert = Array.from(selectedCatModifierOrders.entries()).map(([groupId, orderIdx]) => ({
+                    category_id: catId,
+                    modifier_group_id: groupId,
+                    order_index: orderIdx
+                }));
+                const { error } = await supabase.from('menu_category_modifiers').insert(modifiersToInsert);
+                if (error) console.error("Error updating category modifiers:", error);
+            }
+        }
+
         setIsModalOpen(false);
         fetchCategories();
     };
@@ -534,13 +572,18 @@ const MenuManagementPage: React.FC = () => {
         setAiCheckStatus('idle');
         setAiFeedback('');
         setSelectedAddonIds(new Set());
-        setSelectedModifierGroupIds(new Set());
+        setSelectedModifierOrders(new Map());
+        setDefaultToppingIds(new Set());
         setPriceVariants([]);
 
         if (item) {
             setEditingItem(item);
             setItemForm(item);
             setImagePreview(item.image_url || '');
+
+            // Load default toppings
+            const dtIds: string[] = (item as any).default_topping_ids || [];
+            setDefaultToppingIds(new Set(dtIds));
 
             // Use item.price_variants if available (we need to cast or access it if added to interface)
             const itemWithVariants = item as any;
@@ -558,17 +601,22 @@ const MenuManagementPage: React.FC = () => {
                 setSelectedAddonIds(new Set(addonsData.map(a => a.addon_id)));
             }
 
-            // Fetch linked modifier groups
+            // Fetch linked modifier groups (with order_index)
             const { data: modsData } = await supabase
                 .from('menu_item_modifiers')
-                .select('modifier_group_id')
+                .select('modifier_group_id, order_index')
                 .eq('menu_item_id', item.id);
 
             if (modsData) {
-                setSelectedModifierGroupIds(new Set(modsData.map(m => m.modifier_group_id)));
+                const map = new Map<string, number>();
+                modsData.forEach(m => map.set(m.modifier_group_id, m.order_index ?? 0));
+                setSelectedModifierOrders(map);
             }
         } else {
+            // Opening modal for a NEW item — reset all fields
             setEditingItem(null);
+            setSelectedModifierOrders(new Map());
+            setDefaultToppingIds(new Set());
             setItemForm({
                 name: '',
                 description: '',
@@ -612,8 +660,9 @@ const MenuManagementPage: React.FC = () => {
             ...itemForm,
             image_url: imageUrl,
             restaurant_id: selectedRestaurantId,
-            station_id: itemForm.station_id === '' ? null : itemForm.station_id, // Handle empty string
-            price_variants: priceVariants // Save size variants
+            station_id: itemForm.station_id === '' ? null : itemForm.station_id,
+            price_variants: priceVariants,
+            default_topping_ids: Array.from(defaultToppingIds)
         };
 
         let itemId = editingItem?.id;
@@ -639,11 +688,11 @@ const MenuManagementPage: React.FC = () => {
 
             // Update Modifiers
             await supabase.from('menu_item_modifiers').delete().eq('menu_item_id', itemId);
-            if (selectedModifierGroupIds.size > 0) {
-                const modifiersToInsert = Array.from(selectedModifierGroupIds).map((groupId, idx) => ({
+            if (selectedModifierOrders.size > 0) {
+                const modifiersToInsert = Array.from(selectedModifierOrders.entries()).map(([groupId, orderIdx]) => ({
                     menu_item_id: itemId,
                     modifier_group_id: groupId,
-                    order_index: idx
+                    order_index: orderIdx
                 }));
                 await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
             }
@@ -1361,6 +1410,58 @@ const MenuManagementPage: React.FC = () => {
                                                 </select>
                                                 <p className="text-xs text-gray-500 mt-1">Items in this category will be sent to this station by default.</p>
                                             </div>
+
+                                            {/* Category Modifier Groups Selection */}
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Modifier Groups <span className="text-xs text-gray-400 font-normal">(Applied to ALL items in this category)</span></label>
+                                                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                                                    {modifierGroups.map(group => {
+                                                        const isChecked = selectedCatModifierOrders.has(group.id);
+                                                        const orderVal = selectedCatModifierOrders.get(group.id) ?? 0;
+                                                        return (
+                                                            <div key={group.id} className="flex items-center gap-3">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`cat-modgroup-${group.id}`}
+                                                                    checked={isChecked}
+                                                                    onChange={(e) => {
+                                                                        const newMap = new Map(selectedCatModifierOrders);
+                                                                        if (e.target.checked) {
+                                                                            newMap.set(group.id, newMap.size);
+                                                                        } else {
+                                                                            newMap.delete(group.id);
+                                                                        }
+                                                                        setSelectedCatModifierOrders(newMap);
+                                                                    }}
+                                                                    className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold flex-shrink-0"
+                                                                />
+                                                                <label htmlFor={`cat-modgroup-${group.id}`} className="text-sm text-gray-700 flex-1">
+                                                                    <span className="font-medium">{group.name}</span>
+                                                                    <span className="text-xs text-gray-400 ml-1">({group.is_required ? 'Required' : 'Optional'}, {group.is_multiple ? 'Multi' : 'Single'})</span>
+                                                                </label>
+                                                                {isChecked && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-xs text-gray-500">Order:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            value={orderVal}
+                                                                            onChange={(e) => {
+                                                                                const newMap = new Map(selectedCatModifierOrders);
+                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
+                                                                                setSelectedCatModifierOrders(newMap);
+                                                                            }}
+                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
+                                                </div>
+                                            </div>
+
                                             <div className="flex justify-end space-x-3 pt-4">
                                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                                                 <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Category</button>
@@ -1448,6 +1549,102 @@ const MenuManagementPage: React.FC = () => {
                                                 </div>
                                             </div>
 
+                                             {/* Modifier Groups Selection - shown early for easy access */}
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Modifier Groups <span className="text-xs text-gray-400">(set order to control display position)</span></label>
+                                                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                                                    {modifierGroups.map(group => {
+                                                        const isChecked = selectedModifierOrders.has(group.id);
+                                                        const orderVal = selectedModifierOrders.get(group.id) ?? 0;
+                                                        return (
+                                                            <div key={group.id} className="flex items-center gap-3">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`modgroup-${group.id}`}
+                                                                    checked={isChecked}
+                                                                    onChange={(e) => {
+                                                                        const newMap = new Map(selectedModifierOrders);
+                                                                        if (e.target.checked) {
+                                                                            newMap.set(group.id, newMap.size);
+                                                                        } else {
+                                                                            newMap.delete(group.id);
+                                                                        }
+                                                                        setSelectedModifierOrders(newMap);
+                                                                    }}
+                                                                    className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold flex-shrink-0"
+                                                                />
+                                                                <label htmlFor={`modgroup-${group.id}`} className="text-sm text-gray-700 flex-1">
+                                                                    <span className="font-medium">{group.name}</span>
+                                                                    <span className="text-xs text-gray-400 ml-1">({group.is_required ? 'Required' : 'Optional'}, {group.is_multiple ? 'Multi' : 'Single'})</span>
+                                                                </label>
+                                                                {isChecked && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-xs text-gray-500">Order:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            value={orderVal}
+                                                                            onChange={(e) => {
+                                                                                const newMap = new Map(selectedModifierOrders);
+                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
+                                                                                setSelectedModifierOrders(newMap);
+                                                                            }}
+                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
+                                                </div>
+                                            </div>
+
+                                            {/* Default Toppings (pre-loaded on pizza) */}
+                                            {(() => {
+                                                // Find all multiple-type modifier groups linked to this item
+                                                const linkedMultiGroupIds = Array.from(selectedModifierOrders.keys()).filter(gid => {
+                                                    const g = modifierGroups.find((mg: any) => mg.id === gid);
+                                                    return g && g.is_multiple;
+                                                });
+                                                const toppingOptions = modifierGroups
+                                                    .filter((g: any) => linkedMultiGroupIds.includes(g.id))
+                                                    .flatMap((g: any) => g.items || []);
+                                                if (toppingOptions.length === 0) return null;
+                                                return (
+                                                    <div className="border-t border-gray-200 pt-6">
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Default Toppings <span className="text-xs text-gray-400 font-normal">(included with this item — customers can exclude/swap in POS)</span>
+                                                        </label>
+                                                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                                                            {toppingOptions.map((ti: any) => {
+                                                                const isDefault = defaultToppingIds.has(ti.id);
+                                                                return (
+                                                                    <button
+                                                                        key={ti.id}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const newSet = new Set(defaultToppingIds);
+                                                                            if (isDefault) newSet.delete(ti.id);
+                                                                            else newSet.add(ti.id);
+                                                                            setDefaultToppingIds(newSet);
+                                                                        }}
+                                                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                                                            isDefault
+                                                                                ? 'bg-green-100 border-green-400 text-green-800'
+                                                                                : 'bg-white border-gray-300 text-gray-600 hover:border-brand-gold'
+                                                                        }`}
+                                                                    >
+                                                                        {isDefault && '✓ '}{ti.name}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        <p className="text-xs text-gray-400 mt-1">Green chips = included by default. Click to toggle.</p>
+                                                    </div>
+                                                );
+                                            })()}
+
                                             {/* Size Variants / Price Variants */}
                                             <div className="border-t border-gray-200 pt-6">
                                                 <div className="flex justify-between items-center mb-2">
@@ -1513,36 +1710,6 @@ const MenuManagementPage: React.FC = () => {
                                                 ) : (
                                                     <p className="text-sm text-gray-500 italic">No variants. Uses base price.</p>
                                                 )}
-                                            </div>
-
-                                            {/* Modifier Groups Selection */}
-                                            <div className="border-t border-gray-200 pt-6">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Modifier Groups (e.g. Toppings, Crust)</label>
-                                                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
-                                                    {modifierGroups.map(group => (
-                                                        <div key={group.id} className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                id={`modgroup-${group.id}`}
-                                                                checked={selectedModifierGroupIds.has(group.id)}
-                                                                onChange={(e) => {
-                                                                    const newSet = new Set(selectedModifierGroupIds);
-                                                                    if (e.target.checked) newSet.add(group.id);
-                                                                    else newSet.delete(group.id);
-                                                                    setSelectedModifierGroupIds(newSet);
-                                                                }}
-                                                                className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
-                                                            />
-                                                            <label htmlFor={`modgroup-${group.id}`} className="ml-2 text-sm text-gray-700 flex flex-col">
-                                                                <span>{group.name}</span>
-                                                                <span className="text-xs text-gray-500">
-                                                                    {group.is_required ? 'Required' : 'Optional'}, {group.is_multiple ? 'Multi' : 'Single'}
-                                                                </span>
-                                                            </label>
-                                                        </div>
-                                                    ))}
-                                                    {modifierGroups.length === 0 && <p className="text-sm text-gray-500 col-span-2">No modifier groups created.</p>}
-                                                </div>
                                             </div>
 
                                             {/* Add-ons Selection */}

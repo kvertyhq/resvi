@@ -10,6 +10,7 @@ interface OrderItem {
     quantity: number;
     price_snapshot: number;
     selected_modifiers?: any[];
+    excluded_toppings?: any[];
     notes?: string;
     round_number?: number;
 }
@@ -111,10 +112,25 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                                                 {item.selected_modifiers && item.selected_modifiers.length > 0 && (
                                                     <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 pl-6">
                                                         {item.selected_modifiers.map((mod: any, idx: number) => (
-                                                            <span key={idx}>
-                                                                + {mod.name}
-                                                                {idx < item.selected_modifiers!.length - 1 && ', '}
-                                                            </span>
+                                                            <div key={idx} className="flex gap-1 flex-wrap">
+                                                                <span>+ {mod.name} {mod.modifier_group_name ? `(${mod.modifier_group_name})` : ''}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {item.excluded_toppings && item.excluded_toppings.length > 0 && (
+                                                    <div className="text-sm text-red-500 dark:text-red-400 mt-1 pl-6">
+                                                        {item.excluded_toppings.map((ex: any, idx: number) => (
+                                                            <div key={idx} className="flex gap-1 flex-wrap items-center">
+                                                                <span className="font-bold">NO {ex.name}</span>
+                                                                {ex.group_name && <span className="text-xs opacity-70">({ex.group_name})</span>}
+                                                                {ex.replacement && (
+                                                                    <>
+                                                                        <span className="text-gray-400 mx-1">→</span>
+                                                                        <span className="text-green-600 dark:text-green-400 font-medium">REPLACE WITH {ex.replacement.name}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 )}

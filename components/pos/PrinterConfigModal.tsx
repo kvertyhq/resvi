@@ -425,10 +425,17 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                         </div>
                     )}
 
-                    {/* Exit Application Button */}
-                    {/* @ts-ignore */}
-                    {(window as any).__TAURI_INTERNALS__ && (
-                        <div className="pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                    {/* Session Actions */}
+                    <div className="pt-6 border-t border-gray-200 dark:border-gray-700 mt-6 space-y-3">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full flex items-center justify-center gap-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 p-3 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-bold text-sm"
+                        >
+                            <RefreshCw className="w-5 h-5" />
+                            Reload Interface
+                        </button>
+
+                        {(window as any).__TAURI_INTERNALS__ && (
                             <button
                                 onClick={handleExitApp}
                                 className="w-full flex items-center justify-center gap-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 p-3 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-bold text-sm"
@@ -436,8 +443,8 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                                 <LogOut className="w-5 h-5" />
                                 Exit POS Application
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">

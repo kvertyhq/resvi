@@ -9,6 +9,7 @@ interface MenuContextType {
     modifierGroups: any[];
     modifierItems: any[];
     menuItemModifiers: any[];
+    menuCategoryModifiers: any[];
     loading: boolean;
 
     isSyncing: boolean;
@@ -22,6 +23,7 @@ const MenuContext = createContext<MenuContextType>({
     modifierGroups: [],
     modifierItems: [],
     menuItemModifiers: [],
+    menuCategoryModifiers: [],
     loading: true,
 
     isSyncing: false,
@@ -36,6 +38,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [modifierGroups, setModifierGroups] = useState<any[]>([]);
     const [modifierItems, setModifierItems] = useState<any[]>([]);
     const [menuItemModifiers, setMenuItemModifiers] = useState<any[]>([]);
+    const [menuCategoryModifiers, setMenuCategoryModifiers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isSyncing, setIsSyncing] = useState(false);
@@ -66,6 +69,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setModifierGroups(groups || []);
                 setModifierItems(mItems || []);
                 setMenuItemModifiers(mLinks || []);
+                setMenuCategoryModifiers([]); // Initial sync will fill this
                 setLoading(false);
             } catch (e) {
 
@@ -97,6 +101,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // 2. Modifiers & Links & Items (Parallel)
             let modSet = new Set<string>();
             let linksData: any[] = [];
+            let catLinksData: any[] = [];
             let groupsData: any[] = [];
             let mItemsData: any[] = [];
 
@@ -114,15 +119,30 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 if (groupsData.length > 0) {
                     const groupIds = groupsData.map(g => g.id);
-                    const [linksRes, itemsRes] = await Promise.all([
+                    const [linksRes, catLinksRes, itemsRes] = await Promise.all([
                         supabase.from('menu_item_modifiers').select('*').in('menu_item_id', itemIds),
+                        supabase.from('menu_category_modifiers').select('*').in('category_id', catData.map(c => c.id)),
                         supabase.from('menu_modifier_items').select('*').in('modifier_group_id', groupIds).eq('is_available', true)
                     ]);
 
                     if (linksRes.data) {
                         linksData = linksRes.data;
-                        modSet = new Set(linksRes.data.map(l => l.menu_item_id));
                     }
+
+                    if (catLinksRes.data) {
+                        catLinksData = catLinksRes.data;
+                    }
+
+                    // Build modSet: items with direct modifiers OR category modifiers
+                    const itemsWithDirectMod = new Set(linksData.map(l => l.menu_item_id));
+                    const categoriesWithMod = new Set(catLinksData.map(l => l.category_id));
+                    
+                    itemData.forEach(item => {
+                        if (itemsWithDirectMod.has(item.id) || categoriesWithMod.has(item.category_id)) {
+                            modSet.add(item.id);
+                        }
+                    });
+
                     if (itemsRes.data) mItemsData = itemsRes.data;
                 }
             }
@@ -132,6 +152,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setMenuItems(itemData);
             setItemModifiersMap(modSet);
             setMenuItemModifiers(linksData);
+            setMenuCategoryModifiers(catLinksData);
             setModifierGroups(groupsData);
             setModifierItems(mItemsData);
             setLoading(false);
@@ -145,6 +166,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 modifierGroups: groupsData,
                 modifierItems: mItemsData,
                 menuItemModifiers: linksData,
+                menuCategoryModifiers: catLinksData,
                 timestamp: Date.now()
             }));
 
@@ -164,6 +186,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             modifierGroups,
             modifierItems,
             menuItemModifiers,
+            menuCategoryModifiers,
             loading, 
             isSyncing,
             refreshMenu 

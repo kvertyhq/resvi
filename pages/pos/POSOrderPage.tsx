@@ -31,6 +31,7 @@ interface CartItem {
     basePrice: number;
     quantity: number;
     modifiers: any[];
+    excluded_toppings?: any[]; // toppings removed with optional replacements
     notes?: string;
     course: string; // 'Starter', 'Main', 'Dessert', 'Drink'
     isMiscellaneous?: boolean; // Flag for custom items
@@ -356,35 +357,25 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
-    const addToCart = (item: any, modifiers: any[], finalPrice: number) => {
+    const addToCart = (item: any, modifiers: any[], finalPrice: number, excludedToppings?: any[]) => {
         // Check if item with same ID, price, and modifiers already exists
         const existingItemIndex = cartItems.findIndex(cartItem => {
-            // Check if same item ID and price
-            if (cartItem.id !== item.id || cartItem.price !== finalPrice) {
-                return false;
-            }
-
-            // Check if modifiers match
-            if (cartItem.modifiers.length !== modifiers.length) {
-                return false;
-            }
-
-            // Compare each modifier (including location and intensity for uniqueness)
+            if (cartItem.id !== item.id || cartItem.price !== finalPrice) return false;
+            if (cartItem.modifiers.length !== modifiers.length) return false;
             const cartModifiers = cartItem.modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
             const newModifiers = modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
-
             return JSON.stringify(cartModifiers) === JSON.stringify(newModifiers);
         });
 
-        if (existingItemIndex !== -1) {
-            // Item exists, increment quantity
+        if (existingItemIndex !== -1 && !excludedToppings?.length) {
+            // Item exists (and no exclusions to track), increment quantity
             setCartItems(prev => prev.map((cartItem, index) =>
                 index === existingItemIndex
                     ? { ...cartItem, quantity: cartItem.quantity + 1 }
                     : cartItem
             ));
         } else {
-            // New item, add to cart
+            // New item (or has exclusions — always add as separate line)
             const newItem: CartItem = {
                 tempId: crypto.randomUUID(),
                 id: item.id,
@@ -393,11 +384,11 @@ const POSOrderPage: React.FC = () => {
                 price: finalPrice,
                 quantity: 1,
                 modifiers: modifiers,
-                course: 'Main', // Default
+                excluded_toppings: excludedToppings,
+                course: 'Main',
                 station_id: item.station_id,
                 category_id: (item as any).category_id
             };
-
             setCartItems(prev => [...prev, newItem]);
         }
     };
@@ -593,6 +584,7 @@ const POSOrderPage: React.FC = () => {
                 quantity: item.quantity,
                 price: item.price,
                 modifiers: item.modifiers,
+                excluded_toppings: item.excluded_toppings || [], // New system
                 notes: item.notes || null,
                 course: item.course,
                 is_miscellaneous: item.isMiscellaneous || false,
@@ -824,6 +816,7 @@ const POSOrderPage: React.FC = () => {
                 quantity: item.quantity,
                 price_snapshot: item.price,
                 selected_modifiers: item.modifiers,
+                excluded_toppings: item.excluded_toppings || [], // New system
                 notes: item.notes,
                 course_name: item.course,
                 round_number: currentRound,
@@ -1173,7 +1166,7 @@ const POSOrderPage: React.FC = () => {
                                             <div className="text-xs text-gray-500 mt-1 pl-2 border-l-2 border-gray-300">
                                                 {item.selected_modifiers.map((m: any, i: number) => (
                                                     <div key={i} className="flex gap-1 flex-wrap">
-                                                        <span>+ {m.name}</span>
+                                                        <span>+ {m.name} {m.modifier_group_name ? `(${m.modifier_group_name})` : ''}</span>
                                                         {m.location && m.location !== 'whole' && (
                                                             <span className="text-[10px] bg-gray-100 px-1 rounded uppercase font-bold text-gray-400">({m.location})</span>
                                                         )}
@@ -1241,7 +1234,7 @@ const POSOrderPage: React.FC = () => {
                                                 {item.modifiers.map((mod, idx) => (
                                                     <div key={idx} className="flex justify-between items-center">
                                                         <div className="flex gap-1 flex-wrap">
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">+ {mod.name}</span>
+                                                            <span className="font-medium text-gray-700 dark:text-gray-300">+ {mod.name} {mod.modifier_group_name ? `(${mod.modifier_group_name})` : ''}</span>
                                                             {mod.location && mod.location !== 'whole' && (
                                                                 <span className="text-[9px] bg-gray-200 dark:bg-gray-600 px-1 rounded uppercase font-bold">({mod.location})</span>
                                                             )}

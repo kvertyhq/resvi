@@ -28,7 +28,10 @@ const SettingsLocation: React.FC<SettingsLocationProps> = ({ formData, handleCha
                 </div>
                 <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Google Map URL</label>
-                    <input type="url" name="google_map_url" value={formData.google_map_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                    <input type="url" name="google_map_url" value={formData.google_map_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" placeholder="https://www.google.com/maps/embed?pb=..." />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Please use the <strong>Embed a map</strong> URL. (Google Maps {'>'} Share {'>'} Embed a map {'>'} copy only the <code>src</code> attribute).
+                    </p>
                 </div>
                 <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>

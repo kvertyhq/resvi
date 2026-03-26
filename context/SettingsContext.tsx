@@ -45,6 +45,7 @@ type Settings = {
   twitter_url?: string;
   tiktok_url?: string;
   youtube_url?: string;
+  google_map_url?: string;
 };
 
 interface SettingsContextType {

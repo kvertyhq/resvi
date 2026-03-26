@@ -191,15 +191,57 @@ const ContactPage: React.FC = () => {
             </div>
             {/* Map */}
             <div className="h-full min-h-[400px] mt-10 lg:mt-0">
-              <iframe
-                width="100%"
-                height="100%"
-                style={{ border: 0, minHeight: '400px' }}
-                loading="lazy"
-                allowFullScreen
-                src="https://maps.google.com/maps?q=24+South+Street,+Yeovil+BA20+1NN,+England&t=&z=13&ie=UTF8&iwloc=&output=embed"
-                title="Google Map"
-              ></iframe>
+              {(() => {
+                const mapUrl = settings?.google_map_url || "24 South Street, Yeovil BA20 1NN, England";
+
+                // If it's already a full embed URL, use it
+                if (mapUrl.includes('google.com/maps/embed') || mapUrl.includes('output=embed')) {
+                  return (
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0, minHeight: '400px' }}
+                      loading="lazy"
+                      allowFullScreen
+                      src={mapUrl}
+                      title="Google Map"
+                    ></iframe>
+                  );
+                }
+
+                // If it's a short link (maps.app.goo.gl or goo.gl/maps), we can't easily embed it
+                // We'll show a link to open it or try to use the address if available
+                if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl/maps')) {
+                  return (
+                    <div className="bg-gray-100 h-full min-h-[400px] flex flex-col items-center justify-center p-8 text-center border border-dashed border-gray-300 rounded-lg">
+                      <p className="text-gray-600 mb-4">This Google Maps link cannot be embedded directly.</p>
+                      <a
+                        href={mapUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-brand-gold text-white px-6 py-2 rounded font-medium hover:opacity-90 transition-opacity"
+                      >
+                        View on Google Maps
+                      </a>
+                      <p className="text-xs text-gray-400 mt-4">Tip: Use the "Embed a map" option in Google Maps for a better experience here.</p>
+                    </div>
+                  );
+                }
+
+                // Otherwise, treat it as a search query/address and wrap it
+                const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapUrl)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+                return (
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, minHeight: '400px' }}
+                    loading="lazy"
+                    allowFullScreen
+                    src={embedUrl}
+                    title="Google Map"
+                  ></iframe>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -40,6 +40,11 @@ type Settings = {
   currency?: string;
   bookings_enabled?: boolean;
   show_tax?: boolean;
+  facebook_url?: string;
+  instagram_url?: string;
+  twitter_url?: string;
+  tiktok_url?: string;
+  youtube_url?: string;
 };
 
 interface SettingsContextType {

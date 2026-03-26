@@ -265,7 +265,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     type="button"
                                     onClick={() => setPaymentMethod('cash')}
                                     className={`py-3 px-4 border rounded-lg text-center transition-all ${paymentMethod === 'cash'
-                                        ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
+                                        ? 'border-brand-button bg-brand-button/10 text-brand-dark-gray font-bold ring-2 ring-brand-button ring-offset-1'
                                         : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
@@ -277,7 +277,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                     type="button"
                                     onClick={() => setPaymentMethod('card')}
                                     className={`py-3 px-4 border rounded-lg text-center transition-all ${paymentMethod === 'card'
-                                        ? 'border-brand-gold bg-brand-gold/10 text-brand-dark-gray font-bold ring-2 ring-brand-gold ring-offset-1'
+                                        ? 'border-brand-button bg-brand-button/10 text-brand-dark-gray font-bold ring-2 ring-brand-button ring-offset-1'
                                         : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
@@ -298,7 +298,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                             <button
                                 onClick={handleCashSubmit}
                                 disabled={isLoading}
-                                className="w-full bg-brand-gold text-white font-bold py-3 rounded-lg uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+                                className="w-full bg-brand-button text-white font-bold py-3 rounded-lg uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
                             >
                                 {isLoading ? 'Processing...' : `Place Order (£${totalToPay.toFixed(2)})`}
                             </button>
@@ -333,7 +333,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({ isOpen, onClose, onSubm
                                             e.preventDefault();
                                         }
                                     }}
-                                    className="w-full bg-brand-gold text-white font-bold py-3 rounded-lg uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed shadow-md mt-4"
+                                    className="w-full bg-brand-button text-white font-bold py-3 rounded-lg uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed shadow-md mt-4"
                                 >
                                     {isProcessingPayment ? 'Processing...' : `Pay £${totalToPay.toFixed(2)}`}
                                 </button>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
+import { useSettings } from '../../context/SettingsContext';
 import { supabase } from '../../supabaseClient';
 import { Save } from 'lucide-react';
 import SettingsBasicInfo from '../../components/admin/settings/SettingsBasicInfo';
+import SettingsTheme from '../../components/admin/settings/SettingsTheme';
 import SettingsLocation from '../../components/admin/settings/SettingsLocation';
 import SettingsOperations from '../../components/admin/settings/SettingsOperations';
 import SettingsMedia from '../../components/admin/settings/SettingsMedia';
@@ -40,6 +42,7 @@ const Toast = ({ message, onClose }: { message: { type: 'success' | 'error', tex
 
 const SettingsPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
+    const { refreshSettings } = useSettings();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -66,7 +69,9 @@ const SettingsPage: React.FC = () => {
         youtube_url: '',
         logo_url: '',
         cover_image_url: '',
-        theme_color: '#000000',
+        theme_color: '#c9a96e',
+        header_color: '#333333',
+        button_color: '#c9a96e',
         tax_rate: 0,
         max_booking_size: 10,
         opening_hours: {} as Record<string, string[]>,
@@ -137,7 +142,9 @@ const SettingsPage: React.FC = () => {
                         youtube_url: settings.youtube_url || '',
                         logo_url: settings.logo_url || '',
                         cover_image_url: settings.cover_image_url || '',
-                        theme_color: settings.theme_color || '#000000',
+                        theme_color: settings.theme_color || '#c9a96e',
+                        header_color: settings.header_color || '#333333',
+                        button_color: settings.button_color || settings.theme_color || '#c9a96e',
                         tax_rate: settings.tax_rate || 0,
                         max_booking_size: settings.max_booking_size || 10,
                         opening_hours: settings.opening_hours || {},
@@ -208,6 +215,7 @@ const SettingsPage: React.FC = () => {
 
             if (error) throw error;
 
+            await refreshSettings();
             setMessage({ type: 'success', text: 'Settings saved successfully!' });
         } catch (err: any) {
             console.error('Error saving settings:', err);
@@ -221,6 +229,7 @@ const SettingsPage: React.FC = () => {
 
     const tabs = [
         { id: 'general', label: 'General' },
+        { id: 'theme', label: 'Theme' },
         { id: 'media', label: 'Media & Socials' },
         { id: 'operations', label: 'Operations' },
         { id: 'orders', label: 'Orders' },
@@ -326,6 +335,12 @@ const SettingsPage: React.FC = () => {
                                     <div className="space-y-8 animate-fadeIn">
                                         <SettingsBasicInfo formData={formData} handleChange={handleChange} />
                                         <SettingsLocation formData={formData} handleChange={handleChange} />
+                                    </div>
+                                )}
+                                
+                                {activeTab === 'theme' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsTheme formData={formData} handleChange={handleChange} />
                                     </div>
                                 )}
 

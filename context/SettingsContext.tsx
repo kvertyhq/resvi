@@ -46,18 +46,22 @@ type Settings = {
   tiktok_url?: string;
   youtube_url?: string;
   google_map_url?: string;
+  header_color?: string;
+  button_color?: string;
 };
 
 interface SettingsContextType {
   settings: Settings | null;
   loading: boolean;
   error: string | null;
+  refreshSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
   settings: null,
   loading: true,
   error: null,
+  refreshSettings: async () => { },
 });
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -67,65 +71,78 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        const res = await fetch(
-          import.meta.env.VITE_SUPABASE_URL + "/rest/v1/rpc/get_restaurant_settings",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`,
-            },
-            body: JSON.stringify({ p_id: import.meta.env.VITE_RESTAURANT_ID })
-          }
-        );
-
-        if (!res.ok) {
-          const body = await res.text();
-          console.error('Settings fetch failed:', res.status, body);
-          throw new Error(`Failed to load settings: ${res.statusText}`);
+  const refreshSettings = async () => {
+    try {
+      const res = await fetch(
+        import.meta.env.VITE_SUPABASE_URL + "/rest/v1/rpc/get_restaurant_settings",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`,
+          },
+          body: JSON.stringify({ p_id: import.meta.env.VITE_RESTAURANT_ID })
         }
+      );
 
-        const data = await res.json();
-        const settingsData = Array.isArray(data) ? data[0] : (data?.data || data);
-
-        setSettings(settingsData);
-        document.title = settingsData?.name || 'Restaurant';
-
-        // Apply theme color globally
-        if (settingsData?.theme_color) {
-          document.documentElement.style.setProperty('--theme-color', settingsData.theme_color);
-        } else {
-          // Fallback to brand-gold if not set in DB
-          document.documentElement.style.setProperty('--theme-color', '#c9a96e');
-        }
-
-        // Update favicon
-        if (data?.data?.logo_url) {
-          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-          if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.head.appendChild(link);
-          }
-          link.href = data.data.logo_url;
-        }
-      } catch (err: any) {
-        console.error('Settings load error:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        const body = await res.text();
+        console.error('Settings fetch failed:', res.status, body);
+        throw new Error(`Failed to load settings: ${res.statusText}`);
       }
-    }
 
-    loadSettings();
+      const data = await res.json();
+      const settingsData = Array.isArray(data) ? data[0] : (data?.data || data);
+
+      setSettings(settingsData);
+      document.title = settingsData?.name || 'Restaurant';
+
+      // Apply theme colors globally
+      const root = document.documentElement;
+
+      if (settingsData?.theme_color) {
+        root.style.setProperty('--theme-color', settingsData.theme_color);
+      } else {
+        root.style.setProperty('--theme-color', '#c9a96e');
+      }
+
+      if (settingsData?.header_color) {
+        root.style.setProperty('--header-color', settingsData.header_color);
+      } else {
+        root.style.setProperty('--header-color', '#333333');
+      }
+
+      if (settingsData?.button_color) {
+        root.style.setProperty('--button-color', settingsData.button_color);
+      } else {
+        root.style.setProperty('--button-color', settingsData?.theme_color || '#c9a96e');
+      }
+
+      // Update favicon
+      if (settingsData?.logo_url) {
+        let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'icon';
+          document.head.appendChild(link);
+        }
+        link.href = settingsData.logo_url;
+      }
+    } catch (err: any) {
+      console.error('Settings load error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshSettings();
   }, []);
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, error }}>
+    <SettingsContext.Provider value={{ settings, loading, error, refreshSettings }}>
       {children}
     </SettingsContext.Provider>
   );

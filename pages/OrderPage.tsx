@@ -394,7 +394,7 @@ const OrderPage: React.FC = () => {
                     <button
                         onClick={handleContinue}
                         disabled={isCheckingCapacity}
-                        className="w-full mt-6 bg-brand-gold text-white py-4 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                        className="w-full mt-6 bg-brand-button text-white py-4 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                     >
                         {isCheckingCapacity ? 'Checking Availability...' : 'Continue'}
                     </button>

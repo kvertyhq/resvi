@@ -159,7 +159,7 @@ const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber
                 <button
                     onClick={onNext}
                     disabled={!selectedDate}
-                    className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                    className="px-8 py-3 bg-brand-button text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
                     Next
                 </button>
@@ -229,7 +229,7 @@ const TimeGuestStep = ({ selectedTime, onTimeSelect, selectedGuests, onGuestsSel
                 <button
                     onClick={onNext}
                     disabled={!selectedTime || !selectedGuests || isLoading}
-                    className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                    className="px-8 py-3 bg-brand-button text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
                     {isLoading ? 'Checking...' : 'Next'}
                 </button>
@@ -280,7 +280,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading, stepN
                     <button
                         type="submit"
                         disabled={isSubmitDisabled}
-                        className="px-8 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                        className="px-8 py-3 bg-brand-button text-white font-bold uppercase text-sm tracking-wider disabled:bg-gray-400 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                     >
                         {isLoading ? 'Submitting...' : 'Submit'}
                     </button>
@@ -305,7 +305,7 @@ const BookingPage: React.FC = () => {
                         We are not accepting online table reservations at the moment. Please contact us directly or order online.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <a href="/#/order" className="px-6 py-3 bg-brand-gold text-white font-bold uppercase text-sm tracking-wider hover:opacity-90 transition-opacity rounded-sm">
+                        <a href="/#/order" className="px-6 py-3 bg-brand-button text-white font-bold uppercase text-sm tracking-wider hover:opacity-90 transition-opacity rounded-sm">
                             Order Online
                         </a>
                         <a href="/#/contact" className="px-6 py-3 border border-gray-300 text-gray-700 font-bold uppercase text-sm tracking-wider hover:bg-gray-100 transition-colors rounded-sm">

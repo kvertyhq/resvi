@@ -162,7 +162,7 @@ const OrderSummary: React.FC = () => {
                 <button
                     disabled={cart.length === 0 || isOverMaxOrderValue}
                     onClick={handleOrderClick}
-                    className="w-full mt-6 bg-brand-dark-gray text-white py-3 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-mid-gray"
+                    className="w-full mt-6 bg-brand-button text-white py-3 rounded-lg font-bold uppercase tracking-wider transition-opacity duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                 >
                     Order Now
                 </button>

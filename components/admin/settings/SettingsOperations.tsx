@@ -33,13 +33,6 @@ const SettingsOperations: React.FC<SettingsOperationsProps> = ({ formData, handl
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max Booking Size</label>
                     <input type="number" name="max_booking_size" value={formData.max_booking_size} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Theme Color</label>
-                    <div className="flex items-center space-x-2">
-                        <input type="color" name="theme_color" value={formData.theme_color} onChange={handleChange} className="h-10 w-10 border border-gray-300 rounded p-1" />
-                        <input type="text" name="theme_color" value={formData.theme_color} onChange={handleChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    </div>
-                </div>
 
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center">

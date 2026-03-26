@@ -183,7 +183,7 @@ const ContactPage: React.FC = () => {
                   <input type="text" id="human-check" name="humanCheck" value={formData.humanCheck} onChange={handleChange} required className="w-24 px-4 py-3 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
                 <div>
-                  <button type="submit" className="bg-brand-gold text-white px-8 py-3 font-semibold tracking-wider hover:opacity-90 transition-opacity duration-300 uppercase text-sm">
+                  <button type="submit" className="bg-brand-button text-white px-8 py-3 font-semibold tracking-wider hover:opacity-90 transition-opacity duration-300 uppercase text-sm">
                     Submit
                   </button>
                 </div>

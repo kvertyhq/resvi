@@ -58,7 +58,7 @@ const MenuItem: React.FC<{ item: MenuItemData; onAdd: (item: MenuItemData) => vo
             <p className="font-bold text-brand-dark-gray text-lg">{settings?.currency}{(item.price ?? 0).toFixed(2)}</p>
             <button
               onClick={() => onAdd(item)}
-              className="mt-3 px-4 py-2 bg-brand-gold text-white text-sm font-semibold rounded-md hover:bg-brand-dark-gray transition-colors w-full"
+              className="mt-3 px-4 py-2 bg-brand-button text-white text-sm font-semibold rounded-md hover:opacity-90 transition-colors w-full"
               disabled={(item as any).is_available === false}
             >
               {(item as any).is_available === false ? 'Unavailable' : 'Add'}

@@ -24,10 +24,11 @@ export default {
             },
             colors: {
                 'brand-dark': '#222222',
-                'brand-dark-gray': '#333333',
+                'brand-dark-gray': 'var(--header-color, #333333)',
                 'brand-mid-gray': '#555555',
                 'brand-light-gray': '#F5F5F5',
-                'brand-gold': '#c9a96e',
+                'brand-gold': 'var(--theme-color, #c9a96e)',
+                'brand-button': 'var(--button-color, #c9a96e)',
             }
         }
     },

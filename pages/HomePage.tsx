@@ -35,7 +35,7 @@ const HomePage: React.FC = () => {
                     <div className="mt-8 flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
                         <NavLink
                             to="order"
-                            className="bg-brand-gold text-white px-8 py-3 font-semibold tracking-wider hover:bg-yellow-700 transition duration-300"
+                            className="bg-brand-button text-white px-8 py-3 font-semibold tracking-wider hover:opacity-90 transition duration-300"
                         >
                             Order Now
                         </NavLink>

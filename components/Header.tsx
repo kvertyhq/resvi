@@ -36,11 +36,14 @@ const Header: React.FC = () => {
     const { settings } = useSettings();
 
     return (
-        <header className="bg-brand-dark-gray text-white shadow-md sticky top-0 z-50">
+        <header
+            className="text-white shadow-md sticky top-0 z-50 transition-colors duration-300"
+            style={{ backgroundColor: settings?.header_color || 'var(--header-color, #333333)' }}
+        >
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
                     <div className="flex-shrink-0">
-                        <NavLink to="/" onClick={() => setIsMenuOpen(false)} className="text-xl font-serif tracking-widest">
+                        <NavLink to="/" onClick={() => setIsMenuOpen(false)} className="text-xl font-serif tracking-widest flex items-center">
                             {settings?.logo_url ? (
                                 <img src={settings.logo_url} alt={settings.name || 'Restaurant Logo'} className="h-12 w-auto object-contain" />
                             ) : (
@@ -62,7 +65,10 @@ const Header: React.FC = () => {
             </div>
 
             {isMenuOpen && (
-                <div className="md:hidden bg-brand-dark-gray">
+                <div
+                    className="md:hidden transition-colors duration-300"
+                    style={{ backgroundColor: settings?.header_color || 'var(--header-color, #333333)' }}
+                >
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col items-center">
                         <NavLinks onLinkClick={() => setIsMenuOpen(false)} />
                     </div>

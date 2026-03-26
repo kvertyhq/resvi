@@ -548,7 +548,11 @@ const BookingPage: React.FC = () => {
                         {/* Form Area */}
                         <div className="lg:col-span-3">
                             <h2 className="text-3xl font-serif text-brand-dark">Reserve a table</h2>
-                            <p className="text-brand-mid-gray mb-6">or Call us at 0344 32423453</p>
+                            {settings?.phone && (
+                                <p className="text-brand-mid-gray mb-6">
+                                    or Call us at <a href={`tel:${settings.phone}`} className="hover:text-brand-gold transition-colors">{settings.phone}</a>
+                                </p>
+                            )}
 
                             <div className="bg-gray-100 p-6 sm:p-8 shadow-lg rounded-sm">
                                 {step === 1 && (

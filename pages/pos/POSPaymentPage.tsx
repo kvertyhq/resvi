@@ -22,6 +22,7 @@ const POSPaymentPage: React.FC = () => {
     const [numSplits, setNumSplits] = useState(2);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card');
     const [processing, setProcessing] = useState(false);
+    const [currency, setCurrency] = useState<string>('£');
 
     // Modal State
     const [successModalData, setSuccessModalData] = useState<{
@@ -46,12 +47,22 @@ const POSPaymentPage: React.FC = () => {
         const fetchSetting = async () => {
             if (!order?.restaurant_id) return;
             try {
-                const { data } = await supabase.rpc('get_receipt_settings', {
+                // Fetch Receipt Settings for cash drawer
+                const { data: recData } = await supabase.rpc('get_receipt_settings', {
                     p_restaurant_id: order.restaurant_id
                 });
-                setShowCashDrawerButton(data?.show_cash_drawer_button ?? false);
+                setShowCashDrawerButton(recData?.show_cash_drawer_button ?? false);
+
+                // Fetch Restaurant Settings for currency
+                const { data: restData } = await supabase.rpc('get_restaurant_settings', { 
+                    p_id: order.restaurant_id 
+                });
+                const rData = Array.isArray(restData?.data) ? restData.data[0] : restData?.data || restData;
+                if (rData?.currency) {
+                    setCurrency(rData.currency);
+                }
             } catch (error) {
-                console.error('Error fetching cash drawer setting:', error);
+                console.error('Error fetching settings:', error);
             }
         };
         fetchSetting();
@@ -185,16 +196,16 @@ const POSPaymentPage: React.FC = () => {
 
                 <div className="flex justify-between text-gray-500 dark:text-gray-400 mb-2">
                     <span>Total Amount</span>
-                    <span>${order.total_amount.toFixed(2)}</span>
+                    <span>{currency}{order.total_amount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-green-600 dark:text-green-400 mb-2">
                     <span>Paid So Far</span>
-                    <span>${totalPaid.toFixed(2)}</span>
+                    <span>{currency}{totalPaid.toFixed(2)}</span>
                 </div>
                 <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
                 <div className="flex justify-between text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-4 md:mb-8">
                     <span>Due</span>
-                    <span>${remainingBalance.toFixed(2)}</span>
+                    <span>{currency}{remainingBalance.toFixed(2)}</span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -208,7 +219,7 @@ const POSPaymentPage: React.FC = () => {
                                     <span className="capitalize text-gray-900 dark:text-white">{p.payment_method}</span>
                                     <div className="text-gray-500 dark:text-gray-500 text-xs">{new Date(p.created_at).toLocaleTimeString()}</div>
                                 </div>
-                                <span className="font-bold">${p.amount.toFixed(2)}</span>
+                                <span className="font-bold">{currency}{p.amount.toFixed(2)}</span>
                             </div>
                         ))
                     )}
@@ -272,7 +283,7 @@ const POSPaymentPage: React.FC = () => {
                 <div className="mb-8 w-full max-w-lg">
                     <label className="block text-gray-500 dark:text-gray-400 mb-2 uppercase text-sm font-bold">Amount to Charge</label>
                     <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-500 dark:text-gray-500">$</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-500 dark:text-gray-500">{currency}</span>
                         <input
                             type="number"
                             step="0.01"
@@ -305,7 +316,7 @@ const POSPaymentPage: React.FC = () => {
                         style={{ backgroundColor: 'var(--theme-color)' }}
                         className="col-span-2 text-white py-6 rounded-xl font-bold text-2xl shadow-lg transform active:scale-95 transition-all mt-4 disabled:opacity-50 hover:brightness-110"
                     >
-                        {processing ? 'Processing...' : `Charge $${parseFloat(amountToPay || '0').toFixed(2)}`}
+                        {processing ? 'Processing...' : `Charge ${currency}${parseFloat(amountToPay || '0').toFixed(2)}`}
                     </button>
 
                     {/* Cash Drawer Button */}
@@ -332,6 +343,7 @@ const POSPaymentPage: React.FC = () => {
                 amountPaid={successModalData.amountPaid}
                 remaining={successModalData.remaining}
                 isFullyPaid={successModalData.isFullyPaid}
+                currency={currency}
             />
         </div>
     );

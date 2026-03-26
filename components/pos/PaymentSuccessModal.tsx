@@ -7,6 +7,7 @@ interface PaymentSuccessModalProps {
     amountPaid: number;
     remaining: number;
     isFullyPaid: boolean;
+    currency: string;
     change?: number; // Optional, for future use if we calculate change
 }
 
@@ -15,7 +16,8 @@ const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
     onClose,
     amountPaid,
     remaining,
-    isFullyPaid
+    isFullyPaid,
+    currency
 }) => {
     if (!isOpen) return null;
 
@@ -44,12 +46,12 @@ const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                         <div className="flex justify-between items-center mb-1">
                             <span className="text-gray-500 dark:text-gray-400">Amount Paid</span>
-                            <span className="text-xl font-bold text-gray-900 dark:text-white">${amountPaid.toFixed(2)}</span>
+                            <span className="text-xl font-bold text-gray-900 dark:text-white">{currency}{amountPaid.toFixed(2)}</span>
                         </div>
                         {!isFullyPaid && (
                             <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600 mt-2">
                                 <span className="text-gray-500 dark:text-gray-400">Remaining</span>
-                                <span className="text-lg font-semibold text-red-500 dark:text-red-400">${remaining.toFixed(2)}</span>
+                                <span className="text-lg font-semibold text-red-500 dark:text-red-400">{currency}{remaining.toFixed(2)}</span>
                             </div>
                         )}
                     </div>

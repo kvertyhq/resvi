@@ -208,7 +208,7 @@ const POSHistoryPage: React.FC = () => {
                                 <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 min-w-[120px]">
                                     <div className="text-right">
                                         <div className="text-xl font-bold text-gray-900 dark:text-white">
-                                            {settings?.currency || '$'}{order.total_amount.toFixed(2)}
+                                            {settings?.currency || '£'}{order.total_amount.toFixed(2)}
                                         </div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400">Total Amount</div>
                                     </div>
@@ -307,7 +307,7 @@ const POSHistoryPage: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="font-semibold text-gray-900 dark:text-white">
-                                                {settings?.currency || '$'}{itemTotal.toFixed(2)}
+                                                {settings?.currency || '£'}{itemTotal.toFixed(2)}
                                             </div>
                                         </div>
                                     );
@@ -317,17 +317,17 @@ const POSHistoryPage: React.FC = () => {
                             <div className="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Subtotal</span>
-                                    <span>{settings?.currency || '$'}{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
+                                    <span>{settings?.currency || '£'}{(selectedOrder.metadata?.subtotal || 0).toFixed(2)}</span>
                                 </div>
                                 {settings?.show_tax !== false && (selectedOrder.metadata?.tax || 0) > 0 && (
                                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                         <span>Tax</span>
-                                        <span>{settings?.currency || '$'}{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
+                                        <span>{settings?.currency || '£'}{(selectedOrder.metadata?.tax || 0).toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <span>Total</span>
-                                    <span>{settings?.currency || '$'}{selectedOrder.total_amount.toFixed(2)}</span>
+                                    <span>{settings?.currency || '£'}{selectedOrder.total_amount.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>

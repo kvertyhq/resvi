@@ -454,7 +454,7 @@ const POSWalkInPage: React.FC = () => {
                                     <div className="flex justify-between text-sm mb-1">
                                         <span className="text-gray-600 dark:text-gray-400">Total:</span>
                                         <span className="font-bold text-gray-900 dark:text-white">
-                                            £{order.total_amount.toFixed(2)}
+                                            {settings?.currency || '£'}{order.total_amount.toFixed(2)}
                                         </span>
                                     </div>
                                     {order.payment_status && (
@@ -587,6 +587,7 @@ const POSWalkInPage: React.FC = () => {
                     setSelectedOrder(null);
                 }}
                 order={selectedOrder}
+                currency={settings?.currency || '£'}
             />
 
             {/* Held Orders Modal */}

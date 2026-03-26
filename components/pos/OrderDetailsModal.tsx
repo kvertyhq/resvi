@@ -33,9 +33,10 @@ interface OrderDetailsModalProps {
         };
         order_items?: OrderItem[];
     } | null;
+    currency: string;
 }
 
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, order }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, order, currency }) => {
     if (!isOpen || !order) return null;
 
     const subtotal = order.order_items?.reduce((sum, item) => sum + (item.price_snapshot * item.quantity), 0) || 0;
@@ -124,7 +125,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                                                 )}
                                             </div>
                                             <div className="font-semibold text-gray-900 dark:text-white ml-4">
-                                                £{(item.price_snapshot * item.quantity).toFixed(2)}
+                                                {currency}{(item.price_snapshot * item.quantity).toFixed(2)}
                                             </div>
                                         </div>
                                     ))}
@@ -138,17 +139,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                         <div className="space-y-2">
                             <div className="flex justify-between text-gray-700 dark:text-gray-300">
                                 <span>Subtotal</span>
-                                <span>£{subtotal.toFixed(2)}</span>
+                                <span>{currency}{subtotal.toFixed(2)}</span>
                             </div>
                             {discount > 0 && (
                                 <div className="flex justify-between text-green-600 dark:text-green-400">
                                     <span>Discount ({order.discount_type})</span>
-                                    <span>-£{discount.toFixed(2)}</span>
+                                    <span>-{currency}{discount.toFixed(2)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-2xl font-bold text-gray-900 dark:text-white pt-4 border-t border-gray-200 dark:border-gray-700">
                                 <span>Total</span>
-                                <span>£{order.total_amount.toFixed(2)}</span>
+                                <span>{currency}{order.total_amount.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>

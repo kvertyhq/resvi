@@ -17,7 +17,7 @@ interface MenuCategory {
 
 const CategoryManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,18 +82,15 @@ const CategoryManagementPage: React.FC = () => {
     };
 
     const handleDeleteCategory = async (id: string) => {
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Delete',
             'Are you sure? This might affect items linked to this category.',
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    await supabase.from('menu_categories').delete().eq('id', id);
-                    fetchCategories();
-                }
-            }
+            'warning'
         );
+        if (confirmed) {
+            await supabase.from('menu_categories').delete().eq('id', id);
+            fetchCategories();
+        }
     };
 
     if (!selectedRestaurantId) return <div className="text-center py-10 text-gray-500">Select a restaurant context</div>;

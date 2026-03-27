@@ -19,7 +19,7 @@ interface Floor {
 
 const SettingsTableManagement: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const [tables, setTables] = useState<TableInfo[]>([]);
     const [floors, setFloors] = useState<Floor[]>([]);
     const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
@@ -104,40 +104,34 @@ const SettingsTableManagement: React.FC = () => {
             ? 'This floor contains tables. Deleting it will delete all tables on it. Continue?'
             : 'Delete this floor?';
 
-        showAlert(
-            'Confirm Delete',
-            message,
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    try {
-                        if (hasTables) {
-                            const { error: tableDelError } = await supabase
-                                .from('table_info')
-                                .delete()
-                                .eq('floor_id', floorId);
-                            if (tableDelError) throw tableDelError;
-                        }
-
-                        const { error } = await supabase
-                            .from('restaurant_floors')
-                            .delete()
-                            .eq('id', floorId);
-
-                        if (error) throw error;
-
-                        if (selectedFloorId === floorId) {
-                            setSelectedFloorId(null);
-                        }
-                        await fetchData();
-                    } catch (error) {
-                        console.error('Error deleting floor:', error);
-                        showAlert('Error', 'Failed to delete floor', 'error');
-                    }
+        const confirmed = await showConfirm('Confirm Delete', message, 'warning');
+        
+        if (confirmed) {
+            try {
+                if (hasTables) {
+                    const { error: tableDelError } = await supabase
+                        .from('table_info')
+                        .delete()
+                        .eq('floor_id', floorId);
+                    if (tableDelError) throw tableDelError;
                 }
+
+                const { error } = await supabase
+                    .from('restaurant_floors')
+                    .delete()
+                    .eq('id', floorId);
+
+                if (error) throw error;
+
+                if (selectedFloorId === floorId) {
+                    setSelectedFloorId(null);
+                }
+                await fetchData();
+            } catch (error) {
+                console.error('Error deleting floor:', error);
+                showAlert('Error', 'Failed to delete floor', 'error');
             }
-        );
+        }
     };
 
     const handleAddTable = async () => {
@@ -176,28 +170,25 @@ const SettingsTableManagement: React.FC = () => {
     };
 
     const handleDeleteTable = async (id: string) => {
-        showAlert(
+        const confirmed = await showConfirm(
             'Confirm Delete',
             'Are you sure you want to delete this table?',
-            'warning',
-            {
-                showCancel: true,
-                onConfirm: async () => {
-                    try {
-                        const { error } = await supabase
-                            .from('table_info')
-                            .delete()
-                            .eq('id', id);
-
-                        if (error) throw error;
-                        fetchData();
-                    } catch (error) {
-                        console.error('Error deleting table:', error);
-                        showAlert('Error', 'Failed to delete table', 'error');
-                    }
-                }
-            }
+            'warning'
         );
+        if (confirmed) {
+            try {
+                const { error } = await supabase
+                    .from('table_info')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                fetchData();
+            } catch (error) {
+                console.error('Error deleting table:', error);
+                showAlert('Error', 'Failed to delete table', 'error');
+            }
+        }
     };
 
     // Derived state

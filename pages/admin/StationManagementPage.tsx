@@ -6,7 +6,7 @@ import { Plus, Edit, Trash2, Save, X, Settings } from 'lucide-react';
 
 const StationManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const [stations, setStations] = useState<Station[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,7 +79,12 @@ const StationManagementPage: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('Are you sure? This will remove the station. Items assigned to this station may fall back to default routing.')) {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'Are you sure? This will remove the station. Items assigned to this station may fall back to default routing.',
+            'warning'
+        );
+        if (confirmed) {
             try {
                 await StationService.deleteStation(id);
                 fetchStations();

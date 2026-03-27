@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
-import { MessageSquare, CreditCard, History, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { MessageCircle, CreditCard, History, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import CreditPaymentModal from '../../components/admin/CreditPaymentModal';
 
 interface SMSPackage {
@@ -90,7 +90,7 @@ const SMSCreditsPage: React.FC = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <h2 className="text-3xl font-serif font-bold text-gray-800 flex items-center mb-6">
-                <MessageSquare className="h-8 w-8 mr-3 text-brand-gold" />
+                <MessageCircle size={32} className="mr-3 text-brand-gold" />
                 SMS Credits
             </h2>
 
@@ -108,15 +108,15 @@ const SMSCreditsPage: React.FC = () => {
                                 <span className="ml-2 text-gray-500">credits</span>
                             </div>
                         </div>
-                        <div className="bg-brand-gold bg-opacity-10 p-4 rounded-full">
-                            <MessageSquare className="h-8 w-8 text-brand-gold" />
+                        <div className="bg-brand-gold p-4 rounded-full">
+                            <MessageCircle size={32} className="text-white" />
                         </div>
                     </div>
 
                     {/* Packages Grid */}
                     <div>
                         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                            <CreditCard className="h-5 w-5 mr-2 text-gray-400" />
+                            <CreditCard size={20} className="mr-2 text-gray-400" />
                             Purchase Credits
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -144,7 +144,7 @@ const SMSCreditsPage: React.FC = () => {
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                             <h3 className="font-bold text-gray-700 flex items-center">
-                                <History className="h-5 w-5 mr-2 text-gray-400" />
+                                <History size={20} className="mr-2 text-gray-400" />
                                 History
                             </h3>
                         </div>

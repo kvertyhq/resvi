@@ -29,7 +29,7 @@ const Header: React.FC = () => {
             <NavLink to="/about" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>About Us</NavLink>
             <NavLink to="/contact" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Contact Us</NavLink>
             <NavLink to="/order" onClick={onLinkClick} className={({ isActive }) => `${navLinkClasses} ${isActive ? activeLinkClasses : ''}`}>Order Online</NavLink>
-            {settings?.bookings_enabled !== false && (
+            {settings?.bookings_enabled === true && (
                 <NavLink to="/booking" onClick={onLinkClick} className="px-5 py-2 border border-white text-white hover:bg-white hover:text-brand-dark transition duration-300 uppercase tracking-wider text-sm">Book a Table</NavLink>
             )}
         </>

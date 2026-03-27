@@ -150,7 +150,7 @@ const OrderPage: React.FC = () => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-160px)] font-sans">
             {/* Left Panel */}
-            <div className="bg-brand-dark-gray text-white flex items-center justify-center p-8 relative overflow-hidden min-h-[40vh] lg:min-h-full bg-cover bg-center" style={{ backgroundImage: "url('https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/674.jpg')" }}>
+            <div className="bg-brand-dark-gray text-white flex items-center justify-center p-8 relative overflow-hidden min-h-[40vh] lg:min-h-full bg-cover bg-center" style={{ backgroundImage: `url('${settings?.website_settings?.order_image_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/674.jpg"}')` }}>
                 <div className="absolute inset-0 bg-black opacity-60"></div>
                 <div className="relative z-10 text-center">
                     <h1 className="text-5xl md:text-6xl font-serif tracking-wider">Let's get your order started</h1>

@@ -139,6 +139,14 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                     <input type="text" name="booking_image_url" value={websiteSettings.booking_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                     <ImagePreview url={websiteSettings.booking_image_url} label="Booking Page" />
                 </div>
+
+                {/* Order Page Image URL */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Order Page Image URL</label>
+                    <p className="text-xs text-gray-500 mb-2">The header image shown on the online ordering page.</p>
+                    <input type="text" name="order_image_url" value={websiteSettings.order_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                    <ImagePreview url={websiteSettings.order_image_url} label="Order Page" />
+                </div>
             </div>
 
             <div className="mt-12 p-6 bg-gray-50 rounded-lg border border-gray-200">

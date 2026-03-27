@@ -3,6 +3,8 @@ import { supabase } from '../../supabaseClient';
 import { Clock, CheckCircle, Truck, XCircle, Filter, Eye, X, RefreshCcw, Printer } from 'lucide-react';
 import { receiptService } from '../../services/ReceiptService';
 import { useSettings } from '../../context/SettingsContext';
+import OrderPrinterSettingsModal from '../../components/admin/OrderPrinterSettingsModal';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 interface OrderItem {
     id: string;
@@ -65,6 +67,16 @@ const OrderManagementPage: React.FC = () => {
     // Modal State
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Auto Print State
+    const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+        return localStorage.getItem('admin_auto_print') === 'true';
+    });
+    const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('admin_auto_print', autoPrint.toString());
+    }, [autoPrint]);
 
     const fetchOrders = async () => {
         // Don't set loading to true on background refreshes if we have data, to avoid flicker
@@ -143,6 +155,13 @@ const OrderManagementPage: React.FC = () => {
                 if (newOrder.restaurant_id === selectedRestaurantId && ['delivery', 'collection'].includes(newOrder.order_type)) {
                     console.log('New order received:', payload);
                     playNotificationSound();
+                    
+                    // Trigger auto-print if enabled
+                    if (localStorage.getItem('admin_auto_print') === 'true') {
+                        console.log('Auto-printing new order:', newOrder.id);
+                        receiptService.printOrder(newOrder.id, selectedRestaurantId, false, undefined, showAlert);
+                    }
+                    
                     fetchOrders();
                 }
             })
@@ -314,6 +333,32 @@ const OrderManagementPage: React.FC = () => {
                                     title="Refresh Orders"
                                 >
                                     <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Middle: Print Controls */}
+                        <div className="flex items-center space-x-4 bg-white/50 p-2 rounded-xl border border-gray-100 shadow-sm px-4">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setAutoPrint(!autoPrint)}
+                                    className="flex items-center gap-3 group transition-all"
+                                >
+                                    <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${autoPrint ? 'text-green-600' : 'text-gray-400'}`}>
+                                        Auto Print
+                                    </span>
+                                    <div className={`w-10 h-5 rounded-full relative transition-all duration-300 ${autoPrint ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-gray-300'}`}>
+                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${autoPrint ? 'left-6' : 'left-1'}`} />
+                                    </div>
+                                </button>
+                                <div className="h-6 w-px bg-gray-200 mx-1"></div>
+                                <button
+                                    onClick={() => setIsPrinterModalOpen(true)}
+                                    className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors group"
+                                    title="Printer Settings"
+                                >
+                                    <SettingsIcon className="w-5 h-5 text-gray-400 group-hover:text-brand-gold transition-colors" />
+                                    <span className="text-xs font-medium text-gray-500 group-hover:text-gray-800">Printer</span>
                                 </button>
                             </div>
                         </div>
@@ -735,6 +780,11 @@ const OrderManagementPage: React.FC = () => {
                             </div>
                         </div>
                     )}
+                    {/* Order Printer Settings Modal */}
+                    <OrderPrinterSettingsModal 
+                        isOpen={isPrinterModalOpen}
+                        onClose={() => setIsPrinterModalOpen(false)}
+                    />
                 </>
             )}
         </div>

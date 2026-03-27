@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { invoke } from '@tauri-apps/api/core';
+import { Capacitor } from '@capacitor/core';
 
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
@@ -57,8 +58,12 @@ class ReceiptService {
         // Note: For actual ESC/POS implementation in network/bluetooth drivers,
         // we would send these bytes to the printer.
         // For browser printing, this usually stays as a log/event unless a local relay is used.
-        if (typeof window !== 'undefined') {
-            console.log('Cash drawer pulse signal sent to printer driver');
+        if ((window as any).__TAURI_INTERNALS__) {
+            try {
+                // await invoke('open_drawer'); // If we have a dedicated command
+            } catch (e) {
+                console.error('Failed to open drawer via Tauri', e);
+            }
         }
     }
 
@@ -66,7 +71,9 @@ class ReceiptService {
      * Helper to dispatch print job to the correct driver
      */
     private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, round?: number) {
-        if (settings.type === 'browser') {
+        if (Capacitor.isNativePlatform()) {
+            await this.printCapacitor(orderId, stationId, round);
+        } else if (settings.type === 'browser') {
             await this.printBrowser(orderId, true, stationId, round);
         } else if (settings.type === 'bluetooth') {
             await this.printBluetooth(orderId, stationId, showAlert);
@@ -313,11 +320,15 @@ class ReceiptService {
                 if (logoUrl) {
                     try {
                         console.log('Printing dynamic logo from URL:', logoUrl);
-                        await invoke('print_logo_to_network', {
-                            ip: ip,
-                            port: 9100,
-                            url: logoUrl
-                        });
+                        if ((window as any).__TAURI_INTERNALS__) {
+                            await invoke('print_logo_to_network', {
+                                ip: ip,
+                                port: 9100,
+                                url: logoUrl
+                            });
+                        } else {
+                            console.warn('Network logo print skipped: Not in Tauri environment');
+                        }
                         // Add a small delay for the printer to process the image
                         await new Promise(resolve => setTimeout(resolve, 500));
                     } catch (logoErr) {
@@ -532,17 +543,30 @@ class ReceiptService {
             ];
 
             // Send to Tauri
-            await invoke('print_raw_to_network', {
-                ip: ip,
-                port: 9100,
-                data: Array.from(new Uint8Array(data))
-            });
-
-            if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
+            if ((window as any).__TAURI_INTERNALS__) {
+                await invoke('print_raw_to_network', {
+                    ip: ip,
+                    port: 9100,
+                    data: Array.from(new Uint8Array(data))
+                });
+                if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
+            } else {
+                console.error('Network print failed: invoke is not available');
+                if (showAlert) showAlert('Printer Error', 'Network printing requires the desktop application.', 'error');
+            }
         } catch (error: any) {
             console.error('Network print failed:', error);
             if (showAlert) showAlert('Printer Error', `Failed to print to ${ip}: ${error.message || error}`, 'error');
         }
+    /**
+     * Print using Capacitor (Android/iOS System Print)
+     */
+    private async printCapacitor(orderId: string, stationId?: string, round?: number) {
+        console.log('📱 Printing via Capacitor Native Bridge', { orderId, stationId });
+        
+        // On Capacitor, we reuse the printBrowser logic but optimized for mobile WebView
+        // This triggers the Android/iOS System Print dialog
+        await this.printBrowser(orderId, true, stationId, round);
     }
 }
 

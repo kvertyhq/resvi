@@ -9,24 +9,19 @@ interface SettingsThemeProps {
 }
 
 const ImagePreview: React.FC<{ url: string; label: string }> = ({ url, label }) => {
-    if (!url) return <div className="mt-2 h-20 w-32 bg-gray-100 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs text-center px-2">No {label} set</div>;
+    if (!url) return <div className="h-12 w-16 bg-gray-100 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-[10px] text-center px-1">No {label}</div>;
     
     return (
-        <div className="mt-2 flex items-start space-x-3">
-            <div className="relative group">
-                <img 
-                    src={url} 
-                    alt={label} 
-                    className="h-20 w-32 object-cover rounded border border-gray-200 shadow-sm transition-transform group-hover:scale-105"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
-                    }}
-                />
-                <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity rounded pointer-events-none"></div>
-            </div>
-            <div className="text-[10px] text-gray-400 break-all max-w-[150px] line-clamp-3">
-                {url}
-            </div>
+        <div className="relative group shrink-0">
+            <img 
+                src={url} 
+                alt={label} 
+                className="h-12 w-20 object-cover rounded border border-gray-200 shadow-sm transition-transform group-hover:scale-110"
+                onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80x48?text=Error';
+                }}
+            />
+            <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity rounded pointer-events-none"></div>
         </div>
     );
 };
@@ -59,8 +54,7 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
     return (
         <div>
             <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Website Appearance</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* ... (Appearance fields remain the same) ... */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 {/* Watermark Text */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Watermark Text</label>
@@ -71,7 +65,7 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                 {/* Theme Color */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Theme Color</label>
-                    <p className="text-xs text-gray-500 mb-2">Primary accent color used for highlights and small elements.</p>
+                    <p className="text-xs text-gray-500 mb-2">Primary accent color used for highlights.</p>
                     <div className="flex items-center space-x-2">
                         <input type="color" name="theme_color" value={themeSettings.theme_color || '#c9a96e'} onChange={handleThemeSettingsChange} className="h-10 w-10 border border-gray-300 rounded p-1 cursor-pointer" />
                         <input type="text" name="theme_color" value={themeSettings.theme_color || '#c9a96e'} onChange={handleThemeSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
@@ -91,7 +85,7 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                 {/* Button Color */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Button Color</label>
-                    <p className="text-xs text-gray-500 mb-2">Primary action color for buttons throughout the website.</p>
+                    <p className="text-xs text-gray-500 mb-2">Primary action color for buttons.</p>
                     <div className="flex items-center space-x-2">
                         <input type="color" name="button_color" value={themeSettings.button_color || themeSettings.theme_color || '#c9a96e'} onChange={handleThemeSettingsChange} className="h-10 w-10 border border-gray-300 rounded p-1 cursor-pointer" />
                         <input type="text" name="button_color" value={themeSettings.button_color || themeSettings.theme_color || '#c9a96e'} onChange={handleThemeSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
@@ -100,7 +94,7 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
             </div>
 
             <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4 mt-12">Website Content & Imagery</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 {/* Hero Title */}
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Hero Title</label>
@@ -126,64 +120,80 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
                     <p className="text-xs text-gray-500 mb-2">The main logo shown in the header and footer.</p>
-                    <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={formData.logo_url} label="Logo" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="logo_url" value={formData.logo_url} onChange={handleChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={formData.logo_url} label="Logo" />
+                    </div>
                 </div>
 
                 {/* Cover Page URL */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cover Page URL</label>
                     <p className="text-xs text-gray-500 mb-2">The hero background image on the homepage.</p>
-                    <input type="text" name="cover_page_url" value={websiteSettings.cover_page_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.cover_page_url} label="Cover Page" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="cover_page_url" value={websiteSettings.cover_page_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.cover_page_url} label="Cover Page" />
+                    </div>
                 </div>
 
                 {/* Menu Section Image URL */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Menu Section Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">Background image for the "Our Menu" section.</p>
-                    <input type="text" name="menu_image_url" value={websiteSettings.menu_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.menu_image_url} label="Menu Section" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="menu_image_url" value={websiteSettings.menu_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.menu_image_url} label="Menu Section" />
+                    </div>
                 </div>
 
                 {/* Delivery Section Image URL */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Section Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">Background image for the "Delivery" section.</p>
-                    <input type="text" name="delivery_image_url" value={websiteSettings.delivery_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.delivery_image_url} label="Delivery Section" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="delivery_image_url" value={websiteSettings.delivery_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.delivery_image_url} label="Delivery Section" />
+                    </div>
                 </div>
 
                 {/* Inside Story Image URL */}
-                <div className="md:col-span-2">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Inside Story Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">Background image for the "Our Story" section.</p>
-                    <input type="text" name="inside_story_image_url" value={websiteSettings.inside_story_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.inside_story_image_url} label="Inside Story" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="inside_story_image_url" value={websiteSettings.inside_story_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.inside_story_image_url} label="Inside Story" />
+                    </div>
                 </div>
 
                 {/* Booking Page Image URL */}
-                <div className="md:col-span-2">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Booking Page Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">The image shown on the table reservation page.</p>
-                    <input type="text" name="booking_image_url" value={websiteSettings.booking_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.booking_image_url} label="Booking Page" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="booking_image_url" value={websiteSettings.booking_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.booking_image_url} label="Booking Page" />
+                    </div>
                 </div>
 
                 {/* Order Page Image URL */}
-                <div className="md:col-span-2">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Order Page Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">The header image shown on the online ordering page.</p>
-                    <input type="text" name="order_image_url" value={websiteSettings.order_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.order_image_url} label="Order Page" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="order_image_url" value={websiteSettings.order_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.order_image_url} label="Order Page" />
+                    </div>
                 </div>
 
                 {/* About Page Image URL */}
-                <div className="md:col-span-2">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">About Page Image URL</label>
                     <p className="text-xs text-gray-500 mb-2">The header image shown on the "About Us" page banner.</p>
-                    <input type="text" name="about_image_url" value={websiteSettings.about_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                    <ImagePreview url={websiteSettings.about_image_url} label="About Page" />
+                    <div className="flex items-center space-x-3">
+                        <input type="text" name="about_image_url" value={websiteSettings.about_image_url || ''} onChange={handleWebsiteSettingsChange} className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                        <ImagePreview url={websiteSettings.about_image_url} label="About Page" />
+                    </div>
                 </div>
             </div>
 
@@ -238,15 +248,17 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Image URL</label>
-                                        <input 
-                                            type="text" 
-                                            value={section.image_url || ''} 
-                                            onChange={(e) => handleAboutSectionChange(index, 'image_url', e.target.value)} 
-                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold" 
-                                        />
-                                        <ImagePreview url={section.image_url} label={`About Section ${index + 1}`} />
+                                    <div className="flex items-end space-x-3">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Image URL</label>
+                                            <input 
+                                                type="text" 
+                                                value={section.image_url || ''} 
+                                                onChange={(e) => handleAboutSectionChange(index, 'image_url', e.target.value)} 
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold" 
+                                            />
+                                        </div>
+                                        <ImagePreview url={section.image_url} label={`Section ${index + 1}`} />
                                     </div>
                                 </div>
                             </div>

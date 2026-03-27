@@ -56,7 +56,9 @@ const AboutPage: React.FC = () => {
                             alt={settings.name || "Restaurant Logo"}
                             className="h-40 w-auto object-contain mx-auto mb-8 opacity-80 hover:opacity-100 transition-opacity duration-300"
                         />
-                        <p className="text-gray-400 italic font-serif text-xl">"Where tradition meets modern taste"</p>
+                        <p className="text-gray-400 italic font-serif text-xl leading-relaxed max-w-2xl mx-auto">
+                            "{settings?.website_settings?.hero_title || "Where tradition meets modern taste"}"
+                        </p>
                     </div>
                 </section>
             )}

@@ -122,7 +122,7 @@ const ContactPage: React.FC = () => {
       <section className="bg-brand-dark-gray text-white pt-20 pb-32 text-center relative">
         <DecorativeElement />
         <h1 className="text-5xl md:text-6xl font-serif">Contact Us</h1>
-        <p className="mt-4 text-gray-400 font-sans tracking-wider">Per consequat adolescens ex cu nibh commune</p>
+        <p className="mt-4 text-gray-400 font-sans tracking-wider">We'd love to hear from you. Send us a message and we'll get back to you as soon as possible.</p>
         {/* Jagged Edge */}
         <div className="absolute bottom-0 left-0 w-full h-4 bg-repeat-x" style={{
           backgroundImage: "linear-gradient(135deg, white 25%, transparent 25%), linear-gradient(225deg, white 25%, transparent 25%)",

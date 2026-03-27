@@ -18,10 +18,10 @@ const formatItemsToMarkdown = (items: { item: MenuItemData; quantity: number }[]
         const itemSubtotal = item.price * quantity;
         const rate = item.tax_rate || 0;
         const itemTax = itemSubtotal * (rate / 100);
-        
+
         subtotal += itemSubtotal;
         totalTax += itemTax;
-        
+
         markdown += `- **${quantity}x ${item.name}** (${currency}${item.price.toFixed(2)}) = ${currency}${itemSubtotal.toFixed(2)}\n`;
     });
 
@@ -49,14 +49,6 @@ const ChevronRightIcon = () => (
     </svg>
 );
 
-// Decorative element for banner
-const DecorativeElement = () => (
-    <div className="flex items-center justify-center space-x-2 my-4">
-        <span className="block h-px w-8 bg-brand-gold/50"></span>
-        <span className="block h-1.5 w-1.5 border border-brand-gold/50"></span>
-        <span className="block h-px w-8 bg-brand-gold/50"></span>
-    </div>
-);
 
 // Step 1: Date Selection
 const DateStep = ({ onDateSelect, selectedDate, onNext, closureDates, stepNumber, totalSteps, timezone = 'UTC' }) => {
@@ -521,15 +513,8 @@ const BookingPage: React.FC = () => {
 
     return (
         <div className="bg-white text-brand-dark-gray font-sans">
-            {/* Banner Section */}
-            <section className="bg-brand-mid-gray text-white py-16 text-center">
-                <DecorativeElement />
-                <h1 className="text-5xl font-serif">Reserve a Table</h1>
-                <p className="mt-2 text-gray-400">Book a table for a memorable dining experience</p>
-            </section>
-
             {/* Main Content Section */}
-            <section className="py-12 md:py-20 bg-gray-50 relative overflow-hidden">
+            <section className="py-4 md:py-8 bg-gray-50 relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mr-32 -mt-20 transform rotate-45 opacity-5 pointer-events-none">
                     {/* Decorative background element */}
                 </div>
@@ -539,7 +524,7 @@ const BookingPage: React.FC = () => {
                         {/* Image Placeholder */}
                         <div className="lg:col-span-2 flex items-center justify-center h-96 lg:h-auto">
                             <img
-                                src="https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg"
+                                src={settings?.website_settings?.booking_image_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg"}
                                 alt="Restaurant Interior"
                                 className="w-full h-full object-cover rounded-sm shadow-lg"
                             />

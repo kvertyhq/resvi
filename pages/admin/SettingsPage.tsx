@@ -78,6 +78,9 @@ const SettingsPage: React.FC = () => {
         },
         website_settings: {
             watermark_text: 'Daniel Sushi',
+            hero_title: 'Fuel Your Mood. Feed Your Cravings.',
+            hero_subtitle: 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
+            booking_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg',
             cover_page_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
             menu_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
             delivery_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',
@@ -162,6 +165,9 @@ const SettingsPage: React.FC = () => {
                         },
                         website_settings: settings.website_settings || {
                             watermark_text: settings.watermark_text || 'Daniel Sushi',
+                            hero_title: settings.hero_title || 'Fuel Your Mood. Feed Your Cravings.',
+                            hero_subtitle: settings.hero_subtitle || 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
+                            booking_image_url: settings.booking_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg',
                             cover_page_url: settings.cover_page_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
                             menu_image_url: settings.menu_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
                             delivery_image_url: settings.delivery_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',

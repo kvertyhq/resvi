@@ -31,9 +31,13 @@ const HomePage: React.FC = () => {
                 style={{ backgroundImage: `url('${settings?.website_settings?.cover_page_url || settings?.cover_page_url || "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg"}')` }}
             >
                 <div className="absolute inset-0 bg-black opacity-60"></div>
-                <div className="relative z-10 text-center">
-                    <h1 className="text-5xl md:text-7xl font-serif tracking-wider">Fuel Your Mood. Feed Your Cravings.</h1>
-                    <p className="mt-4 text-lg md:text-xl text-gray-300">Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.</p>
+                <div className="relative z-10 text-center max-w-4xl px-4">
+                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif tracking-wider leading-tight">
+                        {settings?.website_settings?.hero_title || "Fuel Your Mood. Feed Your Cravings."}
+                    </h1>
+                    <p className="mt-6 text-lg md:text-xl text-gray-300 font-light leading-relaxed">
+                        {settings?.website_settings?.hero_subtitle || "Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision."}
+                    </p>
                     <div className="mt-8 flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
                         <NavLink
                             to="order"

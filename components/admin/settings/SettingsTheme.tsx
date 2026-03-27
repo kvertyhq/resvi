@@ -76,8 +76,22 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                 </div>
             </div>
 
-            <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4 mt-12">Website Imagery</h3>
+            <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4 mt-12">Website Content & Imagery</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Hero Title */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hero Title</label>
+                    <p className="text-xs text-gray-500 mb-2">The main headline shown on the homepage hero section.</p>
+                    <input type="text" name="hero_title" value={websiteSettings.hero_title || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+
+                {/* Hero Subtitle */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hero Subtitle</label>
+                    <p className="text-xs text-gray-500 mb-2">The description text shown below the hero title.</p>
+                    <textarea name="hero_subtitle" rows={2} value={websiteSettings.hero_subtitle || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+
                 {/* Logo URL */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
@@ -116,6 +130,14 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                     <p className="text-xs text-gray-500 mb-2">Background image for the "Our Story" section.</p>
                     <input type="text" name="inside_story_image_url" value={websiteSettings.inside_story_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                     <ImagePreview url={websiteSettings.inside_story_image_url} label="Inside Story" />
+                </div>
+
+                {/* Booking Page Image URL */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Booking Page Image URL</label>
+                    <p className="text-xs text-gray-500 mb-2">The image shown on the table reservation page.</p>
+                    <input type="text" name="booking_image_url" value={websiteSettings.booking_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                    <ImagePreview url={websiteSettings.booking_image_url} label="Booking Page" />
                 </div>
             </div>
 

@@ -5,6 +5,7 @@ interface SettingsThemeProps {
     handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     handleWebsiteSettingsChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     handleThemeSettingsChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+    updateWebsiteSettings: (updatedSettings: any) => void;
 }
 
 const ImagePreview: React.FC<{ url: string; label: string }> = ({ url, label }) => {
@@ -30,14 +31,36 @@ const ImagePreview: React.FC<{ url: string; label: string }> = ({ url, label }) 
     );
 };
 
-const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, handleWebsiteSettingsChange, handleThemeSettingsChange }) => {
+const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, handleWebsiteSettingsChange, handleThemeSettingsChange, updateWebsiteSettings }) => {
     const themeSettings = formData.theme_settings || {};
     const websiteSettings = formData.website_settings || {};
+    const aboutSections = websiteSettings.about_sections || [];
+
+    const handleAddAboutSection = () => {
+        const newSection = { title: 'New Section', content: '', image_url: '' };
+        updateWebsiteSettings({ about_sections: [...aboutSections, newSection] });
+    };
+
+    const handleRemoveAboutSection = (index: number) => {
+        const updated = aboutSections.filter((_: any, i: number) => i !== index);
+        updateWebsiteSettings({ about_sections: updated });
+    };
+
+    const handleAboutSectionChange = (index: number, field: string, value: string) => {
+        const updated = aboutSections.map((section: any, i: number) => {
+            if (i === index) {
+                return { ...section, [field]: value };
+            }
+            return section;
+        });
+        updateWebsiteSettings({ about_sections: updated });
+    };
 
     return (
         <div>
             <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Website Appearance</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* ... (Appearance fields remain the same) ... */}
                 {/* Watermark Text */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Watermark Text</label>
@@ -90,6 +113,13 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                     <label className="block text-sm font-medium text-gray-700 mb-1">Hero Subtitle</label>
                     <p className="text-xs text-gray-500 mb-2">The description text shown below the hero title.</p>
                     <textarea name="hero_subtitle" rows={2} value={websiteSettings.hero_subtitle || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                </div>
+
+                {/* About Page Subtitle */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">About Page Subtitle</label>
+                    <p className="text-xs text-gray-500 mb-2">The secondary heading shown on the "About Us" page banner.</p>
+                    <input type="text" name="about_subtitle" value={websiteSettings.about_subtitle || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
 
                 {/* Logo URL */}
@@ -147,10 +177,92 @@ const SettingsTheme: React.FC<SettingsThemeProps> = ({ formData, handleChange, h
                     <input type="text" name="order_image_url" value={websiteSettings.order_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                     <ImagePreview url={websiteSettings.order_image_url} label="Order Page" />
                 </div>
+
+                {/* About Page Image URL */}
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">About Page Image URL</label>
+                    <p className="text-xs text-gray-500 mb-2">The header image shown on the "About Us" page banner.</p>
+                    <input type="text" name="about_image_url" value={websiteSettings.about_image_url || ''} onChange={handleWebsiteSettingsChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
+                    <ImagePreview url={websiteSettings.about_image_url} label="About Page" />
+                </div>
+            </div>
+
+            <div className="mt-12 border-t pt-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900">About Us Sections</h3>
+                        <p className="text-sm text-gray-500">Manage the content blocks on your "About Us" page.</p>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={handleAddAboutSection}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-brand-gold hover:bg-brand-gold/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold"
+                    >
+                        Add New Section
+                    </button>
+                </div>
+
+                <div className="space-y-8">
+                    {aboutSections.map((section: any, index: number) => (
+                        <div key={index} className="p-6 bg-gray-50 rounded-lg border border-gray-200 relative group animate-fadeIn">
+                            <button 
+                                type="button" 
+                                onClick={() => handleRemoveAboutSection(index)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remove Section"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Section Title</label>
+                                        <input 
+                                            type="text" 
+                                            value={section.title || ''} 
+                                            onChange={(e) => handleAboutSectionChange(index, 'title', e.target.value)} 
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Content</label>
+                                        <textarea 
+                                            rows={4} 
+                                            value={section.content || ''} 
+                                            onChange={(e) => handleAboutSectionChange(index, 'content', e.target.value)} 
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Image URL</label>
+                                        <input 
+                                            type="text" 
+                                            value={section.image_url || ''} 
+                                            onChange={(e) => handleAboutSectionChange(index, 'image_url', e.target.value)} 
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold" 
+                                        />
+                                        <ImagePreview url={section.image_url} label={`About Section ${index + 1}`} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+
+                    {aboutSections.length === 0 && (
+                        <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                            <p className="text-gray-500">No about sections added yet. Click "Add New Section" to start.</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="mt-12 p-6 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Preview</h4>
+                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Color Palette Preview</h4>
                 <div className="space-y-4">
                     <div className="h-12 rounded shadow-sm flex items-center px-4 text-white text-xs font-medium" style={{ backgroundColor: themeSettings.header_color || '#333333' }}>
                         Header Preview

@@ -80,8 +80,11 @@ const SettingsPage: React.FC = () => {
             watermark_text: 'Daniel Sushi',
             hero_title: 'Fuel Your Mood. Feed Your Cravings.',
             hero_subtitle: 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
+            about_subtitle: 'Passion on a Plate',
+            about_sections: [],
             order_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/674.jpg',
             booking_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg',
+            about_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg',
             cover_page_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
             menu_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
             delivery_image_url: 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',
@@ -168,8 +171,11 @@ const SettingsPage: React.FC = () => {
                             watermark_text: settings.watermark_text || 'Daniel Sushi',
                             hero_title: settings.hero_title || 'Fuel Your Mood. Feed Your Cravings.',
                             hero_subtitle: settings.hero_subtitle || 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
+                            about_subtitle: settings.about_subtitle || 'Passion on a Plate',
+                            about_sections: settings.about_sections || [],
                             order_image_url: settings.order_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/674.jpg',
                             booking_image_url: settings.booking_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/684.jpg',
+                            about_image_url: settings.about_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/677.jpg',
                             cover_page_url: settings.cover_page_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg',
                             menu_image_url: settings.menu_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg',
                             delivery_image_url: settings.delivery_image_url || 'https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg',
@@ -240,6 +246,16 @@ const SettingsPage: React.FC = () => {
             theme_settings: {
                 ...prev.theme_settings,
                 [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+            }
+        }));
+    };
+
+    const updateWebsiteSettings = (updatedSettings: any) => {
+        setFormData(prev => ({
+            ...prev,
+            website_settings: {
+                ...prev.website_settings,
+                ...updatedSettings
             }
         }));
     };
@@ -397,6 +413,7 @@ const SettingsPage: React.FC = () => {
                                             handleChange={handleChange} 
                                             handleWebsiteSettingsChange={handleWebsiteSettingsChange}
                                             handleThemeSettingsChange={handleThemeSettingsChange}
+                                            updateWebsiteSettings={updateWebsiteSettings}
                                         />
                                     </div>
                                 )}

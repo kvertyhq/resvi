@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { invoke } from '@tauri-apps/api/core';
 import { Capacitor } from '@capacitor/core';
+import { Printer as CapacitorPrinter } from '@bcyesil/capacitor-plugin-printer';
 
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
@@ -434,45 +435,45 @@ class ReceiptService {
                     ...encoder.encode(`${priceValStr}\n`)
                 ];
 
-                    // Modifiers / Addons
-                    const modifiers = item.selected_modifiers || item.selected_addons || [];
-                    if (Array.isArray(modifiers) && modifiers.length > 0) {
-                        modifiers.forEach((mod: any) => {
-                            const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
-                            const modPrice = mod.price || 0;
-                            if (modName) {
-                                // Indent(4) + Name(X) + Sym(1) + Price(9)
-                                const modGroupName = mod.modifier_group_name || mod.group_name;
-                                const fullModName = `+ ${modName}${modGroupName ? ` (${modGroupName})` : ""}`;
-                                const modQtyStr = "    ";
-                                const nameWidth = lineWidth - 4 - 1 - 9;
-                                const modNameStr = fullModName.slice(0, nameWidth).padEnd(nameWidth);
-                                const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
+                // Modifiers / Addons
+                const modifiers = item.selected_modifiers || item.selected_addons || [];
+                if (Array.isArray(modifiers) && modifiers.length > 0) {
+                    modifiers.forEach((mod: any) => {
+                        const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
+                        const modPrice = mod.price || 0;
+                        if (modName) {
+                            // Indent(4) + Name(X) + Sym(1) + Price(9)
+                            const modGroupName = mod.modifier_group_name || mod.group_name;
+                            const fullModName = `+ ${modName}${modGroupName ? ` (${modGroupName})` : ""}`;
+                            const modQtyStr = "    ";
+                            const nameWidth = lineWidth - 4 - 1 - 9;
+                            const modNameStr = fullModName.slice(0, nameWidth).padEnd(nameWidth);
+                            const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
 
-                                data.push(...encoder.encode(modQtyStr));
-                                data.push(...encoder.encode(modNameStr));
-                                if (modPrice > 0) {
-                                    data.push(...encoder.encode(" ")); // Spacer
-                                    data.push(...encoder.encode(`${modPriceValStr}\n`));
-                                } else {
-                                    data.push(...encoder.encode(" ".repeat(10) + "\n"));
-                                }
+                            data.push(...encoder.encode(modQtyStr));
+                            data.push(...encoder.encode(modNameStr));
+                            if (modPrice > 0) {
+                                data.push(...encoder.encode(" ")); // Spacer
+                                data.push(...encoder.encode(`${modPriceValStr}\n`));
+                            } else {
+                                data.push(...encoder.encode(" ".repeat(10) + "\n"));
                             }
-                        });
-                    }
+                        }
+                    });
+                }
 
-                    // Excluded Toppings (New)
-                    const exclusions = item.excluded_toppings || [];
-                    if (Array.isArray(exclusions) && exclusions.length > 0) {
-                        exclusions.forEach((excl: any) => {
-                            const nameWidth = lineWidth - 4;
-                            let exclStr = `  - NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
-                            if (excl.replacement) {
-                                exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
-                            }
-                            data.push(...encoder.encode(exclStr.slice(0, nameWidth).padEnd(nameWidth) + "\n"));
-                        });
-                    }
+                // Excluded Toppings (New)
+                const exclusions = item.excluded_toppings || [];
+                if (Array.isArray(exclusions) && exclusions.length > 0) {
+                    exclusions.forEach((excl: any) => {
+                        const nameWidth = lineWidth - 4;
+                        let exclStr = `  - NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
+                        if (excl.replacement) {
+                            exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
+                        }
+                        data.push(...encoder.encode(exclStr.slice(0, nameWidth).padEnd(nameWidth) + "\n"));
+                    });
+                }
             });
 
             // 4. Totals Breakdown
@@ -558,15 +559,143 @@ class ReceiptService {
             console.error('Network print failed:', error);
             if (showAlert) showAlert('Printer Error', `Failed to print to ${ip}: ${error.message || error}`, 'error');
         }
+    }
+
     /**
      * Print using Capacitor (Android/iOS System Print)
      */
     private async printCapacitor(orderId: string, stationId?: string, round?: number) {
         console.log('📱 Printing via Capacitor Native Bridge', { orderId, stationId });
-        
-        // On Capacitor, we reuse the printBrowser logic but optimized for mobile WebView
-        // This triggers the Android/iOS System Print dialog
-        await this.printBrowser(orderId, true, stationId, round);
+
+        try {
+            // 1. Fetch all data needed for the receipt
+            const { data: order, error: orderError } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    customer:user_id(full_name, phone, address, postcode),
+                    order_items (*)
+                `)
+                .eq('id', orderId)
+                .single();
+
+            if (orderError || !order) throw new Error('Order not found');
+
+            const { data: restData } = await supabase.rpc('get_restaurant_settings', { p_id: order.restaurant_id });
+            const settings = Array.isArray(restData?.data) ? restData.data[0] : restData?.data || restData;
+
+            const { data: receiptSettings } = await supabase.rpc('get_receipt_settings', { p_restaurant_id: order.restaurant_id });
+
+            let stationName = '';
+            if (stationId) {
+                const { data: sData } = await supabase.from('stations').select('name').eq('id', stationId).single();
+                if (sData) stationName = sData.name;
+            }
+
+            // 2. Filter items
+            const displayedItems = order.order_items.filter((item: any) => {
+                const stationMatch = !stationId || item.station_id === stationId;
+                const roundMatch = round === undefined || item.round_number === round;
+                return stationMatch && roundMatch;
+            });
+
+            if (displayedItems.length === 0 && stationId) {
+                console.log('No items for this station, skipping print');
+                return;
+            }
+
+            // 3. Generate HTML
+            const html = this.generateReceiptHtml(order, settings, receiptSettings, stationName, displayedItems);
+
+            // 4. Send to Native Printer
+            await CapacitorPrinter.print({
+                content: html,
+                name: `Order_${order.daily_order_number || order.id.slice(0, 8)}`
+            });
+
+        } catch (error) {
+            console.error('Capacitor print failed:', error);
+        }
+    }
+
+    private generateReceiptHtml(order: any, settings: any, receiptSettings: any, stationName: string, items: any[]) {
+        const currency = settings?.currency || '£';
+        const logoUrl = receiptSettings?.logo_url || settings?.logo_url;
+
+        return `
+            <html>
+            <head>
+                <style>
+                    body { font-family: 'Courier New', Courier, monospace; font-size: 14px; padding: 10px; color: #000; }
+                    .center { text-align: center; }
+                    .bold { font-weight: bold; }
+                    .uppercase { text-transform: uppercase; }
+                    .border-b { border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
+                    .flex { display: flex; justify-content: space-between; }
+                    .small { font-size: 12px; color: #666; }
+                    .mt-2 { margin-top: 8px; }
+                    .mb-4 { margin-bottom: 16px; }
+                    .tag { background: #333; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; display: inline-block; }
+                    ${receiptSettings?.custom_css || ''}
+                </style>
+            </head>
+            <body>
+                <div class="center border-b">
+                    ${receiptSettings?.show_logo && logoUrl ? `<img src="${logoUrl}" style="height:60px; width:60px; border-radius: 50%; margin-bottom: 5px;" />` : ''}
+                    <div class="bold" style="font-size: 18px;">${settings?.name || 'Restaurant'}</div>
+                    ${stationName ? `<div class="bold mt-2 border-b" style="display:inline-block;">${stationName} TICKET</div>` : ''}
+                    <div>${settings?.address_line1 || ''}</div>
+                    <div>${settings?.phone || ''}</div>
+                    ${receiptSettings?.header_text ? `<div class="mt-2 small">${receiptSettings.header_text}</div>` : ''}
+                </div>
+
+                <div class="center border-b">
+                    <div class="mb-4">
+                        <span class="tag">${order.order_type?.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <div class="bold" style="font-size: 16px;">ORDER #${order.daily_order_number || order.id.slice(0, 8)}</div>
+                    <div class="small">${new Date(order.created_at).toLocaleString()}</div>
+                    
+                    ${(order.customer || order.customer_name) ? `
+                        <div class="mt-2 small" style="font-style: italic;">
+                            <div class="bold">${order.customer?.full_name || order.customer_name || 'Guest'}</div>
+                            ${order.customer?.phone || order.customer_phone || ''}
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="mb-4">
+                    ${items.map(item => `
+                        <div class="flex bold">
+                            <span>${item.quantity}x ${item.name_snapshot}</span>
+                            <span>${stationName ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
+                        </div>
+                        ${item.selected_modifiers?.map((mod: any) => `
+                            <div class="flex small" style="padding-left: 10px; font-style: italic;">
+                                <span>+ ${mod.name}</span>
+                                <span>${stationName || !mod.price ? '' : mod.price.toFixed(2)}</span>
+                            </div>
+                        `).join('') || ''}
+                        ${item.excluded_toppings?.map((excl: any) => `
+                            <div class="small" style="padding-left: 10px; color: red; font-style: italic;">
+                                - NO ${excl.name}
+                            </div>
+                        `).join('') || ''}
+                    `).join('')}
+                </div>
+
+                <div class="border-b" style="border-top: 1px dashed #ccc; padding-top: 5px;">
+                    <div class="flex bold" style="font-size: 16px;">
+                        <span>TOTAL</span>
+                        <span>${currency}${order.total_amount.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                ${receiptSettings?.footer_text ? `<div class="center small mt-2">${receiptSettings.footer_text}</div>` : ''}
+                <div class="center small mt-2">Digital Receipt • ${settings?.website_url || ''}</div>
+            </body>
+            </html>
+        `;
     }
 }
 

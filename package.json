@@ -17,6 +17,7 @@
     "sync-version": "node scripts/sync-version.js"
   },
   "dependencies": {
+    "@bcyesil/capacitor-plugin-printer": "0.0.6",
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1",
     "@capacitor/ios": "^6.2.1",

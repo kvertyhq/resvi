@@ -60,7 +60,7 @@ const HomePage: React.FC = () => {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none overflow-hidden">
                     <span className="text-9xl md:text-[20rem] font-bold text-white tracking-widest uppercase">
-                        {settings?.website_settings?.watermark_text || settings?.watermark_text || "Daniel Sushi"}
+                        {settings?.website_settings?.watermark_text || settings?.watermark_text || ""}
                     </span>
                 </div>
             </section>

@@ -4,7 +4,7 @@ ADD COLUMN IF NOT EXISTS website_settings JSONB DEFAULT '{
   "header_color": "#333333",
   "button_color": "#c9a96e",
   "theme_color": "#c9a96e",
-  "watermark_text": "Daniel Sushi",
+  "watermark_text": "Your Name",
   "cover_page_url": "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/734.jpg",
   "menu_image_url": "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg",
   "delivery_image_url": "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/694.jpg",

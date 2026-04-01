@@ -6,7 +6,7 @@ SET website_settings = jsonb_set(
     '[
         {
             "title": "Our Philosophy",
-            "content": "Good food means good mood. The health benefits of eating Daniel Sushi are surprisingly great as it meets the daily nutrition requirements and fulfills the sudden hunger for complete comfort food that you can have.\n\nWe believe in using only the freshest ingredients to create dishes that not only taste amazing but also make you feel good.",
+            "content": "Good food means good mood. The health benefits of eating at our restaurant is surprisingly great as it meets the daily nutrition requirements and fulfills the sudden hunger for complete comfort food that you can have.\n\nWe believe in using only the freshest ingredients to create dishes that not only taste amazing but also make you feel good.",
             "image_url": "https://qbgziszculmwzyhjvfyc.supabase.co/storage/v1/object/public/images/Landing%20Page/689.jpg"
         },
         {

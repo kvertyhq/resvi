@@ -4,10 +4,11 @@ import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
 import { useSettings } from '../../context/SettingsContext';
-import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User, Settings as SettingsIcon } from 'lucide-react';
+import { LogOut, Clock, PhoneIncoming, Printer, BarChart3, Phone, Menu, X, User, Settings as SettingsIcon, ShoppingBag } from 'lucide-react';
 import PrinterConfigModal from './PrinterConfigModal';
 import { IncomingCallModal } from './IncomingCallModal';
 import VirtualKeyboard from './VirtualKeyboard';
+import { supabase } from '../../supabaseClient';
 const POSLayout: React.FC = () => {
     const { user, loading: adminLoading } = useAdmin();
     const { staff, logout, loading: posLoading, clockIn, clockOut, activeShift, uiFontScale } = usePOS();
@@ -17,6 +18,7 @@ const POSLayout: React.FC = () => {
 
     const [showPrinterModal, setShowPrinterModal] = React.useState(false);
     const [showMobileMenu, setShowMobileMenu] = React.useState(false);
+    const [onlineOrdersCount, setOnlineOrdersCount] = React.useState(0);
 
     // Default to orange if no theme color set
     const themeColor = settings?.theme_color || '#f97316';
@@ -49,6 +51,42 @@ const POSLayout: React.FC = () => {
 
     const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
+    // Fetch initial online orders count and subscribe to new orders
+    useEffect(() => {
+        if (!settings?.id) return;
+
+        const fetchCount = async () => {
+             const { count } = await supabase
+                .from('orders')
+                .select('*', { count: 'exact', head: true })
+                .eq('restaurant_id', settings.id)
+                .in('source', ['online', 'qr'])
+                .eq('status', 'pending');
+             
+             if (count !== null) setOnlineOrdersCount(count);
+        };
+        fetchCount();
+
+        const channel = supabase.channel('online_orders_badge')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'orders',
+                filter: `restaurant_id=eq.${settings.id}`
+            }, (payload) => {
+                 fetchCount();
+                 const newRow = payload.new as any;
+                 if (payload.eventType === 'INSERT' && ['online', 'qr'].includes(newRow.source) && newRow.status === 'pending') {
+                     const audio = new Audio('/sounds/bell.mp3');
+                     audio.play().catch(e => console.log('Audio play failed', e));
+                 }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [settings?.id]);
 
 
     // 2. POS Staff Check (Must be logged in with PIN)
@@ -94,6 +132,20 @@ const POSLayout: React.FC = () => {
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
+                    </NavLink>
+
+                    <NavLink
+                        to="/pos/online"
+                        style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
+                        className={({ isActive }) => `relative p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                        title="Online Orders"
+                    >
+                        <ShoppingBag size={24} />
+                        {onlineOrdersCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10 animate-pulse">
+                                {onlineOrdersCount > 99 ? '99+' : onlineOrdersCount}
+                            </span>
+                        )}
                     </NavLink>
 
                     <NavLink
@@ -207,6 +259,16 @@ const POSLayout: React.FC = () => {
                 <NavLink to="/pos/walk-in" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                     <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Walk-In</span>
+                </NavLink>
+
+                <NavLink to="/pos/online" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `relative flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Online</span>
+                    {onlineOrdersCount > 0 && (
+                        <span className="absolute top-0 right-1 bg-red-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full z-10">
+                            {onlineOrdersCount > 99 ? '99+' : onlineOrdersCount}
+                        </span>
+                    )}
                 </NavLink>
 
                 <NavLink to="/pos/kds" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>

@@ -52,7 +52,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('pos-font-scale', scale.toString());
     };
 
-    // Persist login via localStorage for page refreshes (optional, but good for UX)
+    // Persist login via localStorage for page refreshes
     useEffect(() => {
         const storedStaff = localStorage.getItem('pos_staff');
         if (storedStaff) {
@@ -76,9 +76,22 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLoading(false);
     }, []);
 
+    // Watch for disablement mid-session or on load
+    useEffect(() => {
+        if (settings?.is_disabled && staff) {
+            logout();
+            showAlert('Access Restricted', 'Your workspace has been locked. Please contact support.', 'error');
+        }
+    }, [settings?.is_disabled, staff]);
+
     const login = async (pin: string) => {
         if (!settings?.id) {
             console.error('Login failed: Settings not loaded or restaurant_id missing');
+            return false;
+        }
+
+        if (settings.is_disabled) {
+            showAlert('Access Restricted', 'Your workspace has been locked. Please contact support.', 'error');
             return false;
         }
 

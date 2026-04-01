@@ -3,8 +3,9 @@ import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import UserManagementModal from '../../components/admin/UserManagementModal';
+import OnboardRestaurantModal from '../../components/admin/OnboardRestaurantModal';
 import SuperAdminSMSManagement from '../../components/admin/SuperAdminSMSManagement';
-import { Plus, CreditCard, MessageSquare, Shield, Users, Building2 } from 'lucide-react';
+import { Plus, CreditCard, MessageSquare, Shield, Users, Building2, Copy, Lock, Unlock } from 'lucide-react';
 
 interface Restaurant {
     id: string;
@@ -12,6 +13,7 @@ interface Restaurant {
     subscription_plan: string;
     sms_credits: number;
     created_at: string;
+    is_disabled?: boolean;
     stats?: {
         admins: number;
         staff: number;
@@ -33,7 +35,6 @@ const SuperAdminDashboard: React.FC = () => {
     const [selectedRestaurantForUsers, setSelectedRestaurantForUsers] = useState<Restaurant | null>(null);
 
     // Form States
-    const [newRestaurantName, setNewRestaurantName] = useState('');
     const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
     const [creditsAmount, setCreditsAmount] = useState(0);
 
@@ -86,21 +87,17 @@ const SuperAdminDashboard: React.FC = () => {
         setLoading(false);
     };
 
-    const handleCreateRestaurant = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleToggleLock = async (restaurant: Restaurant) => {
         try {
             const { error } = await supabase
                 .from('restaurant_settings')
-                .insert([{ name: newRestaurantName, sms_credits: 0, subscription_plan: 'basic' }]);
-
+                .update({ is_disabled: !restaurant.is_disabled })
+                .eq('id', restaurant.id);
             if (error) throw error;
-
-            setIsCreateModalOpen(false);
-            setNewRestaurantName('');
+            showAlert('Success', `Workspace ${restaurant.is_disabled ? 'unlocked' : 'locked'} successfully`, 'success');
             fetchRestaurants();
         } catch (error: any) {
-            console.error('Error creating restaurant:', error);
-            showAlert('Error', 'Failed to create restaurant: ' + error.message, 'error');
+            showAlert('Error', error.message, 'error');
         }
     };
 
@@ -218,11 +215,28 @@ const SuperAdminDashboard: React.FC = () => {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {restaurants.map(restaurant => (
-                                        <tr key={restaurant.id} className="hover:bg-gray-50">
+                                        <tr key={restaurant.id} className={`${restaurant.is_disabled ? 'opacity-60 bg-gray-50 grayscale-[50%]' : 'hover:bg-gray-50'}`}>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <div className="text-sm font-medium text-gray-900">{restaurant.name}</div>
-                                                    <div className="ml-2 text-xs text-gray-400">({restaurant.id.slice(0, 8)})</div>
+                                                <div className="flex flex-col">
+                                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                                        {restaurant.name}
+                                                        {restaurant.is_disabled && <span className="bg-red-100 text-red-800 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">Locked</span>}
+                                                    </div>
+                                                    <div className="flex items-center mt-1 group">
+                                                        <code className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded mr-1.5 font-mono">
+                                                            {restaurant.id.slice(0, 8)}...
+                                                        </code>
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(restaurant.id);
+                                                                showAlert('Success', 'Restaurant ID copied', 'success');
+                                                            }}
+                                                            className="text-gray-400 hover:text-brand-gold focus:opacity-100 opacity-0 group-hover:opacity-100 transition-all"
+                                                            title="Copy Full ID"
+                                                        >
+                                                            <Copy className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -252,7 +266,14 @@ const SuperAdminDashboard: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <div className="flex justify-end space-x-2">
+                                                <div className="flex justify-end space-x-3 items-center">
+                                                    <button
+                                                        onClick={() => handleToggleLock(restaurant)}
+                                                        className={`${restaurant.is_disabled ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'} flex items-center`}
+                                                        title={restaurant.is_disabled ? "Unlock Workspace" : "Lock Workspace"}
+                                                    >
+                                                        {restaurant.is_disabled ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                                    </button>
                                                     <button
                                                         onClick={() => {
                                                             setSelectedRestaurantForUsers(restaurant);
@@ -287,40 +308,15 @@ const SuperAdminDashboard: React.FC = () => {
             )}
 
             {/* Create Modal */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow-xl w-96">
-                        <h3 className="text-lg font-bold mb-4">Add New Restaurant</h3>
-                        <form onSubmit={handleCreateRestaurant}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant Name</label>
-                                <input
-                                    type="text"
-                                    value={newRestaurantName}
-                                    onChange={e => setNewRestaurantName(e.target.value)}
-                                    className="w-full border border-gray-300 rounded p-2 focus:ring-brand-gold focus:border-brand-gold"
-                                    required
-                                />
-                            </div>
-                            <div className="flex justify-end space-x-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-brand-dark-gray text-white rounded hover:bg-gray-700"
-                                >
-                                    Create
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <OnboardRestaurantModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={() => {
+                    setIsCreateModalOpen(false);
+                    fetchRestaurants();
+                    showAlert('Success', 'Restaurant and Admin User provisioned successfully', 'success');
+                }}
+            />
 
             {/* Credits Modal */}
             {isCreditsModalOpen && selectedRestaurant && (

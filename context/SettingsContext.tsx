@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Settings = {
   id?: string;
+  is_disabled?: boolean;
   restaurant_name?: string;
   logo_url?: string;
   theme_color?: string;

@@ -30,11 +30,7 @@ const SettingsBasicInfo: React.FC<SettingsBasicInfoProps> = ({ formData, handleC
                     <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
                     <input type="url" name="website_url" value={formData.website_url} onChange={handleChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency Symbol</label>
-                    <input type="text" name="currency" value={formData.currency} onChange={handleChange} placeholder="e.g. £, $, €" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
-                </div>
-                <div className="flex items-center space-x-3 mt-6">
+                <div className="col-span-1 md:col-span-2 flex items-center space-x-3 mt-2">
                     <input
                         type="checkbox"
                         id="show_tax"

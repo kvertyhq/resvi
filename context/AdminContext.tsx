@@ -69,7 +69,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setRole(userRole);
 
             // 2. Fetch Restaurants based on Role
-            let query = supabase.from('restaurant_settings').select('id, name');
+            let query = supabase.from('restaurant_settings').select('id, name, is_disabled');
 
             // If NOT super_admin, filter by assigned restaurant
             if (userRole !== 'super_admin' && profile?.restaurant_id) {
@@ -88,12 +88,27 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (restaurantError) {
                 console.error('Error fetching restaurants:', restaurantError);
             } else if (restaurantData) {
-                setRestaurants(restaurantData);
+                // Filter out disabled restaurants unless the user is a super admin
+                const validRestaurants = restaurantData.filter(r => userRole === 'super_admin' || !r.is_disabled);
+
+                if (userRole !== 'super_admin' && validRestaurants.length === 0 && restaurantData.length > 0) {
+                    // Force log out
+                    window.alert("Access Restricted: Your workspace has been disabled. Please contact support.");
+                    await supabase.auth.signOut();
+                    localStorage.removeItem('admin_selected_restaurant_id');
+                    setSelectedRestaurantIdState(null);
+                    setRole(null);
+                    setRestaurants([]);
+                    setLoading(false);
+                    return;
+                }
+
+                setRestaurants(validRestaurants);
 
                 // Auto-select logic
-                if (!selectedRestaurantId || !restaurantData.find(r => r.id === selectedRestaurantId)) {
-                    if (restaurantData.length > 0) {
-                        setSelectedRestaurantId(restaurantData[0].id);
+                if (!selectedRestaurantId || !validRestaurants.find(r => r.id === selectedRestaurantId)) {
+                    if (validRestaurants.length > 0) {
+                        setSelectedRestaurantId(validRestaurants[0].id);
                     } else {
                         setSelectedRestaurantIdState(null);
                     }

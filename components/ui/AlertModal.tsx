@@ -1,4 +1,5 @@
 import React from 'react';
+import { Info, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export type AlertType = 'info' | 'error' | 'success' | 'warning';
 
@@ -32,13 +33,14 @@ const AlertModal: React.FC<AlertModalProps> = ({
   const isPos = mode === 'pos';
 
   const typeConfig = {
-    info: { icon: 'ℹ️', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    error: { icon: '❌', bg: 'bg-red-50 dark:bg-red-900/20' },
-    success: { icon: '✅', bg: 'bg-green-50 dark:bg-green-900/20' },
-    warning: { icon: '⚠️', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
+    info: { icon: Info, colorClass: 'text-blue-500 dark:text-blue-400' },
+    error: { icon: XCircle, colorClass: 'text-red-500 dark:text-red-400' },
+    success: { icon: CheckCircle2, colorClass: 'text-green-500 dark:text-green-400' },
+    warning: { icon: AlertTriangle, colorClass: 'text-yellow-500 dark:text-yellow-400' },
   };
 
   const config = typeConfig[type] || typeConfig.info;
+  const Icon = config.icon;
 
   // Render different styles based on POS mode
   if (isPos) {
@@ -46,7 +48,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
       <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
         <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-full max-w-md transform transition-all animate-slide-up">
           <div className="flex flex-col items-center text-center p-8 bg-gray-900">
-            <div className="text-6xl mb-4">{config.icon}</div>
+            <div className="mb-4"><Icon className={`w-16 h-16 ${config.colorClass}`} /></div>
             <h3 className={`text-3xl font-black uppercase tracking-wider mb-2 ${
                 type === 'error' ? 'text-red-400' :
                 type === 'warning' ? 'text-yellow-400' :
@@ -105,7 +107,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 animate-fade-in">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden w-full max-w-sm transform transition-all animate-slide-up border border-gray-200 dark:border-gray-700">
         <div className="flex items-start p-5 gap-4">
-          <div className="text-2xl mt-0.5 flex-shrink-0">{config.icon}</div>
+          <div className="mt-0.5 flex-shrink-0"><Icon className={`w-6 h-6 ${config.colorClass}`} /></div>
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 break-words">{title}</h3>
             {message && <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{message}</p>}

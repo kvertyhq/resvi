@@ -77,7 +77,7 @@ const SettingsPage: React.FC = () => {
             theme_color: '#c9a96e'
         },
         website_settings: {
-            watermark_text: 'Daniel Sushi',
+            watermark_text: 'Your Name',
             hero_title: 'Fuel Your Mood. Feed Your Cravings.',
             hero_subtitle: 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
             about_subtitle: 'Passion on a Plate',
@@ -168,7 +168,7 @@ const SettingsPage: React.FC = () => {
                             theme_color: settings.theme_color || '#c9a96e'
                         },
                         website_settings: settings.website_settings || {
-                            watermark_text: settings.watermark_text || 'Daniel Sushi',
+                            watermark_text: settings.watermark_text || 'Your Name',
                             hero_title: settings.hero_title || 'Fuel Your Mood. Feed Your Cravings.',
                             hero_subtitle: settings.hero_subtitle || 'Indulge in mood-boosting sushi and expertly prepared steaks—made with high-quality ingredients and chef precision.',
                             about_subtitle: settings.about_subtitle || 'Passion on a Plate',
@@ -405,12 +405,12 @@ const SettingsPage: React.FC = () => {
                                         <SettingsLocation formData={formData} handleChange={handleChange} />
                                     </div>
                                 )}
-                                
+
                                 {activeTab === 'theme' && (
                                     <div className="space-y-8 animate-fadeIn">
-                                        <SettingsTheme 
-                                            formData={formData} 
-                                            handleChange={handleChange} 
+                                        <SettingsTheme
+                                            formData={formData}
+                                            handleChange={handleChange}
                                             handleWebsiteSettingsChange={handleWebsiteSettingsChange}
                                             handleThemeSettingsChange={handleThemeSettingsChange}
                                             updateWebsiteSettings={updateWebsiteSettings}
@@ -420,11 +420,11 @@ const SettingsPage: React.FC = () => {
 
                                 {activeTab === 'media' && (
                                     <div className="space-y-8 animate-fadeIn">
-                                        <SettingsMedia 
-                                            formData={formData} 
-                                            handleChange={handleChange} 
+                                        <SettingsMedia
+                                            formData={formData}
+                                            handleChange={handleChange}
                                             handleWebsiteSettingsChange={handleWebsiteSettingsChange}
-                                            setFormData={setFormData} 
+                                            setFormData={setFormData}
                                         />
                                     </div>
                                 )}

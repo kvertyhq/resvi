@@ -42,6 +42,7 @@ import POSTablesPage from './pages/pos/POSTablesPage';
 import POSOrderPage from './pages/pos/POSOrderPage';
 import POSLoginPage from './pages/pos/POSLoginPage';
 import POSWalkInPage from './pages/pos/POSWalkInPage';
+import POSOnlineOrdersPage from './pages/pos/POSOnlineOrdersPage';
 import CustomerMenuPage from './pages/CustomerMenuPage';
 import POSMyOrdersPage from './pages/pos/POSMyOrdersPage';
 import PublicReceiptPage from './pages/public/PublicReceiptPage';
@@ -244,6 +245,7 @@ function App() {
                   }>
                     <Route index element={<POSTablesPage />} />
                     <Route path="walk-in" element={<POSWalkInPage />} />
+                    <Route path="online" element={<POSOnlineOrdersPage />} />
                     <Route path="phone-setup" element={<POSPhoneOrderSetupPage />} />
                     <Route path="my-orders" element={<POSMyOrdersPage />} />
                     <Route path="kds" element={<KDSPage />} />

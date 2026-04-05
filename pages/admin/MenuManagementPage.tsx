@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -75,6 +75,8 @@ const MenuManagementPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers'>('items');
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [categorySearchQuery, setCategorySearchQuery] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
     // Pagination State
     const itemsPerPage = 10;
@@ -87,6 +89,7 @@ const MenuManagementPage: React.FC = () => {
 
     // Data State
     const [categories, setCategories] = useState<MenuCategory[]>([]);
+    const [allCategories, setAllCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
     const [addons, setAddons] = useState<Addon[]>([]);
     const [stations, setStations] = useState<Station[]>([]);
@@ -118,7 +121,7 @@ const MenuManagementPage: React.FC = () => {
     const [defaultToppingIds, setDefaultToppingIds] = useState<Set<string>>(new Set());
 
     // Size variants state for item edit modal
-    const [priceVariants, setPriceVariants] = useState<{name: string; price: number}[]>([]);
+    const [priceVariants, setPriceVariants] = useState<{ name: string; price: number }[]>([]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,6 +167,8 @@ const MenuManagementPage: React.FC = () => {
     const [imagePreview, setImagePreview] = useState<string>('');
     const [aiCheckStatus, setAiCheckStatus] = useState<'idle' | 'checking' | 'approved' | 'rejected'>('idle');
     const [aiFeedback, setAiFeedback] = useState<string>('');
+    const [isRefreshingCategories, setIsRefreshingCategories] = useState(false);
+    const [isRefreshingItems, setIsRefreshingItems] = useState(false);
 
     useEffect(() => {
         if (selectedRestaurantId) {
@@ -186,11 +191,11 @@ const MenuManagementPage: React.FC = () => {
 
     useEffect(() => {
         if (selectedRestaurantId) fetchItems();
-    }, [itemsPage]);
+    }, [itemsPage, selectedCategoryId]);
 
     useEffect(() => {
         if (selectedRestaurantId) fetchCategories();
-    }, [categoriesPage]);
+    }, [categoriesPage, categorySearchQuery]);
 
     useEffect(() => {
         if (selectedRestaurantId) fetchAddons();
@@ -199,8 +204,22 @@ const MenuManagementPage: React.FC = () => {
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups()]);
+        await Promise.all([fetchCategories(), fetchAllCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups()]);
         setLoading(false);
+    };
+
+    const handleRefresh = async () => {
+        if (!selectedRestaurantId) return;
+        setIsRefreshingItems(true);
+        await Promise.all([
+            fetchCategories(), 
+            fetchAllCategories(), 
+            fetchItems(), 
+            fetchAddons(), 
+            fetchStations(), 
+            fetchModifierGroups()
+        ]);
+        setIsRefreshingItems(false);
     };
 
     const fetchStations = async () => {
@@ -368,17 +387,36 @@ const MenuManagementPage: React.FC = () => {
         }
     };
 
+    const fetchAllCategories = async () => {
+        if (!selectedRestaurantId) return;
+        setIsRefreshingCategories(true);
+        const { data, error } = await supabase
+            .from('menu_categories')
+            .select('*')
+            .eq('restaurant_id', selectedRestaurantId)
+            .order('order_index', { ascending: true });
+
+        if (data) setAllCategories(data);
+        if (error) console.error('Error fetching all categories:', error);
+        setIsRefreshingCategories(false);
+    };
+
     const fetchCategories = async () => {
         if (!selectedRestaurantId) return;
         const from = (categoriesPage - 1) * itemsPerPage;
         const to = from + itemsPerPage - 1;
 
-        const { data, error, count } = await supabase
+        let query = supabase
             .from('menu_categories')
             .select('*', { count: 'exact' })
             .eq('restaurant_id', selectedRestaurantId)
-            .order('order_index', { ascending: true })
-            .range(from, to);
+            .order('order_index', { ascending: true });
+
+        if (categorySearchQuery) {
+            query = query.ilike('name', `%${categorySearchQuery}%`);
+        }
+
+        const { data, error, count } = await query.range(from, to);
 
         if (data) setCategories(data);
         if (count !== null) setCategoriesTotalCount(count);
@@ -387,6 +425,7 @@ const MenuManagementPage: React.FC = () => {
 
     const fetchItems = async () => {
         if (!selectedRestaurantId) return;
+        setIsRefreshingItems(true);
         const from = (itemsPage - 1) * itemsPerPage;
         const to = from + itemsPerPage - 1;
 
@@ -400,11 +439,16 @@ const MenuManagementPage: React.FC = () => {
             query = query.ilike('name', `%${searchQuery}%`);
         }
 
+        if (selectedCategoryId) {
+            query = query.eq('category_id', selectedCategoryId);
+        }
+
         const { data, error, count } = await query.range(from, to);
 
         if (data) setItems(data);
         if (count !== null) setItemsTotalCount(count);
         if (error) console.error('Error fetching items:', error);
+        setIsRefreshingItems(false);
     };
 
     useEffect(() => {
@@ -415,7 +459,17 @@ const MenuManagementPage: React.FC = () => {
             }
         }, 400);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, selectedCategoryId]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (selectedRestaurantId && activeTab === 'categories') {
+                setCategoriesPage(1);
+                fetchCategories();
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [categorySearchQuery]);
 
     const fetchAddons = async () => {
         if (!selectedRestaurantId) return;
@@ -727,7 +781,7 @@ const MenuManagementPage: React.FC = () => {
 
             // 1. Insert the new item
             const itemWithVariants = item as any;
-            
+
             const itemPayload = {
                 restaurant_id: selectedRestaurantId,
                 name: newName,
@@ -848,13 +902,50 @@ const MenuManagementPage: React.FC = () => {
                 <h2 className="text-3xl font-serif font-bold text-gray-800">Menu Management</h2>
                 <div className="flex items-center gap-4">
                     {activeTab === 'items' && (
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search items..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-brand-gold focus:border-brand-gold outline-none w-48 sm:w-64 transition-all"
+                                />
+                            </div>
+                            <select
+                                value={selectedCategoryId}
+                                onChange={(e) => {
+                                    setSelectedCategoryId(e.target.value);
+                                    setItemsPage(1);
+                                }}
+                                className="px-4 py-2 border border-gray-300 rounded-md focus:ring-brand-gold focus:border-brand-gold outline-none text-sm transition-all bg-white"
+                            >
+                                <option value="">All Categories</option>
+                                {allCategories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleRefresh}
+                                disabled={isRefreshingItems}
+                                className="p-2 text-gray-400 hover:text-brand-gold transition-colors disabled:opacity-50"
+                                title="Refresh All Data"
+                            >
+                                <RefreshCw className={`h-5 w-5 ${isRefreshingItems ? 'animate-spin text-brand-gold' : ''}`} />
+                            </button>
+                        </div>
+                    )}
+                    {activeTab === 'categories' && (
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search items..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search categories..."
+                                value={categorySearchQuery}
+                                onChange={(e) => setCategorySearchQuery(e.target.value)}
                                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-brand-gold focus:border-brand-gold outline-none w-64 transition-all"
                             />
                         </div>
@@ -1019,7 +1110,7 @@ const MenuManagementPage: React.FC = () => {
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {items.map((item) => {
-                                            const catName = categories.find(c => c.id === item.category_id)?.name || 'Unknown';
+                                            const catName = allCategories.find(c => c.id === item.category_id)?.name || 'Unknown';
                                             return (
                                                 <tr key={item.id}>
                                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -1042,8 +1133,8 @@ const MenuManagementPage: React.FC = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button 
-                                                            onClick={() => handleDuplicateItem(item)} 
+                                                        <button
+                                                            onClick={() => handleDuplicateItem(item)}
                                                             className="text-blue-600 hover:text-blue-900 mr-4"
                                                             title="Duplicate Item"
                                                         >
@@ -1249,7 +1340,7 @@ const MenuManagementPage: React.FC = () => {
                                             <React.Fragment key={group.id}>
                                                 <tr className={expandedGroupId === group.id ? 'bg-gray-50' : ''}>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <button 
+                                                        <button
                                                             onClick={() => setExpandedGroupId(expandedGroupId === group.id ? null : group.id)}
                                                             className="text-gray-400 hover:text-gray-600"
                                                         >
@@ -1268,15 +1359,15 @@ const MenuManagementPage: React.FC = () => {
                                                         {group.items?.length || 0} items
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button 
-                                                            onClick={() => openModifierItemModal(group.id)} 
+                                                        <button
+                                                            onClick={() => openModifierItemModal(group.id)}
                                                             className="text-green-600 hover:text-green-900 mr-4"
                                                             title="Add Item"
                                                         >
                                                             <Plus className="h-5 w-5" />
                                                         </button>
-                                                        <button 
-                                                            onClick={() => handleDuplicateModifierGroup(group)} 
+                                                        <button
+                                                            onClick={() => handleDuplicateModifierGroup(group)}
                                                             className="text-blue-600 hover:text-blue-900 mr-4"
                                                             title="Duplicate Group"
                                                         >
@@ -1326,14 +1417,14 @@ const MenuManagementPage: React.FC = () => {
                                                                                         </span>
                                                                                     </td>
                                                                                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                                                                        <button 
-                                                                                            onClick={() => openModifierItemModal(group.id, item)} 
+                                                                                        <button
+                                                                                            onClick={() => openModifierItemModal(group.id, item)}
                                                                                             className="text-indigo-600 hover:text-indigo-900 mr-3"
                                                                                         >
                                                                                             <Edit className="h-4 w-4" />
                                                                                         </button>
-                                                                                        <button 
-                                                                                            onClick={() => handleDeleteModifierItem(item.id)} 
+                                                                                        <button
+                                                                                            onClick={() => handleDeleteModifierItem(item.id)}
                                                                                             className="text-red-600 hover:text-red-900"
                                                                                         >
                                                                                             <Trash2 className="h-4 w-4" />
@@ -1458,7 +1549,7 @@ const MenuManagementPage: React.FC = () => {
                                                             </div>
                                                         );
                                                     })}
-                                                {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
+                                                    {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
                                                 </div>
                                             </div>
 
@@ -1498,10 +1589,22 @@ const MenuManagementPage: React.FC = () => {
                                                     <input type="text" name="name" value={itemForm.name} onChange={handleItemInputChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <label className="block text-sm font-medium text-gray-700">Category</label>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={fetchAllCategories}
+                                                            disabled={isRefreshingCategories}
+                                                            className="text-brand-gold hover:text-yellow-600 flex items-center text-xs font-medium disabled:opacity-50"
+                                                            title="Refresh Categories"
+                                                        >
+                                                            <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshingCategories ? 'animate-spin' : ''}`} /> 
+                                                            {isRefreshingCategories ? 'Refreshing...' : 'Refresh'}
+                                                        </button>
+                                                    </div>
                                                     <select name="category_id" value={itemForm.category_id} onChange={handleItemInputChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold">
                                                         <option value="">Select Category</option>
-                                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                        {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
@@ -1549,7 +1652,7 @@ const MenuManagementPage: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                             {/* Modifier Groups Selection - shown early for easy access */}
+                                            {/* Modifier Groups Selection - shown early for easy access */}
                                             <div className="border-t border-gray-200 pt-6">
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">Modifier Groups <span className="text-xs text-gray-400">(set order to control display position)</span></label>
                                                 <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
@@ -1596,7 +1699,7 @@ const MenuManagementPage: React.FC = () => {
                                                             </div>
                                                         );
                                                     })}
-                                                {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
+                                                    {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
                                                 </div>
                                             </div>
 
@@ -1629,11 +1732,10 @@ const MenuManagementPage: React.FC = () => {
                                                                             else newSet.add(ti.id);
                                                                             setDefaultToppingIds(newSet);
                                                                         }}
-                                                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                                                                            isDefault
+                                                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${isDefault
                                                                                 ? 'bg-green-100 border-green-400 text-green-800'
                                                                                 : 'bg-white border-gray-300 text-gray-600 hover:border-brand-gold'
-                                                                        }`}
+                                                                            }`}
                                                                     >
                                                                         {isDefault && '✓ '}{ti.name}
                                                                     </button>
@@ -1818,33 +1920,33 @@ const MenuManagementPage: React.FC = () => {
                             <form onSubmit={handleModifierGroupSubmit} className="space-y-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
-                                    <input 
-                                        type="text" 
-                                        value={modifierGroupForm.name || ''} 
-                                        onChange={e => setModifierGroupForm({...modifierGroupForm, name: e.target.value})} 
-                                        required 
+                                    <input
+                                        type="text"
+                                        value={modifierGroupForm.name || ''}
+                                        onChange={e => setModifierGroupForm({ ...modifierGroupForm, name: e.target.value })}
+                                        required
                                         placeholder="e.g. Pizza Toppings, Crust Size"
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center">
-                                        <input 
-                                            type="checkbox" 
-                                            id="mg_required" 
-                                            checked={modifierGroupForm.is_required || false} 
-                                            onChange={e => setModifierGroupForm({...modifierGroupForm, is_required: e.target.checked})} 
-                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                        <input
+                                            type="checkbox"
+                                            id="mg_required"
+                                            checked={modifierGroupForm.is_required || false}
+                                            onChange={e => setModifierGroupForm({ ...modifierGroupForm, is_required: e.target.checked })}
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
                                         />
                                         <label htmlFor="mg_required" className="ml-2 block text-sm text-gray-900">Required Selection</label>
                                     </div>
                                     <div className="flex items-center">
-                                        <input 
-                                            type="checkbox" 
-                                            id="mg_multiple" 
-                                            checked={modifierGroupForm.is_multiple || false} 
-                                            onChange={e => setModifierGroupForm({...modifierGroupForm, is_multiple: e.target.checked})} 
-                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                        <input
+                                            type="checkbox"
+                                            id="mg_multiple"
+                                            checked={modifierGroupForm.is_multiple || false}
+                                            onChange={e => setModifierGroupForm({ ...modifierGroupForm, is_multiple: e.target.checked })}
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
                                         />
                                         <label htmlFor="mg_multiple" className="ml-2 block text-sm text-gray-900">Allow Multiple</label>
                                     </div>
@@ -1853,22 +1955,22 @@ const MenuManagementPage: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Min Selection</label>
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 min="0"
-                                                value={modifierGroupForm.min_selection !== undefined ? modifierGroupForm.min_selection : 0} 
-                                                onChange={e => setModifierGroupForm({...modifierGroupForm, min_selection: parseInt(e.target.value) || 0})} 
-                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                                value={modifierGroupForm.min_selection !== undefined ? modifierGroupForm.min_selection : 0}
+                                                onChange={e => setModifierGroupForm({ ...modifierGroupForm, min_selection: parseInt(e.target.value) || 0 })}
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                             />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Max Selection (optional)</label>
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 min="0"
-                                                value={modifierGroupForm.max_selection || ''} 
-                                                onChange={e => setModifierGroupForm({...modifierGroupForm, max_selection: e.target.value ? parseInt(e.target.value) : null})} 
-                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                                value={modifierGroupForm.max_selection || ''}
+                                                onChange={e => setModifierGroupForm({ ...modifierGroupForm, max_selection: e.target.value ? parseInt(e.target.value) : null })}
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                             />
                                         </div>
                                     </div>
@@ -1899,23 +2001,23 @@ const MenuManagementPage: React.FC = () => {
                             <form onSubmit={handleModifierItemSubmit} className="space-y-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-                                    <input 
-                                        type="text" 
-                                        value={modifierItemForm.name || ''} 
-                                        onChange={e => setModifierItemForm({...modifierItemForm, name: e.target.value})} 
-                                        required 
+                                    <input
+                                        type="text"
+                                        value={modifierItemForm.name || ''}
+                                        onChange={e => setModifierItemForm({ ...modifierItemForm, name: e.target.value })}
+                                        required
                                         placeholder="e.g. Pepperoni, Extra Cheese"
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Base Price Adjustment (£)</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         step="0.01"
-                                        value={modifierItemForm.price_adjustment !== undefined ? modifierItemForm.price_adjustment : 0} 
-                                        onChange={e => setModifierItemForm({...modifierItemForm, price_adjustment: parseFloat(e.target.value) || 0})} 
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                        value={modifierItemForm.price_adjustment !== undefined ? modifierItemForm.price_adjustment : 0}
+                                        onChange={e => setModifierItemForm({ ...modifierItemForm, price_adjustment: parseFloat(e.target.value) || 0 })}
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Default price added. Ex: 1.50</p>
                                 </div>
@@ -1923,7 +2025,7 @@ const MenuManagementPage: React.FC = () => {
                                 <div className="border-t border-gray-200 pt-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Per-Size Price Matrix (Optional)</label>
                                     <p className="text-xs text-gray-500 mb-3">If this modifier costs different amounts for different item sizes (e.g. Small vs Large pizza), add sizes below.</p>
-                                    
+
                                     <div className="space-y-3">
                                         {Object.entries(modifierItemForm.price_matrix || {}).map(([sizeName, price]) => (
                                             <div key={sizeName} className="flex items-center space-x-3">
@@ -1968,8 +2070,8 @@ const MenuManagementPage: React.FC = () => {
 
                                         {/* Add new size to matrix */}
                                         <div className="flex items-center space-x-2 mt-2">
-                                            <input 
-                                                type="text" 
+                                            <input
+                                                type="text"
                                                 id="new_matrix_size"
                                                 placeholder="New Size (e.g. Medium)"
                                                 className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-brand-gold focus:border-brand-gold"
@@ -1990,7 +2092,7 @@ const MenuManagementPage: React.FC = () => {
                                                     }
                                                 }}
                                             />
-                                            <button 
+                                            <button
                                                 type="button"
                                                 onClick={() => {
                                                     const input = document.getElementById('new_matrix_size') as HTMLInputElement;
@@ -2015,12 +2117,12 @@ const MenuManagementPage: React.FC = () => {
                                 </div>
 
                                 <div className="flex items-center pt-2 border-t border-gray-200">
-                                    <input 
-                                        type="checkbox" 
-                                        id="mi_available" 
-                                        checked={modifierItemForm.is_available !== false} 
-                                        onChange={e => setModifierItemForm({...modifierItemForm, is_available: e.target.checked})} 
-                                        className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" 
+                                    <input
+                                        type="checkbox"
+                                        id="mi_available"
+                                        checked={modifierItemForm.is_available !== false}
+                                        onChange={e => setModifierItemForm({ ...modifierItemForm, is_available: e.target.checked })}
+                                        className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
                                     />
                                     <label htmlFor="mi_available" className="ml-2 block text-sm text-gray-900">Available</label>
                                 </div>

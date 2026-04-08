@@ -41,9 +41,10 @@ interface POSModifierModalProps {
     isOpen: boolean;
     onClose: () => void;
     onAddToCart: (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: ExcludedTopping[], selectedReplacers?: any[]) => void;
+    currency?: string;
 }
 
-const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart }) => {
+const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart, currency = '£' }) => {
     const { showAlert } = useAlert();
     const {
         modifierGroups: allGroups,
@@ -415,7 +416,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                         style={selectedVariant?.name === v.name ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}
                                     >
                                         <div className="text-sm uppercase">{v.name}</div>
-                                        <div className="text-lg">${Number(v.price).toFixed(2)}</div>
+                                        <div className="text-lg">{currency}{Number(v.price).toFixed(2)}</div>
                                     </button>
                                 ))}
                             </div>
@@ -540,7 +541,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                         <div className="text-xs font-bold">{item.name}</div>
                                                         {item.price_adjustment !== 0 && (
                                                             <div className="text-[10px] mt-1 opacity-70">
-                                                                {item.price_adjustment > 0 ? `+£${item.price_adjustment.toFixed(2)}` : `-£${Math.abs(item.price_adjustment).toFixed(2)}`}
+                                                                {item.price_adjustment > 0 ? `+${currency}${item.price_adjustment.toFixed(2)}` : `-${currency}${Math.abs(item.price_adjustment).toFixed(2)}`}
                                                             </div>
                                                         )}
                                                         {isSelected && (
@@ -609,7 +610,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                     )}
                                                     <span className="text-xs font-semibold leading-tight">{item.name}</span>
                                                     {displayPrice > 0 && (
-                                                        <span className="text-[10px] opacity-70 mt-0.5">+${displayPrice.toFixed(2)}</span>
+                                                        <span className="text-[10px] opacity-70 mt-0.5">{currency}{displayPrice.toFixed(2)}</span>
                                                     )}
                                                 </button>
                                             );
@@ -642,7 +643,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                         <span className="font-semibold">{item.name}</span>
                                                         <div className="flex items-center gap-3">
                                                             {displayPrice > 0 && (
-                                                                <span className="text-sm opacity-80">+${displayPrice.toFixed(2)}</span>
+                                                                <span className="text-sm opacity-80">{currency}{displayPrice.toFixed(2)}</span>
                                                             )}
                                                             <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? '' : 'border-gray-500'}`} style={isSelected ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}>
                                                                 {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
@@ -729,7 +730,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                         className="w-full text-white font-bold py-4 rounded-xl shadow-lg transition-all flex justify-between px-8 hover:brightness-110"
                     >
                         <span>Add to Order</span>
-                        <span>${totalPrice.toFixed(2)}</span>
+                        <span>{currency}{totalPrice.toFixed(2)}</span>
                     </button>
                 </div>
             </div>

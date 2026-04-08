@@ -938,9 +938,10 @@ const POSOrderPage: React.FC = () => {
             {/* Modal */}
             <POSModifierModal
                 isOpen={isModalOpen}
-                menuItem={itemForModal}
                 onClose={() => setIsModalOpen(false)}
+                menuItem={itemForModal}
                 onAddToCart={addToCart}
+                currency={settings?.currency}
             />
 
             <OrderUpdatedModal

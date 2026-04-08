@@ -348,7 +348,10 @@ const POSOrderPage: React.FC = () => {
     };
 
     const handleItemClick = (item: any) => {
-        if (itemModifiersMap.has(item.id)) {
+        const hasModifiers = itemModifiersMap.has(item.id);
+        const hasVariants = item.price_variants && item.price_variants.length > 1;
+
+        if (hasModifiers || hasVariants) {
             // Open Modal
             setItemForModal(item);
             setIsModalOpen(true);
@@ -1445,16 +1448,14 @@ const POSOrderPage: React.FC = () => {
                 )}
 
                 {/* Payment Modal */}
-                {stripePromise && (
-                    <Elements stripe={stripePromise}>
-                        <POSPaymentModal
-                            isOpen={showPaymentModal}
-                            onClose={() => setShowPaymentModal(false)}
-                            amount={total}
-                            onPaymentSuccess={handlePaymentSuccess}
-                        />
-                    </Elements>
-                )}
+                <Elements stripe={stripePromise}>
+                    <POSPaymentModal
+                        isOpen={showPaymentModal}
+                        onClose={() => setShowPaymentModal(false)}
+                        amount={total}
+                        onPaymentSuccess={handlePaymentSuccess}
+                    />
+                </Elements>
 
                 {/* Success Modal */}
                 <OrderSuccessModal

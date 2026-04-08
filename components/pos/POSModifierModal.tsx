@@ -45,15 +45,15 @@ interface POSModifierModalProps {
 
 const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart }) => {
     const { showAlert } = useAlert();
-    const { 
-        modifierGroups: allGroups, 
-        modifierItems: allItems, 
-        menuItemModifiers: allLinks, 
-        menuCategoryModifiers: allCatLinks, 
+    const {
+        modifierGroups: allGroups,
+        modifierItems: allItems,
+        menuItemModifiers: allLinks,
+        menuCategoryModifiers: allCatLinks,
         replacerGroups: allReplGroups,
         replacerItems: allReplItems,
         menuItemReplacers: allItemReplLinks,
-        loading: menuLoading 
+        loading: menuLoading
     } = useMenu();
 
     const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -64,7 +64,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
     // --- Replacement State ---
     // Stores selected replacers: { groupId: { itemId: true } }
     const [selectedReplacers, setSelectedReplacers] = useState<Record<string, Record<string, boolean>>>({});
-    
+
     // --- Topping Exclusion State ---
     const [excludedToppings, setExcludedToppings] = useState<ExcludedTopping[]>([]);
     const [replacementPickerFor, setReplacementPickerFor] = useState<string | null>(null);
@@ -106,12 +106,12 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
     // Filter and assemble replacer groups for the current item
     const replacerGroups = useMemo(() => {
         if (!menuItem || !allReplGroups || !allReplItems || !allItemReplLinks) return [];
-        
+
         const linkedGroupIds = allItemReplLinks
             .filter(l => l.menu_item_id === menuItem.id)
             .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
             .map(l => l.replacer_group_id);
-            
+
         return allReplGroups
             .filter(g => linkedGroupIds.includes(g.id))
             .map(g => ({
@@ -370,9 +370,9 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
         });
 
         onAddToCart(
-            finalMenuItem, 
-            flatModifiers, 
-            totalPrice, 
+            finalMenuItem,
+            flatModifiers,
+            totalPrice,
             excludedToppings.length > 0 ? excludedToppings : undefined,
             flatReplacers.length > 0 ? flatReplacers : undefined
         );
@@ -402,7 +402,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                     {/* Variants / Sizes */}
                     {menuItem?.price_variants?.length > 0 && (
                         <div className="border-b border-gray-700 pb-6">
-                            <h3 className="font-bold text-lg text-white mb-3">Select Size</h3>
+                            <h3 className="font-bold text-lg text-white mb-3">Select Variant</h3>
                             <div className="flex gap-2">
                                 {menuItem.price_variants.map((v: any) => (
                                     <button
@@ -518,7 +518,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                         <div className="flex justify-between items-center px-1">
                                             <h4 className="font-bold text-sm text-gray-300 uppercase tracking-wider">{group.name}</h4>
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">
-                                                {group.is_required ? 'Required' : 'Optional'} 
+                                                {group.is_required ? 'Required' : 'Optional'}
                                                 {group.is_multiple ? ' • Multiple' : ' • One only'}
                                             </span>
                                         </div>
@@ -531,8 +531,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                         onClick={() => toggleReplacer(group.id, item.id, group.is_multiple)}
                                                         className={`
                                                             relative p-3 rounded-xl border-2 text-left transition-all
-                                                            ${isSelected 
-                                                                ? 'text-white border-brand-gold bg-brand-gold bg-opacity-10' 
+                                                            ${isSelected
+                                                                ? 'text-white border-brand-gold bg-brand-gold bg-opacity-10'
                                                                 : 'bg-gray-700 border-transparent text-gray-300 hover:bg-gray-600'}
                                                         `}
                                                         style={isSelected ? { borderColor: 'var(--theme-color)', color: 'white' } : {}}
@@ -563,9 +563,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                     {/* Modifier Groups */}
                     {loading ? (
                         <div className="text-center text-gray-400 py-8">Loading modifiers...</div>
-                    ) : modifierGroups.length === 0 ? (
-                        <div className="text-center text-gray-400 py-8">No options available. Add to cart?</div>
-                    ) : (
+                    ) : modifierGroups.length === 0 ? null : (
                         modifierGroups.map(group => (
                             <div key={group.id} className="border-b border-gray-700 pb-6 last:border-0">
                                 <div className="flex justify-between items-center mb-3">

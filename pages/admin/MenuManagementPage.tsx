@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronUp, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -111,6 +111,19 @@ const MenuManagementPage: React.FC = () => {
     const [categories, setCategories] = useState<MenuCategory[]>([]);
     const [allCategories, setAllCategories] = useState<MenuCategory[]>([]);
     const [items, setItems] = useState<MenuItem[]>([]);
+    
+    // Suggestion logic for modifier price matrix
+    const allUniqueVariantNames = useMemo(() => {
+        const names = new Set<string>();
+        items.forEach(item => {
+            if (item.price_variants && Array.isArray(item.price_variants)) {
+                item.price_variants.forEach((v: any) => {
+                    if (v.name) names.add(v.name);
+                });
+            }
+        });
+        return Array.from(names).sort();
+    }, [items]);
     const [addons, setAddons] = useState<Addon[]>([]);
     const [stations, setStations] = useState<Station[]>([]);
     const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
@@ -162,6 +175,17 @@ const MenuManagementPage: React.FC = () => {
 
     // Size variants state for item edit modal
     const [priceVariants, setPriceVariants] = useState<{ name: string; price: number }[]>([]);
+
+    const movePriceVariant = (index: number, direction: 'up' | 'down') => {
+        const newVariants = [...priceVariants];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex >= 0 && newIndex < newVariants.length) {
+            const temp = newVariants[index];
+            newVariants[index] = newVariants[newIndex];
+            newVariants[newIndex] = temp;
+            setPriceVariants(newVariants);
+        }
+    };
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -341,14 +365,30 @@ const MenuManagementPage: React.FC = () => {
     const handleModifierGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRestaurantId) return;
-        const payload = { ...modifierGroupForm, restaurant_id: selectedRestaurantId };
-        if (editingModifierGroup) {
-            await supabase.from('menu_modifiers').update(payload).eq('id', editingModifierGroup.id);
-        } else {
-            await supabase.from('menu_modifiers').insert([payload]);
+        
+        try {
+            // Clean payload - remove nested items and read-only fields
+            const { items, id, created_at, ...cleanPayload } = modifierGroupForm as any;
+            const payload = { 
+                ...cleanPayload, 
+                restaurant_id: selectedRestaurantId 
+            };
+            
+            if (editingModifierGroup) {
+                const { error } = await supabase.from('menu_modifiers').update(payload).eq('id', editingModifierGroup.id);
+                if (error) throw error;
+                showAlert('Success', 'Modifier group updated.', 'success');
+            } else {
+                const { error } = await supabase.from('menu_modifiers').insert([payload]);
+                if (error) throw error;
+                showAlert('Success', 'Modifier group created.', 'success');
+            }
+            setIsModifierGroupModalOpen(false);
+            fetchModifierGroups();
+        } catch (error: any) {
+            console.error('Error saving modifier group:', error);
+            showAlert('Error', error.message || 'Failed to save modifier group.', 'error');
         }
-        setIsModifierGroupModalOpen(false);
-        fetchModifierGroups();
     };
 
     const handleDeleteModifierGroup = async (id: string) => {
@@ -433,14 +473,29 @@ const MenuManagementPage: React.FC = () => {
 
     const handleModifierItemSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = { ...modifierItemForm, modifier_group_id: modifierItemGroupId };
-        if (editingModifierItem) {
-            await supabase.from('menu_modifier_items').update(payload).eq('id', editingModifierItem.id);
-        } else {
-            await supabase.from('menu_modifier_items').insert([payload]);
+        try {
+            // Clean payload
+            const { id, modifier_group_id, created_at, ...cleanPayload } = modifierItemForm as any;
+            const payload = { 
+                ...cleanPayload, 
+                modifier_group_id: modifierItemGroupId 
+            };
+            
+            if (editingModifierItem) {
+                const { error } = await supabase.from('menu_modifier_items').update(payload).eq('id', editingModifierItem.id);
+                if (error) throw error;
+                showAlert('Success', 'Modifier item updated.', 'success');
+            } else {
+                const { error } = await supabase.from('menu_modifier_items').insert([payload]);
+                if (error) throw error;
+                showAlert('Success', 'Modifier item created.', 'success');
+            }
+            setIsModifierItemModalOpen(false);
+            fetchModifierGroups();
+        } catch (error: any) {
+            console.error('Error saving modifier item:', error);
+            showAlert('Error', error.message || 'Failed to save modifier item.', 'error');
         }
-        setIsModifierItemModalOpen(false);
-        fetchModifierGroups();
     };
 
     const handleDeleteModifierItem = async (id: string) => {
@@ -469,14 +524,30 @@ const MenuManagementPage: React.FC = () => {
     const handleReplacerGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRestaurantId) return;
-        const payload = { ...replacerGroupForm, restaurant_id: selectedRestaurantId };
-        if (editingReplacerGroup) {
-            await supabase.from('menu_replacer_groups').update(payload).eq('id', editingReplacerGroup.id);
-        } else {
-            await supabase.from('menu_replacer_groups').insert([payload]);
+        
+        try {
+            // Clean payload
+            const { items, id, created_at, ...cleanPayload } = replacerGroupForm as any;
+            const payload = { 
+                ...cleanPayload, 
+                restaurant_id: selectedRestaurantId 
+            };
+            
+            if (editingReplacerGroup) {
+                const { error } = await supabase.from('menu_replacer_groups').update(payload).eq('id', editingReplacerGroup.id);
+                if (error) throw error;
+                showAlert('Success', 'Replacer group updated.', 'success');
+            } else {
+                const { error } = await supabase.from('menu_replacer_groups').insert([payload]);
+                if (error) throw error;
+                showAlert('Success', 'Replacer group created.', 'success');
+            }
+            setIsReplacerGroupModalOpen(false);
+            fetchReplacerGroups();
+        } catch (error: any) {
+            console.error('Error saving replacer group:', error);
+            showAlert('Error', error.message || 'Failed to save replacer group.', 'error');
         }
-        setIsReplacerGroupModalOpen(false);
-        fetchReplacerGroups();
     };
 
     const handleDeleteReplacerGroup = async (id: string) => {
@@ -505,18 +576,34 @@ const MenuManagementPage: React.FC = () => {
 
     const handleReplacerItemSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = { ...replacerItemForm, replacer_group_id: replacerItemGroupId };
-        // handle empty target_modifier_item_id
-        if (payload.target_modifier_item_id === '') {
-            payload.target_modifier_item_id = null as any;
+        try {
+            // Clean payload
+            const { id, replacer_group_id, created_at, ...cleanPayload } = replacerItemForm as any;
+            const payload = { 
+                ...cleanPayload, 
+                replacer_group_id: replacerItemGroupId 
+            };
+            
+            // handle empty target_modifier_item_id
+            if (payload.target_modifier_item_id === '') {
+                payload.target_modifier_item_id = null;
+            }
+            
+            if (editingReplacerItem) {
+                const { error } = await supabase.from('menu_replacer_items').update(payload).eq('id', editingReplacerItem.id);
+                if (error) throw error;
+                showAlert('Success', 'Replacer option updated.', 'success');
+            } else {
+                const { error } = await supabase.from('menu_replacer_items').insert([payload]);
+                if (error) throw error;
+                showAlert('Success', 'Replacer option created.', 'success');
+            }
+            setIsReplacerItemModalOpen(false);
+            fetchReplacerGroups();
+        } catch (error: any) {
+            console.error('Error saving replacer option:', error);
+            showAlert('Error', error.message || 'Failed to save replacer option.', 'error');
         }
-        if (editingReplacerItem) {
-            await supabase.from('menu_replacer_items').update(payload).eq('id', editingReplacerItem.id);
-        } else {
-            await supabase.from('menu_replacer_items').insert([payload]);
-        }
-        setIsReplacerItemModalOpen(false);
-        fetchReplacerGroups();
     };
 
     const handleDeleteReplacerItem = async (id: string) => {
@@ -1549,11 +1636,11 @@ const MenuManagementPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <button
-                                                            onClick={() => openModifierItemModal(group.id)}
-                                                            className="text-green-600 hover:text-green-900 mr-4"
+                                                            onClick={() => openModifierItemModal(group.id, undefined, allUniqueVariantNames)}
+                                                            className="inline-flex items-center px-2 py-1 border border-brand-gold text-xs font-medium rounded text-brand-gold hover:bg-brand-gold hover:text-white transition-colors mr-4"
                                                             title="Add Item"
                                                         >
-                                                            <Plus className="h-5 w-5" />
+                                                            <Plus className="h-3 w-3 mr-1" /> Add Item
                                                         </button>
                                                         <button
                                                             onClick={() => handleDuplicateModifierGroup(group)}
@@ -1607,7 +1694,7 @@ const MenuManagementPage: React.FC = () => {
                                                                                     </td>
                                                                                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                                                                                         <button
-                                                                                            onClick={() => openModifierItemModal(group.id, item)}
+                                                                                            onClick={() => openModifierItemModal(group.id, item, allUniqueVariantNames)}
                                                                                             className="text-indigo-600 hover:text-indigo-900 mr-3"
                                                                                         >
                                                                                             <Edit className="h-4 w-4" />
@@ -2137,6 +2224,24 @@ const MenuManagementPage: React.FC = () => {
                                                                         }}
                                                                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-brand-gold focus:border-brand-gold"
                                                                     />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={index === 0}
+                                                                        onClick={() => movePriceVariant(index, 'up')}
+                                                                        className={`text-gray-400 hover:text-brand-gold ${index === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                    >
+                                                                        <ChevronUp className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={index === priceVariants.length - 1}
+                                                                        onClick={() => movePriceVariant(index, 'down')}
+                                                                        className={`text-gray-400 hover:text-brand-gold ${index === priceVariants.length - 1 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                    >
+                                                                        <ChevronDown className="h-4 w-4" />
+                                                                    </button>
                                                                 </div>
                                                                 <div className="w-32">
                                                                     <div className="relative rounded-md shadow-sm">

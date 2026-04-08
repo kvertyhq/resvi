@@ -69,10 +69,30 @@ interface ModifierItem {
     is_available: boolean;
 }
 
+interface ReplacerGroup {
+    id: string;
+    restaurant_id: string;
+    name: string;
+    is_required: boolean;
+    is_multiple: boolean;
+    min_selection: number;
+    max_selection: number | null;
+    items?: ReplacerItem[];
+}
+
+interface ReplacerItem {
+    id: string;
+    replacer_group_id: string;
+    name: string;
+    target_modifier_item_id?: string;
+    price_adjustment: number;
+    is_available: boolean;
+}
+
 const MenuManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
     const { showAlert, showConfirm } = useAlert();
-    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers'>('items');
+    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers' | 'replacers'>('items');
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [categorySearchQuery, setCategorySearchQuery] = useState('');
@@ -94,7 +114,9 @@ const MenuManagementPage: React.FC = () => {
     const [addons, setAddons] = useState<Addon[]>([]);
     const [stations, setStations] = useState<Station[]>([]);
     const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+    const [replacerGroups, setReplacerGroups] = useState<ReplacerGroup[]>([]);
     const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+    const [expandedReplacerGroupId, setExpandedReplacerGroupId] = useState<string | null>(null);
 
     // Modifier Group Modal State
     const [isModifierGroupModalOpen, setIsModifierGroupModalOpen] = useState(false);
@@ -111,11 +133,29 @@ const MenuManagementPage: React.FC = () => {
     });
     const [modifierItemGroupId, setModifierItemGroupId] = useState<string>('');
 
+    // Replacer Group Modal State
+    const [isReplacerGroupModalOpen, setIsReplacerGroupModalOpen] = useState(false);
+    const [editingReplacerGroup, setEditingReplacerGroup] = useState<ReplacerGroup | null>(null);
+    const [replacerGroupForm, setReplacerGroupForm] = useState<Partial<ReplacerGroup>>({
+        name: '', is_required: false, is_multiple: true, min_selection: 0, max_selection: null
+    });
+
+    // Replacer Item Modal State
+    const [isReplacerItemModalOpen, setIsReplacerItemModalOpen] = useState(false);
+    const [editingReplacerItem, setEditingReplacerItem] = useState<ReplacerItem | null>(null);
+    const [replacerItemForm, setReplacerItemForm] = useState<Partial<ReplacerItem>>({
+        name: '', price_adjustment: 0, is_available: true, target_modifier_item_id: ''
+    });
+    const [replacerItemGroupId, setReplacerItemGroupId] = useState<string>('');
+
     // For size-based price matrix input (variant names derived from item being edited)
     const [priceMatrixVariants, setPriceMatrixVariants] = useState<string[]>([]);
 
     // Linked modifier groups: groupId -> order_index
     const [selectedModifierOrders, setSelectedModifierOrders] = useState<Map<string, number>>(new Map());
+
+    // Linked replacer groups: groupId -> order_index
+    const [selectedReplacerOrders, setSelectedReplacerOrders] = useState<Map<string, number>>(new Map());
 
     // Default toppings that come pre-loaded with this item (array of modifier_item IDs)
     const [defaultToppingIds, setDefaultToppingIds] = useState<Set<string>>(new Set());
@@ -204,7 +244,7 @@ const MenuManagementPage: React.FC = () => {
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchAllCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups()]);
+        await Promise.all([fetchCategories(), fetchAllCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups(), fetchReplacerGroups()]);
         setLoading(false);
     };
 
@@ -217,7 +257,8 @@ const MenuManagementPage: React.FC = () => {
             fetchItems(), 
             fetchAddons(), 
             fetchStations(), 
-            fetchModifierGroups()
+            fetchModifierGroups(),
+            fetchReplacerGroups()
         ]);
         setIsRefreshingItems(false);
     };
@@ -256,6 +297,33 @@ const MenuManagementPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Error fetching modifier groups:', error);
+        }
+    };
+
+    const fetchReplacerGroups = async () => {
+        if (!selectedRestaurantId) return;
+        try {
+            const { data: groups } = await supabase
+                .from('menu_replacer_groups')
+                .select('*')
+                .eq('restaurant_id', selectedRestaurantId)
+                .order('name');
+
+            if (groups) {
+                // Load items for each group
+                const { data: allItems } = await supabase
+                    .from('menu_replacer_items')
+                    .select('*')
+                    .in('replacer_group_id', groups.map(g => g.id));
+
+                const groupsWithItems = groups.map(g => ({
+                    ...g,
+                    items: (allItems || []).filter(i => i.replacer_group_id === g.id)
+                }));
+                setReplacerGroups(groupsWithItems);
+            }
+        } catch (error) {
+            console.error('Error fetching replacer groups:', error);
         }
     };
 
@@ -386,6 +454,84 @@ const MenuManagementPage: React.FC = () => {
             fetchModifierGroups();
         }
     };
+
+    const openReplacerGroupModal = (group?: ReplacerGroup) => {
+        if (group) {
+            setEditingReplacerGroup(group);
+            setReplacerGroupForm(group);
+        } else {
+            setEditingReplacerGroup(null);
+            setReplacerGroupForm({ name: '', is_required: false, is_multiple: true, min_selection: 0, max_selection: null });
+        }
+        setIsReplacerGroupModalOpen(true);
+    };
+
+    const handleReplacerGroupSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedRestaurantId) return;
+        const payload = { ...replacerGroupForm, restaurant_id: selectedRestaurantId };
+        if (editingReplacerGroup) {
+            await supabase.from('menu_replacer_groups').update(payload).eq('id', editingReplacerGroup.id);
+        } else {
+            await supabase.from('menu_replacer_groups').insert([payload]);
+        }
+        setIsReplacerGroupModalOpen(false);
+        fetchReplacerGroups();
+    };
+
+    const handleDeleteReplacerGroup = async (id: string) => {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'This will delete the replacer group and ALL its items. Continue?',
+            'warning'
+        );
+        if (confirmed) {
+            await supabase.from('menu_replacer_groups').delete().eq('id', id);
+            fetchReplacerGroups();
+        }
+    };
+
+    const openReplacerItemModal = (groupId: string, item?: ReplacerItem) => {
+        setReplacerItemGroupId(groupId);
+        if (item) {
+            setEditingReplacerItem(item);
+            setReplacerItemForm(item);
+        } else {
+            setEditingReplacerItem(null);
+            setReplacerItemForm({ name: '', price_adjustment: 0, is_available: true, target_modifier_item_id: null as any });
+        }
+        setIsReplacerItemModalOpen(true);
+    };
+
+    const handleReplacerItemSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = { ...replacerItemForm, replacer_group_id: replacerItemGroupId };
+        // handle empty target_modifier_item_id
+        if (payload.target_modifier_item_id === '') {
+            payload.target_modifier_item_id = null as any;
+        }
+        if (editingReplacerItem) {
+            await supabase.from('menu_replacer_items').update(payload).eq('id', editingReplacerItem.id);
+        } else {
+            await supabase.from('menu_replacer_items').insert([payload]);
+        }
+        setIsReplacerItemModalOpen(false);
+        fetchReplacerGroups();
+    };
+
+    const handleDeleteReplacerItem = async (id: string) => {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'Delete this replacer item?',
+            'warning'
+        );
+        if (confirmed) {
+            await supabase.from('menu_replacer_items').delete().eq('id', id);
+            fetchReplacerGroups();
+        }
+    };
+
+
 
     const fetchAllCategories = async () => {
         if (!selectedRestaurantId) return;
@@ -627,6 +773,7 @@ const MenuManagementPage: React.FC = () => {
         setAiFeedback('');
         setSelectedAddonIds(new Set());
         setSelectedModifierOrders(new Map());
+        setSelectedReplacerOrders(new Map());
         setDefaultToppingIds(new Set());
         setPriceVariants([]);
 
@@ -666,10 +813,23 @@ const MenuManagementPage: React.FC = () => {
                 modsData.forEach(m => map.set(m.modifier_group_id, m.order_index ?? 0));
                 setSelectedModifierOrders(map);
             }
+
+            // Fetch linked replacer groups
+            const { data: repsData } = await supabase
+                .from('menu_item_replacers')
+                .select('replacer_group_id, order_index')
+                .eq('menu_item_id', item.id);
+
+            if (repsData) {
+                const map = new Map<string, number>();
+                repsData.forEach(r => map.set(r.replacer_group_id, r.order_index ?? 0));
+                setSelectedReplacerOrders(map);
+            }
         } else {
             // Opening modal for a NEW item — reset all fields
             setEditingItem(null);
             setSelectedModifierOrders(new Map());
+            setSelectedReplacerOrders(new Map());
             setDefaultToppingIds(new Set());
             setItemForm({
                 name: '',
@@ -750,6 +910,17 @@ const MenuManagementPage: React.FC = () => {
                 }));
                 await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
             }
+
+            // Update Replacers
+            await supabase.from('menu_item_replacers').delete().eq('menu_item_id', itemId);
+            if (selectedReplacerOrders.size > 0) {
+                const replacersToInsert = Array.from(selectedReplacerOrders.entries()).map(([groupId, orderIdx]) => ({
+                    menu_item_id: itemId,
+                    replacer_group_id: groupId,
+                    order_index: orderIdx
+                }));
+                await supabase.from('menu_item_replacers').insert(replacersToInsert);
+            }
         }
 
         setIsModalOpen(false);
@@ -827,6 +998,18 @@ const MenuManagementPage: React.FC = () => {
                 }));
                 const { error: modsError } = await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
                 if (modsError) console.error("Error copying modifiers:", modsError);
+            }
+
+            // 4. Insert Replacers
+            const { data: replacersData } = await supabase.from('menu_item_replacers').select('replacer_group_id, order_index').eq('menu_item_id', item.id);
+            if (replacersData && replacersData.length > 0) {
+                const replacersToInsert = replacersData.map(r => ({
+                    menu_item_id: newItemId,
+                    replacer_group_id: r.replacer_group_id,
+                    order_index: r.order_index
+                }));
+                const { error: replacersError } = await supabase.from('menu_item_replacers').insert(replacersToInsert);
+                if (replacersError) console.error("Error copying replacers:", replacersError);
             }
 
             showAlert('Success', 'Menu item duplicated successfully.', 'success');
@@ -951,11 +1134,11 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
                     <button
-                        onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : openItemModal()}
+                        onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : activeTab === 'replacers' ? openReplacerGroupModal() : openItemModal()}
                         className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
                     >
                         <Plus className="h-5 w-5 mr-2" />
-                        Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : 'Item'}
+                        Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : activeTab === 'replacers' ? 'Replacer Group' : 'Item'}
                     </button>
                 </div>
             </div>
@@ -985,6 +1168,12 @@ const MenuManagementPage: React.FC = () => {
                     className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'modifiers' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                     <Settings2 className="h-4 w-4 mr-2" /> Modifiers
+                </button>
+                <button
+                    onClick={() => setActiveTab('replacers')}
+                    className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'replacers' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Settings2 className="h-4 w-4 mr-2" /> Replacers
                 </button>
             </div>
 
@@ -1450,6 +1639,129 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'replacers' && (
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"></th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Settings</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {replacerGroups.map((group) => (
+                                            <React.Fragment key={group.id}>
+                                                <tr className={expandedReplacerGroupId === group.id ? 'bg-gray-50' : ''}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <button
+                                                            onClick={() => setExpandedReplacerGroupId(expandedReplacerGroupId === group.id ? null : group.id)}
+                                                            className="text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            {expandedReplacerGroupId === group.id ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{group.name}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <div className="flex space-x-2">
+                                                            {group.is_required && <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Required</span>}
+                                                            {group.is_multiple && <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Multiple</span>}
+                                                            {!group.is_multiple && <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">Single</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        {group.items?.length || 0} items
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <button
+                                                            onClick={() => openReplacerItemModal(group.id)}
+                                                            className="text-green-600 hover:text-green-900 mr-4"
+                                                            title="Add Item"
+                                                        >
+                                                            <Plus className="h-5 w-5" />
+                                                        </button>
+                                                        <button onClick={() => openReplacerGroupModal(group)} className="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit Group"><Edit className="h-5 w-5" /></button>
+                                                        <button onClick={() => handleDeleteReplacerGroup(group.id)} className="text-red-600 hover:text-red-900" title="Delete Group"><Trash2 className="h-5 w-5" /></button>
+                                                    </td>
+                                                </tr>
+                                                {/* Expanded Items Drawer */}
+                                                {expandedReplacerGroupId === group.id && (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                                                            <div className="pl-10">
+                                                                {group.items && group.items.length > 0 ? (
+                                                                    <table className="min-w-full divide-y divide-gray-200 bg-white shadow-sm rounded-lg overflow-hidden ring-1 ring-black ring-opacity-5">
+                                                                        <thead className="bg-gray-100">
+                                                                            <tr>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Swaps Out (Target)</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Adj.</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-200">
+                                                                            {group.items.map(item => {
+                                                                                // Find the target modifier item to show its name
+                                                                                let targetName = "Unknown";
+                                                                                if (item.target_modifier_item_id) {
+                                                                                    // Search through modifierGroups
+                                                                                    for (const mg of modifierGroups) {
+                                                                                        const found = mg.items?.find(i => i.id === item.target_modifier_item_id);
+                                                                                        if (found) {
+                                                                                            targetName = found.name;
+                                                                                            break;
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                                return (
+                                                                                    <tr key={item.id} className="hover:bg-gray-50">
+                                                                                        <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
+                                                                                        <td className="px-4 py-2 text-sm text-gray-500">{item.target_modifier_item_id ? <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full line-through">{targetName}</span> : <span className="text-gray-400 italic">None selected</span>}</td>
+                                                                                        <td className="px-4 py-2 text-sm text-gray-600">£{(item.price_adjustment || 0).toFixed(2)}</td>
+                                                                                        <td className="px-4 py-2 whitespace-nowrap">
+                                                                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                                                {item.is_available ? 'Available' : 'Unavailable'}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                        <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                                                                            <button
+                                                                                                onClick={() => openReplacerItemModal(group.id, item)}
+                                                                                                className="text-indigo-600 hover:text-indigo-900 mr-3"
+                                                                                            >
+                                                                                                <Edit className="h-4 w-4" />
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteReplacerItem(item.id)}
+                                                                                                className="text-red-600 hover:text-red-900"
+                                                                                            >
+                                                                                                <Trash2 className="h-4 w-4" />
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })}
+                                                                        </tbody>
+                                                                    </table>
+                                                                ) : (
+                                                                    <div className="text-sm text-gray-500 italic py-2">No options in this replacer group. Click + to add some.</div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                        {replacerGroups.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No replacer groups found.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modal */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1700,6 +2012,56 @@ const MenuManagementPage: React.FC = () => {
                                                         );
                                                     })}
                                                     {modifierGroups.length === 0 && <p className="text-sm text-gray-500">No modifier groups created.</p>}
+                                                </div>
+                                            </div>
+
+                                            {/* Replacer Groups Selection */}
+                                            <div className="border-t border-gray-200 pt-6">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Replacer Groups <span className="text-xs text-gray-400">(set order to control display position)</span></label>
+                                                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                                                    {replacerGroups.map(group => {
+                                                        const isChecked = selectedReplacerOrders.has(group.id);
+                                                        const orderVal = selectedReplacerOrders.get(group.id) ?? 0;
+                                                        return (
+                                                            <div key={group.id} className="flex items-center gap-3">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`replgroup-${group.id}`}
+                                                                    checked={isChecked}
+                                                                    onChange={(e) => {
+                                                                        const newMap = new Map(selectedReplacerOrders);
+                                                                        if (e.target.checked) {
+                                                                            newMap.set(group.id, newMap.size);
+                                                                        } else {
+                                                                            newMap.delete(group.id);
+                                                                        }
+                                                                        setSelectedReplacerOrders(newMap);
+                                                                    }}
+                                                                    className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold flex-shrink-0"
+                                                                />
+                                                                <label htmlFor={`replgroup-${group.id}`} className="text-sm text-gray-700 flex-1">
+                                                                    <span className="font-medium">{group.name}</span>
+                                                                </label>
+                                                                {isChecked && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-xs text-gray-500">Order:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            value={orderVal}
+                                                                            onChange={(e) => {
+                                                                                const newMap = new Map(selectedReplacerOrders);
+                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
+                                                                                setSelectedReplacerOrders(newMap);
+                                                                            }}
+                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {replacerGroups.length === 0 && <p className="text-sm text-gray-500">No replacer groups created.</p>}
                                                 </div>
                                             </div>
 
@@ -2129,6 +2491,162 @@ const MenuManagementPage: React.FC = () => {
                                 <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                                     <button type="button" onClick={() => setIsModifierItemModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                                     <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Item</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Replacer Group Modal */}
+            {isReplacerGroupModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {editingReplacerGroup ? 'Edit Replacer Group' : 'Add Replacer Group'}
+                            </h3>
+                            <button onClick={() => setIsReplacerGroupModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <form onSubmit={handleReplacerGroupSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
+                                    <input
+                                        type="text"
+                                        value={replacerGroupForm.name || ''}
+                                        onChange={e => setReplacerGroupForm({ ...replacerGroupForm, name: e.target.value })}
+                                        required
+                                        placeholder="e.g. Patty Replacements, Sauce Swaps"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="rg_required"
+                                            checked={replacerGroupForm.is_required || false}
+                                            onChange={e => setReplacerGroupForm({ ...replacerGroupForm, is_required: e.target.checked })}
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
+                                        />
+                                        <label htmlFor="rg_required" className="ml-2 block text-sm text-gray-900">Required Selection</label>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="rg_multiple"
+                                            checked={replacerGroupForm.is_multiple || false}
+                                            onChange={e => setReplacerGroupForm({ ...replacerGroupForm, is_multiple: e.target.checked })}
+                                            className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
+                                        />
+                                        <label htmlFor="rg_multiple" className="ml-2 block text-sm text-gray-900">Allow Multiple Swaps</label>
+                                    </div>
+                                </div>
+                                {replacerGroupForm.is_multiple && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Min Selection</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={replacerGroupForm.min_selection !== undefined ? replacerGroupForm.min_selection : 0}
+                                                onChange={e => setReplacerGroupForm({ ...replacerGroupForm, min_selection: parseInt(e.target.value) || 0 })}
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Max Selection (optional)</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={replacerGroupForm.max_selection || ''}
+                                                onChange={e => setReplacerGroupForm({ ...replacerGroupForm, max_selection: e.target.value ? parseInt(e.target.value) : null })}
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                                placeholder="No limit"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                                    <button type="button" onClick={() => setIsReplacerGroupModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Group</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Replacer Item Modal */}
+            {isReplacerItemModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {editingReplacerItem ? 'Edit Replacer Option' : 'Add Replacer Option'}
+                            </h3>
+                            <button onClick={() => setIsReplacerItemModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <form onSubmit={handleReplacerItemSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Replacement Name</label>
+                                    <input
+                                        type="text"
+                                        value={replacerItemForm.name || ''}
+                                        onChange={e => setReplacerItemForm({ ...replacerItemForm, name: e.target.value })}
+                                        required
+                                        placeholder="e.g. Extra Ham, Beyond Patty"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Price Adjustment (£)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={replacerItemForm.price_adjustment !== undefined ? replacerItemForm.price_adjustment : 0}
+                                            onChange={e => setReplacerItemForm({ ...replacerItemForm, price_adjustment: parseFloat(e.target.value) || 0 })}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Swaps Out (Optional Target)</label>
+                                        <select
+                                            value={replacerItemForm.target_modifier_item_id || ''}
+                                            onChange={e => setReplacerItemForm({ ...replacerItemForm, target_modifier_item_id: e.target.value })}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                        >
+                                            <option value="">-- None (Just Add) --</option>
+                                            {modifierGroups.map(group => (
+                                                <optgroup key={group.id} label={`Modifiers: ${group.name}`}>
+                                                    {group.items?.map(item => (
+                                                        <option key={item.id} value={item.id}>{item.name}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">If selected, this ingredient is removed when the user chooses this replacement.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center pt-2 border-t border-gray-200">
+                                    <input
+                                        type="checkbox"
+                                        id="ri_available"
+                                        checked={replacerItemForm.is_available !== false}
+                                        onChange={e => setReplacerItemForm({ ...replacerItemForm, is_available: e.target.checked })}
+                                        className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold"
+                                    />
+                                    <label htmlFor="ri_available" className="ml-2 block text-sm text-gray-900">Available</label>
+                                </div>
+                                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                                    <button type="button" onClick={() => setIsReplacerItemModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" className="px-4 py-2 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800">Save Option</button>
                                 </div>
                             </form>
                         </div>

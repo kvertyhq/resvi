@@ -40,22 +40,33 @@ interface POSModifierModalProps {
     menuItem: any;
     isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: ExcludedTopping[]) => void;
+    onAddToCart: (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: ExcludedTopping[], selectedReplacers?: any[]) => void;
 }
 
 const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart }) => {
     const { showAlert } = useAlert();
-    const { modifierGroups: allGroups, modifierItems: allItems, menuItemModifiers: allLinks, menuCategoryModifiers: allCatLinks, loading: menuLoading } = useMenu();
-    
+    const { 
+        modifierGroups: allGroups, 
+        modifierItems: allItems, 
+        menuItemModifiers: allLinks, 
+        menuCategoryModifiers: allCatLinks, 
+        replacerGroups: allReplGroups,
+        replacerItems: allReplItems,
+        menuItemReplacers: allItemReplLinks,
+        loading: menuLoading 
+    } = useMenu();
+
     const [selectedVariant, setSelectedVariant] = useState<any>(null);
     const [selections, setSelections] = useState<Record<string, Record<string, Partial<SelectedModifier>>>>({});
     const [totalPrice, setTotalPrice] = useState(0);
     const [expandedCustomise, setExpandedCustomise] = useState<Record<string, boolean>>({});
 
-    // --- Topping Exclusion / Replacement State ---
-    // Which default toppings have been excluded and their optional replacements
+    // --- Replacement State ---
+    // Stores selected replacers: { groupId: { itemId: true } }
+    const [selectedReplacers, setSelectedReplacers] = useState<Record<string, Record<string, boolean>>>({});
+    
+    // --- Topping Exclusion State ---
     const [excludedToppings, setExcludedToppings] = useState<ExcludedTopping[]>([]);
-    // Which excluded topping ID the replacement picker is currently open for (null = picker closed)
     const [replacementPickerFor, setReplacementPickerFor] = useState<string | null>(null);
 
     const toggleCustomise = (key: string) =>
@@ -92,6 +103,24 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
             .sort((a, b) => (linkMap.get(a.id) ?? 0) - (linkMap.get(b.id) ?? 0));
     }, [menuItem, allLinks, allCatLinks, allGroups, allItems]);
 
+    // Filter and assemble replacer groups for the current item
+    const replacerGroups = useMemo(() => {
+        if (!menuItem || !allReplGroups || !allReplItems || !allItemReplLinks) return [];
+        
+        const linkedGroupIds = allItemReplLinks
+            .filter(l => l.menu_item_id === menuItem.id)
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+            .map(l => l.replacer_group_id);
+            
+        return allReplGroups
+            .filter(g => linkedGroupIds.includes(g.id))
+            .map(g => ({
+                ...g,
+                items: allReplItems.filter(i => i.replacer_group_id === g.id)
+            }))
+            .sort((a, b) => linkedGroupIds.indexOf(a.id) - linkedGroupIds.indexOf(b.id));
+    }, [menuItem, allReplGroups, allReplItems, allItemReplLinks]);
+
     // Resolve default toppings from their IDs
     const defaultToppings = useMemo(() => {
         if (!menuItem || !allItems) return [];
@@ -119,6 +148,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
             setSelections({});
             setExpandedCustomise({});
             setExcludedToppings([]);
+            setSelectedReplacers({});
             setReplacementPickerFor(null);
         }
     }, [isOpen, menuItem]);
@@ -150,8 +180,22 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
             }
         });
 
-        setTotalPrice(basePrice + modifiersTotal);
-    }, [selections, modifierGroups, menuItem, selectedVariant]);
+        // Add Replacers Total
+        let replacersTotal = 0;
+        Object.keys(selectedReplacers).forEach(groupId => {
+            const group = replacerGroups.find(g => g.id === groupId);
+            if (group) {
+                Object.keys(selectedReplacers[groupId]).forEach(itemId => {
+                    const item = group.items.find(i => i.id === itemId);
+                    if (item) {
+                        replacersTotal += Number(item.price_adjustment || 0);
+                    }
+                });
+            }
+        });
+
+        setTotalPrice(basePrice + modifiersTotal + replacersTotal);
+    }, [selections, modifierGroups, selectedReplacers, replacerGroups, menuItem, selectedVariant]);
 
     const loading = menuLoading;
 
@@ -207,8 +251,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                 const group = modifierGroups.find(g => g.items.some(i => i.id === topping.id));
                 // Exclude it and open replacement picker
                 setReplacementPickerFor(topping.id);
-                return [...prev, { 
-                    id: topping.id, 
+                return [...prev, {
+                    id: topping.id,
                     name: topping.name,
                     group_name: group?.name
                 }];
@@ -228,9 +272,52 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
         setReplacementPickerFor(null);
     };
 
+    const toggleReplacer = (groupId: string, itemId: string, isMultiple: boolean) => {
+        setSelectedReplacers(prev => {
+            const groupSelections = prev[groupId] || {};
+            const isSelected = !!groupSelections[itemId];
+            const group = replacerGroups.find(g => g.id === groupId);
+            const item = group?.items.find(i => i.id === itemId);
+
+            let newGroup = { ...groupSelections };
+            if (isSelected) {
+                delete newGroup[itemId];
+            } else {
+                if (!isMultiple) newGroup = {};
+                newGroup[itemId] = true;
+
+                // Handle target exclusion
+                if (item?.target_modifier_item_id) {
+                    const targetTopping = defaultToppings.find(t => t.id === item.target_modifier_item_id);
+                    if (targetTopping && !excludedToppings.find(e => e.id === targetTopping.id)) {
+                        setExcludedToppings(prevEx => [...prevEx, {
+                            id: targetTopping.id,
+                            name: targetTopping.name,
+                            group_name: modifierGroups.find(mg => mg.items.some(mi => mi.id === targetTopping.id))?.name
+                        }]);
+                    }
+                }
+            }
+            return { ...prev, [groupId]: newGroup };
+        });
+    };
+
     const handleConfirm = () => {
         for (const group of modifierGroups) {
             const selectedCount = Object.keys(selections[group.id] || {}).length;
+            if (group.is_required && selectedCount < (group.min_selection || 1)) {
+                showAlert('Selection Required', `Please select options for ${group.name}`, 'warning');
+                return;
+            }
+            if (group.max_selection && selectedCount > group.max_selection) {
+                showAlert('Too Many Options', `Too many options for ${group.name} (Max ${group.max_selection})`, 'warning');
+                return;
+            }
+        }
+
+        // Validate Replacer Groups
+        for (const group of replacerGroups) {
+            const selectedCount = Object.keys(selectedReplacers[group.id] || {}).length;
             if (group.is_required && selectedCount < (group.min_selection || 1)) {
                 showAlert('Selection Required', `Please select options for ${group.name}`, 'warning');
                 return;
@@ -263,7 +350,32 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
             ? { ...menuItem, name: `${menuItem.name} (${selectedVariant.name})`, price: selectedVariant.price }
             : menuItem;
 
-        onAddToCart(finalMenuItem, flatModifiers, totalPrice, excludedToppings.length > 0 ? excludedToppings : undefined);
+        const flatReplacers: any[] = [];
+        Object.keys(selectedReplacers).forEach(groupId => {
+            const group = replacerGroups.find(g => g.id === groupId);
+            if (group) {
+                Object.keys(selectedReplacers[groupId]).forEach(itemId => {
+                    const item = group.items.find(i => i.id === itemId);
+                    if (item) {
+                        flatReplacers.push({
+                            id: item.id,
+                            group_id: groupId,
+                            name: item.name,
+                            price_adjustment: item.price_adjustment,
+                            target_modifier_item_id: item.target_modifier_item_id
+                        });
+                    }
+                });
+            }
+        });
+
+        onAddToCart(
+            finalMenuItem, 
+            flatModifiers, 
+            totalPrice, 
+            excludedToppings.length > 0 ? excludedToppings : undefined,
+            flatReplacers.length > 0 ? flatReplacers : undefined
+        );
         onClose();
     };
 
@@ -296,11 +408,10 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                     <button
                                         key={v.name}
                                         onClick={() => setSelectedVariant(v)}
-                                        className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold ${
-                                            selectedVariant?.name === v.name
-                                                ? 'bg-opacity-20 text-white'
-                                                : 'bg-gray-700 border-transparent text-gray-400'
-                                        }`}
+                                        className={`flex-1 p-3 rounded-xl border-2 transition-all font-bold ${selectedVariant?.name === v.name
+                                            ? 'bg-opacity-20 text-white'
+                                            : 'bg-gray-700 border-transparent text-gray-400'
+                                            }`}
                                         style={selectedVariant?.name === v.name ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}
                                     >
                                         <div className="text-sm uppercase">{v.name}</div>
@@ -311,7 +422,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                         </div>
                     )}
 
-                    {/* ── Default / Included Toppings Section ── */}
+                    {/* Included Toppings Section */}
                     {defaultToppings.length > 0 && (
                         <div className="border-b border-gray-700 pb-6">
                             <div className="flex justify-between items-center mb-3">
@@ -326,11 +437,10 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                         <div key={topping.id} className="flex flex-col items-start gap-1">
                                             <button
                                                 onClick={() => toggleExclusion(topping)}
-                                                className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${
-                                                    isExcluded
-                                                        ? 'bg-red-900 border-red-500 text-red-300 line-through'
-                                                        : 'bg-gray-700 border-gray-600 text-gray-200 hover:border-red-400'
-                                                }`}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${isExcluded
+                                                    ? 'bg-red-900 border-red-500 text-red-300 line-through'
+                                                    : 'bg-gray-700 border-gray-600 text-gray-200 hover:border-red-400'
+                                                    }`}
                                             >
                                                 {isExcluded ? `NO ${topping.name}` : topping.name}
                                             </button>
@@ -382,11 +492,10 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                     <button
                                                         key={t.id}
                                                         onClick={() => pickReplacement(replacementPickerFor, t)}
-                                                        className={`p-2 rounded-lg text-xs font-semibold border-2 transition-all text-center ${
-                                                            isChosen
-                                                                ? 'text-white'
-                                                                : 'bg-gray-800 border-transparent text-gray-300 hover:bg-gray-700'
-                                                        }`}
+                                                        className={`p-2 rounded-lg text-xs font-semibold border-2 transition-all text-center ${isChosen
+                                                            ? 'text-white'
+                                                            : 'bg-gray-800 border-transparent text-gray-300 hover:bg-gray-700'
+                                                            }`}
                                                         style={isChosen ? { backgroundColor: 'color-mix(in srgb, var(--theme-color) 30%, #111827)', borderColor: 'var(--theme-color)' } : {}}
                                                     >
                                                         {t.name}
@@ -396,6 +505,58 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Replacer Groups Section */}
+                    {replacerGroups.length > 0 && (
+                        <div className="border-b border-gray-700 pb-6">
+                            <h3 className="font-bold text-lg text-white mb-4">Replacements & Swaps</h3>
+                            <div className="space-y-6">
+                                {replacerGroups.map(group => (
+                                    <div key={group.id} className="space-y-3">
+                                        <div className="flex justify-between items-center px-1">
+                                            <h4 className="font-bold text-sm text-gray-300 uppercase tracking-wider">{group.name}</h4>
+                                            <span className="text-[10px] text-gray-500 uppercase font-bold">
+                                                {group.is_required ? 'Required' : 'Optional'} 
+                                                {group.is_multiple ? ' • Multiple' : ' • One only'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {group.items.map((item: any) => {
+                                                const isSelected = !!(selectedReplacers[group.id] || {})[item.id];
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => toggleReplacer(group.id, item.id, group.is_multiple)}
+                                                        className={`
+                                                            relative p-3 rounded-xl border-2 text-left transition-all
+                                                            ${isSelected 
+                                                                ? 'text-white border-brand-gold bg-brand-gold bg-opacity-10' 
+                                                                : 'bg-gray-700 border-transparent text-gray-300 hover:bg-gray-600'}
+                                                        `}
+                                                        style={isSelected ? { borderColor: 'var(--theme-color)', color: 'white' } : {}}
+                                                    >
+                                                        <div className="text-xs font-bold">{item.name}</div>
+                                                        {item.price_adjustment !== 0 && (
+                                                            <div className="text-[10px] mt-1 opacity-70">
+                                                                {item.price_adjustment > 0 ? `+£${item.price_adjustment.toFixed(2)}` : `-£${Math.abs(item.price_adjustment).toFixed(2)}`}
+                                                            </div>
+                                                        )}
+                                                        {isSelected && (
+                                                            <div className="absolute top-2 right-2">
+                                                                <div className="w-4 h-4 rounded-full flex items-center justify-center bg-brand-gold" style={{ backgroundColor: 'var(--theme-color)' }}>
+                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -515,9 +676,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                                                 <button
                                                                                     key={loc}
                                                                                     onClick={() => updateModifierDetail(group.id, item.id, 'location', loc)}
-                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${
-                                                                                        modifier.location === loc ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
-                                                                                    }`}
+                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${modifier.location === loc ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                                        }`}
                                                                                 >
                                                                                     {loc}
                                                                                 </button>
@@ -531,9 +691,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                                                                                 <button
                                                                                     key={int}
                                                                                     onClick={() => updateModifierDetail(group.id, item.id, 'intensity', int)}
-                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${
-                                                                                        modifier.intensity === int ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
-                                                                                    }`}
+                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${modifier.intensity === int ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                                        }`}
                                                                                 >
                                                                                     {int}
                                                                                 </button>

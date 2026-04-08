@@ -32,6 +32,7 @@ interface CartItem {
     quantity: number;
     modifiers: any[];
     excluded_toppings?: any[]; // toppings removed with optional replacements
+    selected_replacers?: any[]; // structured swaps/replacements
     notes?: string;
     course: string; // 'Starter', 'Main', 'Dessert', 'Drink'
     isMiscellaneous?: boolean; // Flag for custom items
@@ -357,11 +358,16 @@ const POSOrderPage: React.FC = () => {
         }
     };
 
-    const addToCart = (item: any, modifiers: any[], finalPrice: number, excludedToppings?: any[]) => {
+    const addToCart = (item: any, modifiers: any[], finalPrice: number, excludedToppings?: any[], selectedReplacers?: any[]) => {
         // Check if item with same ID, price, and modifiers already exists
         const existingItemIndex = cartItems.findIndex(cartItem => {
             if (cartItem.id !== item.id || cartItem.price !== finalPrice) return false;
             if (cartItem.modifiers.length !== modifiers.length) return false;
+            
+            // If there are exclusions or replacers, we treat them as unique (don't stack)
+            if (excludedToppings?.length || selectedReplacers?.length) return false;
+            if (cartItem.excluded_toppings?.length || cartItem.selected_replacers?.length) return false;
+
             const cartModifiers = cartItem.modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
             const newModifiers = modifiers.map(m => `${m.modifier_item_id}-${m.location}-${m.intensity}`).sort();
             return JSON.stringify(cartModifiers) === JSON.stringify(newModifiers);
@@ -385,6 +391,7 @@ const POSOrderPage: React.FC = () => {
                 quantity: 1,
                 modifiers: modifiers,
                 excluded_toppings: excludedToppings,
+                selected_replacers: selectedReplacers,
                 course: 'Main',
                 station_id: item.station_id,
                 category_id: (item as any).category_id
@@ -584,7 +591,8 @@ const POSOrderPage: React.FC = () => {
                 quantity: item.quantity,
                 price: item.price,
                 modifiers: item.modifiers,
-                excluded_toppings: item.excluded_toppings || [], // New system
+                excluded_toppings: item.excluded_toppings || [],
+                selected_replacers: item.selected_replacers || [],
                 notes: item.notes || null,
                 course: item.course,
                 is_miscellaneous: item.isMiscellaneous || false,
@@ -816,7 +824,8 @@ const POSOrderPage: React.FC = () => {
                 quantity: item.quantity,
                 price_snapshot: item.price,
                 selected_modifiers: item.modifiers,
-                excluded_toppings: item.excluded_toppings || [], // New system
+                excluded_toppings: item.excluded_toppings || [],
+                selected_replacers: item.selected_replacers || [],
                 notes: item.notes,
                 course_name: item.course,
                 round_number: currentRound,

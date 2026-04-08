@@ -10,6 +10,9 @@ interface MenuContextType {
     modifierItems: any[];
     menuItemModifiers: any[];
     menuCategoryModifiers: any[];
+    replacerGroups: any[];
+    replacerItems: any[];
+    menuItemReplacers: any[];
     loading: boolean;
 
     isSyncing: boolean;
@@ -24,6 +27,9 @@ const MenuContext = createContext<MenuContextType>({
     modifierItems: [],
     menuItemModifiers: [],
     menuCategoryModifiers: [],
+    replacerGroups: [],
+    replacerItems: [],
+    menuItemReplacers: [],
     loading: true,
 
     isSyncing: false,
@@ -39,6 +45,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [modifierItems, setModifierItems] = useState<any[]>([]);
     const [menuItemModifiers, setMenuItemModifiers] = useState<any[]>([]);
     const [menuCategoryModifiers, setMenuCategoryModifiers] = useState<any[]>([]);
+    const [replacerGroups, setReplacerGroups] = useState<any[]>([]);
+    const [replacerItems, setReplacerItems] = useState<any[]>([]);
+    const [menuItemReplacers, setMenuItemReplacers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isSyncing, setIsSyncing] = useState(false);
@@ -70,6 +79,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setModifierItems(mItems || []);
                 setMenuItemModifiers(mLinks || []);
                 setMenuCategoryModifiers([]); // Initial sync will fill this
+                setReplacerGroups(JSON.parse(cachedData).replacerGroups || []);
+                setReplacerItems(JSON.parse(cachedData).replacerItems || []);
+                setMenuItemReplacers(JSON.parse(cachedData).menuItemReplacers || []);
                 setLoading(false);
             } catch (e) {
 
@@ -147,6 +159,25 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
 
+            // 3. Replacers (Parallel)
+            const [replGroupsRes, replLinksRes] = await Promise.all([
+                supabase.from('menu_replacer_groups').select('*').eq('restaurant_id', restaurantId),
+                supabase.from('menu_item_replacers').select('*').in('menu_item_id', itemData.map(i => i.id))
+            ]);
+
+            const replGroupsData = replGroupsRes.data || [];
+            const replLinksData = replLinksRes.data || [];
+            let replItemsData: any[] = [];
+
+            if (replGroupsData.length > 0) {
+                const { data: replItemsRes } = await supabase
+                    .from('menu_replacer_items')
+                    .select('*')
+                    .in('replacer_group_id', replGroupsData.map(g => g.id))
+                    .eq('is_available', true);
+                if (replItemsRes) replItemsData = replItemsRes;
+            }
+
             // Update State
             setCategories(catData);
             setMenuItems(itemData);
@@ -155,6 +186,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setMenuCategoryModifiers(catLinksData);
             setModifierGroups(groupsData);
             setModifierItems(mItemsData);
+            setReplacerGroups(replGroupsData);
+            setReplacerItems(replItemsData);
+            setMenuItemReplacers(replLinksData);
             setLoading(false);
 
             // Save to Cache
@@ -167,6 +201,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 modifierItems: mItemsData,
                 menuItemModifiers: linksData,
                 menuCategoryModifiers: catLinksData,
+                replacerGroups: replGroupsData,
+                replacerItems: replItemsData,
+                menuItemReplacers: replLinksData,
                 timestamp: Date.now()
             }));
 
@@ -187,6 +224,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             modifierItems,
             menuItemModifiers,
             menuCategoryModifiers,
+            replacerGroups,
+            replacerItems,
+            menuItemReplacers,
             loading, 
             isSyncing,
             refreshMenu 

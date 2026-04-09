@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { configManager } from "../utils/config";
 
 type Settings = {
   id?: string;
@@ -73,6 +74,8 @@ interface SettingsContextType {
   loading: boolean;
   error: string | null;
   refreshSettings: () => Promise<void>;
+  restaurantId: string | null;
+  requiresSetup: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
@@ -80,6 +83,8 @@ const SettingsContext = createContext<SettingsContextType>({
   loading: true,
   error: null,
   refreshSettings: async () => { },
+  restaurantId: null,
+  requiresSetup: false,
 });
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -88,8 +93,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [restaurantId, setRestaurantIdState] = useState<string | null>(configManager.getRestaurantId());
+  const [requiresSetup, setRequiresSetup] = useState(false);
 
   const refreshSettings = async () => {
+    const currentId = configManager.getRestaurantId();
+    if (!currentId) {
+        setRequiresSetup(true);
+        setLoading(false);
+        return;
+    }
+    setRestaurantIdState(currentId);
+    setRequiresSetup(false);
+
     try {
       const res = await fetch(
         import.meta.env.VITE_SUPABASE_URL + "/rest/v1/rpc/get_restaurant_settings",
@@ -100,7 +116,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`,
           },
-          body: JSON.stringify({ p_id: import.meta.env.VITE_RESTAURANT_ID })
+          body: JSON.stringify({ p_id: currentId })
         }
       );
 
@@ -156,7 +172,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, error, refreshSettings }}>
+    <SettingsContext.Provider value={{ settings, loading, error, refreshSettings, restaurantId, requiresSetup }}>
       {children}
     </SettingsContext.Provider>
   );

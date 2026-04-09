@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
+import { useSettings } from './SettingsContext';
 import { RESTAURANT_POSTCODE, MAX_DELIVERY_DISTANCE_KM, IDEAL_POSTCODES_API_BASE } from '../constants/delivery';
 import { supabase } from '../supabaseClient';
 
@@ -88,6 +89,7 @@ interface OrderContextType extends OrderState {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { restaurantId } = useSettings();
   const [state, setState] = useState<OrderState>({
     orderType: null,
     postcode: '',
@@ -109,7 +111,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch delivery settings on mount (Zones are now checked dynamically via RPC)
   React.useEffect(() => {
     const fetchData = async () => {
-      const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
       if (!restaurantId) return;
 
       // Fetch Settings
@@ -198,7 +199,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // 1. Check for Configured Delivery Zones First via RPC
     const { data: zoneMatches, error: zoneError } = await supabase.rpc('get_matching_delivery_zone', {
       p_postcode: cleanPostcode,
-      p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID
+      p_restaurant_id: restaurantId,
     });
 
     if (zoneError) console.error("Error checking zones:", zoneError);
@@ -487,7 +488,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (dateForCheck && timeForCheck) {
       console.log(`Validating capacity for ${dateForCheck} ${timeForCheck}`);
       const { data: capacityData, error: capacityError } = await supabase.rpc('check_timeslot_capacity', {
-        p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+        p_restaurant_id: restaurantId,
         p_date: dateForCheck,
         p_time: timeForCheck,
         p_order_type: finalOrderType
@@ -550,7 +551,7 @@ Notes: ${orderDetails.notes}
         p_order_type: finalOrderType,
         p_payment_method: paymentMethod,
         p_phone: orderDetails.phone,
-        p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+        p_restaurant_id: restaurantId,
         p_scheduled_time: scheduledTime,
         p_transaction_id: orderDetails.paymentIntentId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         p_order_source: 'online'

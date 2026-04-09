@@ -5,7 +5,7 @@ import { FileText } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const HomePage: React.FC = () => {
-    const { settings } = useSettings();
+    const { settings, restaurantId } = useSettings();
     const [menuPdfUrl, setMenuPdfUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -13,7 +13,7 @@ const HomePage: React.FC = () => {
             const { data } = await supabase
                 .from('restaurant_settings')
                 .select('menu_pdf_url, is_menu_pdf_visible')
-                .eq('id', import.meta.env.VITE_RESTAURANT_ID)
+                .eq('id', restaurantId)
                 .single();
 
             if (data && data.menu_pdf_url && data.is_menu_pdf_visible !== false) {

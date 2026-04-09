@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { supabase } from '../supabaseClient';
+import { useSettings } from '../context/SettingsContext';
 
 const timeSlots = ['12:00', '12:30', '13:00', '13:30', '18:00', '18:30', '19:00', '19:30'];
 const peopleOptions = [1, 2, 3, 4];
 
 const ReservationPage: React.FC = () => {
+  const { restaurantId } = useSettings();
   const [step, setStep] = useState(1);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [time, setTime] = useState('');
@@ -44,7 +46,7 @@ const ReservationPage: React.FC = () => {
       p_auto_confirm: false,
       p_table_count: Math.ceil(person / 4),
       p_user_id: null, // Set to null as per task
-      p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+      p_restaurant_id: restaurantId,
     };
 
     try {

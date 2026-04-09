@@ -24,7 +24,7 @@ const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 
 
 const OrderPage: React.FC = () => {
     const navigate = useNavigate();
-    const { settings } = useSettings();
+    const { settings, restaurantId } = useSettings();
     const { showAlert } = useAlert();
     const { orderType, setOrderType, postcode, deliveryAvailable, deliveryDistance, deliveryError, checkPostcode, setCollectionSlot, setDeliverySlot, deliveryFee } = useOrder();
 
@@ -111,7 +111,7 @@ const OrderPage: React.FC = () => {
 
         try {
             const { data, error } = await supabase.rpc('check_timeslot_capacity', {
-                p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                p_restaurant_id: restaurantId,
                 p_date: date,
                 p_time: time,
                 p_order_type: orderType

@@ -25,7 +25,7 @@ const DecorativeElement = () => (
 
 
 const ContactPage: React.FC = () => {
-  const { settings } = useSettings();
+  const { settings, restaurantId } = useSettings();
   const [captcha, setCaptcha] = useState({ num1: 0, num2: 0 });
   const [modalState, setModalState] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'error' }>({
     isOpen: false,
@@ -79,7 +79,7 @@ const ContactPage: React.FC = () => {
             user_agent: navigator.userAgent,
             referrer: document.referrer,
             processed: false,
-            restaurant_id: settings?.id || import.meta.env.VITE_RESTAURANT_ID
+            restaurant_id: settings?.id || restaurantId
           }
         ]);
 

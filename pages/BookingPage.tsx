@@ -284,7 +284,7 @@ const DetailsStep = ({ formData, setFormData, onPrev, onSubmit, isLoading, stepN
 
 
 const BookingPage: React.FC = () => {
-    const { settings } = useSettings();
+    const { settings, restaurantId } = useSettings();
     const { showAlert } = useAlert();
     const [step, setStep] = useState(1);
 
@@ -327,7 +327,7 @@ const BookingPage: React.FC = () => {
             const { data, error } = await supabase
                 .from('table_info')
                 .select('count')
-                .eq('restaurant_id', import.meta.env.VITE_RESTAURANT_ID)
+                .eq('restaurant_id', restaurantId)
                 .order('count', { ascending: false })
                 .limit(1);
 
@@ -463,7 +463,7 @@ const BookingPage: React.FC = () => {
                     p_phone: validatedPhone,
                     p_table_count: calculateTables(bookingData.guests),
                     p_user_id: null, // Assuming guest booking for now, or could be session.user.id if auth implemented
-                    p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+                    p_restaurant_id: restaurantId,
                     p_preorder_summary: formatItemsToMarkdown(selectedItems, settings?.currency)
                 });
 

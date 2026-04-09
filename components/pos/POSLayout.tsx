@@ -56,14 +56,14 @@ const POSLayout: React.FC = () => {
         if (!settings?.id) return;
 
         const fetchCount = async () => {
-             const { count } = await supabase
+            const { count } = await supabase
                 .from('orders')
                 .select('*', { count: 'exact', head: true })
                 .eq('restaurant_id', settings.id)
                 .in('source', ['online', 'qr'])
                 .eq('status', 'pending');
-             
-             if (count !== null) setOnlineOrdersCount(count);
+
+            if (count !== null) setOnlineOrdersCount(count);
         };
         fetchCount();
 
@@ -74,12 +74,12 @@ const POSLayout: React.FC = () => {
                 table: 'orders',
                 filter: `restaurant_id=eq.${settings.id}`
             }, (payload) => {
-                 fetchCount();
-                 const newRow = payload.new as any;
-                 if (payload.eventType === 'INSERT' && ['online', 'qr'].includes(newRow.source) && newRow.status === 'pending') {
-                     const audio = new Audio('/sounds/bell.mp3');
-                     audio.play().catch(e => console.log('Audio play failed', e));
-                 }
+                fetchCount();
+                const newRow = payload.new as any;
+                if (payload.eventType === 'INSERT' && ['online', 'qr'].includes(newRow.source) && newRow.status === 'pending') {
+                    const audio = new Audio('/sounds/bell.mp3');
+                    audio.play().catch(e => console.log('Audio play failed', e));
+                }
             })
             .subscribe();
 
@@ -208,7 +208,7 @@ const POSLayout: React.FC = () => {
 
                             {/* Printer Settings Button */}
                             <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 flex items-center justify-center text-xs font-bold" style={{ color: 'var(--theme-color)' }}>
-                                {staff.full_name.charAt(0)}
+                                {staff?.full_name?.charAt(0) || user?.email?.charAt(0) || <User size={16} />}
                             </div>
 
                             <button
@@ -303,7 +303,7 @@ const POSLayout: React.FC = () => {
                         <div className="flex justify-between items-center mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-bold text-[var(--theme-color)] shadow-sm">
-                                    {staff?.full_name.charAt(0) || <User size={20} />}
+                                    {staff?.full_name?.charAt(0) || user?.email?.charAt(0) || <User size={20} />}
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-gray-900 dark:text-white">{staff?.full_name}</h3>

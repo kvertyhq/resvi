@@ -81,7 +81,7 @@ const MenuPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { settings } = useSettings();
+  const { settings, restaurantId } = useSettings();
 
   const [selectedItem, setSelectedItem] = useState<MenuItemData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,7 +158,7 @@ const MenuPage: React.FC = () => {
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
           body: JSON.stringify({
-            p_restaurant_id: import.meta.env.VITE_RESTAURANT_ID,
+            p_restaurant_id: restaurantId,
             p_available_only: true
           }),
         });

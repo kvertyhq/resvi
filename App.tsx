@@ -16,6 +16,7 @@ import BookingPage from './pages/BookingPage';
 import MenuPage from './pages/MenuPage';
 import AboutPage from './pages/AboutPage';
 import TermsPage from './pages/TermsPage';
+import StartupSetup from './pages/admin/StartupSetup';
 
 // Admin Pages
 import LoginPage from './pages/admin/LoginPage';
@@ -131,6 +132,12 @@ function App() {
 
   if (loading) {
     return <SplashScreen logo={settings?.logo_url} loading={loading} />;
+  }
+
+  const { requiresSetup } = useSettings();
+
+  if (requiresSetup) {
+    return <StartupSetup />;
   }
 
   return (

@@ -38,6 +38,13 @@ export const configManager = {
     },
 
     /**
+     * Clears the current restaurant ID from local storage.
+     */
+    clearRestaurantId: (): void => {
+        localStorage.removeItem(STORAGE_KEY);
+    },
+
+    /**
      * Helper to detect if running in a Tauri/Desktop environment
      */
     isTauri: (): boolean => {

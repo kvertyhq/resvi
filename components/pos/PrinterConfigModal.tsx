@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Printer, Bluetooth, Wifi, Monitor, Search, Loader2, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { configManager } from '../../utils/config';
 import { getVersion } from '@tauri-apps/api/app';
 import { usePOS } from '../../context/POSContext';
 import { Type, Minus, Plus, Info, CheckCircle2, AlertTriangle, Download, LogOut } from 'lucide-react';
@@ -23,7 +24,7 @@ interface PrinterConfigModalProps {
 
 const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose }) => {
     const { uiFontScale, setUIFontScale } = usePOS();
-    const { showAlert, showPrompt } = useAlert();
+    const { showAlert, showConfirm, showPrompt } = useAlert();
     const [settings, setSettings] = useState<PrinterSettings>({
         type: 'browser',
         networkIp: '',
@@ -433,6 +434,24 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                         >
                             <RefreshCw className="w-5 h-5" />
                             Reload Interface
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                const confirmed = await showConfirm(
+                                    "Reset System Configuration?",
+                                    "This will clear the current Restaurant ID and return you to the initial setup screen. Are you sure?",
+                                    "warning"
+                                );
+                                if (confirmed) {
+                                    configManager.clearRestaurantId();
+                                    window.location.reload();
+                                }
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 p-3 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors font-bold text-sm"
+                        >
+                            <AlertTriangle className="w-5 h-5" />
+                            Reset Restaurant Configuration
                         </button>
 
                         {(window as any).__TAURI_INTERNALS__ && (

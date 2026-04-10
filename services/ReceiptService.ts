@@ -83,15 +83,15 @@ class ReceiptService {
     /**
      * Helper to dispatch print job to the correct driver
      */
-    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, round?: number) {
+    private async printToDriver(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, round?: number, isKOT: boolean = false) {
         if (Capacitor.isNativePlatform()) {
-            await this.printCapacitor(orderId, stationId, round);
+            await this.printCapacitor(orderId, stationId, round, isKOT);
         } else if (settings.type === 'browser') {
-            await this.printBrowser(orderId, true, stationId, round);
+            await this.printBrowser(orderId, true, stationId, round, isKOT);
         } else if (settings.type === 'bluetooth') {
             await this.printBluetooth(orderId, stationId, showAlert);
         } else if (settings.type === 'network') {
-            await this.printNetwork(orderId, settings, stationId, showAlert);
+            await this.printNetwork(orderId, settings, stationId, showAlert, isKOT);
         }
     }
 
@@ -181,8 +181,11 @@ class ReceiptService {
             for (const station of stations) {
                 // We could filter station type here if we only want to print to certain stations
                 await new Promise(resolve => setTimeout(resolve, 500));
-                await this.printToDriver(orderId, settings, station.id, showAlert, round);
+                await this.printToDriver(orderId, settings, station.id, showAlert, round, true);
             }
+        } else {
+            // Fallback: Default to master printer if no specific stations exist
+            await this.printToDriver(orderId, settings, undefined, showAlert, round, true);
         }
     }
 
@@ -236,9 +239,12 @@ class ReceiptService {
         }
     }
 
-    private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string, round?: number) {
-        // Open the public receipt page in a popup window
-        let url = `#/r/${orderId}?${autoPrint ? 'autoprint=true' : ''}`;
+    private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string, round?: number, isKOT: boolean = false) {
+        // Open the public receipt page or Kitchen Ticket in a popup window
+        let url = isKOT 
+            ? `#/pos/print-kot/${orderId}?${autoPrint ? 'autoprint=true' : ''}` 
+            : `#/r/${orderId}?${autoPrint ? 'autoprint=true' : ''}`;
+            
         if (stationId) {
             url += `&station_id=${stationId}`;
         }
@@ -275,7 +281,7 @@ class ReceiptService {
         else console.log(msg);
     }
 
-    private async printNetwork(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any) {
+    private async printNetwork(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, isKOT: boolean = false) {
         const ip = settings.networkIp;
         if (!ip) {
             if (showAlert) showAlert('Printer Error', 'No Printer IP configured.', 'error');
@@ -283,7 +289,7 @@ class ReceiptService {
             return;
         }
 
-        console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId})`);
+        console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId}) (KOT: ${isKOT})`);
 
         try {
             // Fetch order and items for printing
@@ -435,17 +441,28 @@ class ReceiptService {
 
                 // Format: Qty(4) + Name(X) + Sym(1) + Price(9) = lineWidth
                 const qtyStr = `${item.quantity}x `.padEnd(4);
-                const nameWidth = lineWidth - 4 - 1 - 9;
-                const nameStr = itemName.slice(0, nameWidth).padEnd(nameWidth);
-                const priceValStr = itemPrice.toFixed(2).padStart(9);
+                
+                if (isKOT) {
+                    // Double width and double height for Kitchen Items
+                    data = [
+                        ...data,
+                        ...[27, 33, 48], // Double width & height
+                        ...encoder.encode(`${qtyStr}${itemName}`.slice(0, lineWidth / 2) + "\n"),
+                        ...[27, 33, 0], // Normal size
+                    ];
+                } else {
+                    const nameWidth = lineWidth - 4 - 1 - 9;
+                    const nameStr = itemName.slice(0, nameWidth).padEnd(nameWidth);
+                    const priceValStr = itemPrice.toFixed(2).padStart(9);
 
-                data = [
-                    ...data,
-                    ...encoder.encode(qtyStr),
-                    ...encoder.encode(nameStr),
-                    ...encoder.encode(" "), // Spacer in place of currency byte
-                    ...encoder.encode(`${priceValStr}\n`)
-                ];
+                    data = [
+                        ...data,
+                        ...encoder.encode(qtyStr),
+                        ...encoder.encode(nameStr),
+                        ...encoder.encode(" "), // Spacer in place of currency byte
+                        ...encoder.encode(`${priceValStr}\n`)
+                    ];
+                }
 
                 // Modifiers / Addons
                 const modifiers = item.selected_modifiers || item.selected_addons || [];
@@ -464,11 +481,11 @@ class ReceiptService {
 
                             data.push(...encoder.encode(modQtyStr));
                             data.push(...encoder.encode(modNameStr));
-                            if (modPrice > 0) {
+                            if (modPrice > 0 && !isKOT) {
                                 data.push(...encoder.encode(" ")); // Spacer
                                 data.push(...encoder.encode(`${modPriceValStr}\n`));
                             } else {
-                                data.push(...encoder.encode(" ".repeat(10) + "\n"));
+                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
                             }
                         }
                     });
@@ -488,63 +505,73 @@ class ReceiptService {
                 }
             });
 
-            // 4. Totals Breakdown
-            const subtotal = order.metadata?.subtotal || 0;
-            const tax = order.metadata?.tax || 0;
-            const deliveryFee = order.metadata?.delivery_fee || 0;
+            // 4. Totals Breakdown (Skip for KOT)
+            if (!isKOT) {
+                const subtotal = order.metadata?.subtotal || 0;
+                const tax = order.metadata?.tax || 0;
+                const deliveryFee = order.metadata?.delivery_fee || 0;
 
-            data = [
-                ...data,
-                ...[27, 97, 1], // Center for divider
-                ...encoder.encode(divider),
-            ];
-
-            if (tax > 0 && restaurant.show_tax !== false) {
-                const taxLabel = "Tax: ";
-                const taxVal = tax.toFixed(2);
-                const paddingCount = lineWidth - taxLabel.length - taxVal.length - 1;
-                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-                data.push(...encoder.encode(taxLabel));
-                data.push(currencyByte);
-                data.push(...encoder.encode(`${taxVal}\n`));
-            }
-
-            if (deliveryFee > 0) {
-                const deliveryLabel = "Delivery Fee: ";
-                const deliveryVal = deliveryFee.toFixed(2);
-                const paddingCount = lineWidth - deliveryLabel.length - deliveryVal.length - 1;
-                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-                data.push(...encoder.encode(deliveryLabel));
-                data.push(currencyByte);
-                data.push(...encoder.encode(`${deliveryVal}\n`));
-            }
-
-            // Big Total - Manual right align within block
-            const totalLabel = "TOTAL: ";
-            const totalVal = (order.total_amount || 0).toFixed(2);
-            const paddingCount = lineWidth - totalLabel.length - totalVal.length - 1;
-
-            data.push(...[27, 33, 16]); // Double height
-            data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-            data.push(...encoder.encode(totalLabel));
-            data.push(currencyByte);
-            data.push(...encoder.encode(`${totalVal}\n`));
-            data.push(...[27, 33, 0]); // Reset
-
-            // 5. Custom Admin Footer (includes Thank You if configured)
-            if (receiptSettings?.footer_text) {
                 data = [
                     ...data,
-                    ...[27, 97, 1], // Center
-                    ...encoder.encode("\n"),
-                    ...encoder.encode(`${receiptSettings.footer_text}\n`),
+                    ...[27, 97, 1], // Center for divider
+                    ...encoder.encode(divider),
                 ];
+
+                if (tax > 0 && restaurant.show_tax !== false) {
+                    const taxLabel = "Tax: ";
+                    const taxVal = tax.toFixed(2);
+                    const paddingCount = lineWidth - taxLabel.length - taxVal.length - 1;
+                    data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+                    data.push(...encoder.encode(taxLabel));
+                    data.push(currencyByte);
+                    data.push(...encoder.encode(`${taxVal}\n`));
+                }
+
+                if (deliveryFee > 0) {
+                    const deliveryLabel = "Delivery Fee: ";
+                    const deliveryVal = deliveryFee.toFixed(2);
+                    const paddingCount = lineWidth - deliveryLabel.length - deliveryVal.length - 1;
+                    data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+                    data.push(...encoder.encode(deliveryLabel));
+                    data.push(currencyByte);
+                    data.push(...encoder.encode(`${deliveryVal}\n`));
+                }
+
+                // Big Total - Manual right align within block
+                const totalLabel = "TOTAL: ";
+                const totalVal = (order.total_amount || 0).toFixed(2);
+                const paddingCount = lineWidth - totalLabel.length - totalVal.length - 1;
+
+                data.push(...[27, 33, 16]); // Double height
+                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
+                data.push(...encoder.encode(totalLabel));
+                data.push(currencyByte);
+                data.push(...encoder.encode(`${totalVal}\n`));
+                data.push(...[27, 33, 0]); // Reset
+
+                // 5. Custom Admin Footer (includes Thank You if configured)
+                if (receiptSettings?.footer_text) {
+                    data = [
+                        ...data,
+                        ...[27, 97, 1], // Center
+                        ...encoder.encode("\n"),
+                        ...encoder.encode(`${receiptSettings.footer_text}\n`),
+                    ];
+                } else {
+                    // Default footer if no custom one
+                    data = [
+                        ...data,
+                        ...[27, 97, 1], // Center
+                        ...encoder.encode("\nThank you for choosing us!\n"),
+                    ];
+                }
             } else {
-                // Default footer if no custom one
+                // KOT Footer
                 data = [
                     ...data,
                     ...[27, 97, 1], // Center
-                    ...encoder.encode("\nThank you for choosing us!\n"),
+                    ...encoder.encode(divider),
+                    ...encoder.encode("-- END OF TICKET --\n"),
                 ];
             }
 
@@ -576,8 +603,8 @@ class ReceiptService {
     /**
      * Print using Capacitor (Android/iOS System Print)
      */
-    private async printCapacitor(orderId: string, stationId?: string, round?: number) {
-        console.log('📱 Printing via Capacitor Native Bridge', { orderId, stationId });
+    private async printCapacitor(orderId: string, stationId?: string, round?: number, isKOT: boolean = false) {
+        console.log('📱 Printing via Capacitor Native Bridge', { orderId, stationId, isKOT });
 
         try {
             // 1. Fetch all data needed for the receipt
@@ -617,7 +644,7 @@ class ReceiptService {
             }
 
             // 3. Generate HTML
-            const html = this.generateReceiptHtml(order, settings, receiptSettings, stationName, displayedItems);
+            const html = this.generateReceiptHtml(order, settings, receiptSettings, stationName, displayedItems, isKOT);
 
             // 4. Send to Native Printer
             await CapacitorPrinter.print({
@@ -630,7 +657,7 @@ class ReceiptService {
         }
     }
 
-    private generateReceiptHtml(order: any, settings: any, receiptSettings: any, stationName: string, items: any[]) {
+    private generateReceiptHtml(order: any, settings: any, receiptSettings: any, stationName: string, items: any[], isKOT: boolean = false) {
         const currency = settings?.currency || '£';
         const logoUrl = receiptSettings?.logo_url || settings?.logo_url;
 
@@ -678,33 +705,39 @@ class ReceiptService {
 
                 <div class="mb-4">
                     ${items.map(item => `
-                        <div class="flex bold">
+                        <div class="flex bold ${isKOT ? "mt-2" : ""}" style="${isKOT ? "font-size: 20px;" : ""}">
                             <span>${item.quantity}x ${item.name_snapshot}</span>
-                            <span>${stationName ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
+                            <span>${(stationName || isKOT) ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                         </div>
                         ${item.selected_modifiers?.map((mod: any) => `
-                            <div class="flex small" style="padding-left: 10px; font-style: italic;">
+                            <div class="flex small" style="padding-left: 10px; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
                                 <span>+ ${mod.name}</span>
-                                <span>${stationName || !mod.price ? '' : mod.price.toFixed(2)}</span>
+                                <span>${(stationName || isKOT) || !mod.price ? '' : mod.price.toFixed(2)}</span>
                             </div>
                         `).join('') || ''}
                         ${item.excluded_toppings?.map((excl: any) => `
-                            <div class="small" style="padding-left: 10px; color: red; font-style: italic;">
+                            <div class="small" style="padding-left: 10px; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
                                 - NO ${excl.name}
                             </div>
                         `).join('') || ''}
                     `).join('')}
                 </div>
 
-                <div class="border-b" style="border-top: 1px dashed #ccc; padding-top: 5px;">
-                    <div class="flex bold" style="font-size: 16px;">
-                        <span>TOTAL</span>
-                        <span>${currency}${order.total_amount.toFixed(2)}</span>
+                ${!isKOT ? `
+                    <div class="border-b" style="border-top: 1px dashed #ccc; padding-top: 5px;">
+                        <div class="flex bold" style="font-size: 16px;">
+                            <span>TOTAL</span>
+                            <span>${currency}${order.total_amount.toFixed(2)}</span>
+                        </div>
                     </div>
-                </div>
+                ` : `
+                    <div class="center bold border-t" style="border-top: 1px dashed #ccc; padding-top: 10px;">
+                        -- END OF TICKET --
+                    </div>
+                `}
 
-                ${receiptSettings?.footer_text ? `<div class="center small mt-2">${receiptSettings.footer_text}</div>` : ''}
-                <div class="center small mt-2">Digital Receipt • ${settings?.website_url || ''}</div>
+                ${!isKOT && receiptSettings?.footer_text ? `<div class="center small mt-2">${receiptSettings.footer_text}</div>` : ''}
+                ${!isKOT ? `<div class="center small mt-2">Digital Receipt • ${settings?.website_url || ''}</div>` : ''}
             </body>
             </html>
         `;

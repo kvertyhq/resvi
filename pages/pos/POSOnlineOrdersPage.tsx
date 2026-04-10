@@ -3,7 +3,7 @@ import { supabase } from '../../supabaseClient';
 import { useSettings } from '../../context/SettingsContext';
 import { usePOS } from '../../context/POSContext';
 import { useAlert } from '../../context/AlertContext';
-import { Clock, Check, X, Printer, RefreshCw, ShoppingBag, Eye } from 'lucide-react';
+import { Clock, Check, X, Printer, RefreshCw, ShoppingBag, Eye, ChefHat } from 'lucide-react';
 import { format } from 'date-fns';
 import { receiptService } from '../../services/ReceiptService';
 import OrderDetailsModal from '../../components/pos/OrderDetailsModal';
@@ -300,14 +300,6 @@ const POSOnlineOrdersPage: React.FC = () => {
                         >
                             Mark Ready
                         </button>
-                        <button
-                            onClick={() => handlePrintOrder(order.id)}
-                            disabled={actionLoading === `print-${order.id}`}
-                            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
-                            title="Print Receipt"
-                        >
-                            <Printer size={20} />
-                        </button>
                     </>
                 )}
                 {['ready'].includes(order.status) && (
@@ -321,6 +313,21 @@ const POSOnlineOrdersPage: React.FC = () => {
                         </button>
                     </>
                 )}
+                <button
+                    onClick={() => handlePrintOrder(order.id)}
+                    disabled={actionLoading === `print-${order.id}`}
+                    className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 shrink-0"
+                    title="Print Receipt"
+                >
+                    <Printer size={20} />
+                </button>
+                <button
+                    onClick={() => receiptService.printKitchenTickets(order.id, settings?.id, undefined, showAlert)}
+                    className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors border border-orange-200 dark:border-orange-800/50 shrink-0"
+                    title="Print Kitchen Ticket (KOT)"
+                >
+                    <ChefHat size={20} />
+                </button>
                 <button
                     onClick={() => setSelectedOrder(order)}
                     className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 shrink-0"

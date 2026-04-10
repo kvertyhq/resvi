@@ -5,7 +5,7 @@ import { usePOS } from '../../context/POSContext';
 import { useAlert } from '../../context/AlertContext';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
-import { Plus, Eye, CreditCard, Trash2, Printer, Pause, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { Plus, Eye, CreditCard, Trash2, Printer, Pause, ChevronLeft, ChevronRight, RotateCw, ChefHat } from 'lucide-react';
 import OrderDetailsModal from '../../components/pos/OrderDetailsModal';
 import HeldOrdersModal from '../../components/pos/HeldOrdersModal';
 import NotificationModal from '../../components/pos/NotificationModal';
@@ -518,6 +518,16 @@ const POSWalkInPage: React.FC = () => {
                                             title="Print Receipt"
                                         >
                                             <Printer className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                receiptService.printKitchenTickets(order.id, settings?.id, undefined, showAlert);
+                                            }}
+                                            className="px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded text-sm transition-colors flex items-center justify-center border border-orange-200 dark:border-orange-800/50"
+                                            title="Print Kitchen Ticket (KOT)"
+                                        >
+                                            <ChefHat className="h-4 w-4" />
                                         </button>
                                     </div>
 

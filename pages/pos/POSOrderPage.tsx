@@ -943,19 +943,19 @@ const POSOrderPage: React.FC = () => {
             return;
         }
 
-        // Prepare local print data (No DB save)
+        // If there are no unsaved items but we have an order, reprint the whole order as KOT
+        if (cartItems.length === 0 && currentOrder) {
+             await receiptService.printKitchenTickets(currentOrder.id, settings.id, undefined, showAlert);
+             return;
+        }
+
+        // Prepare local print data (No DB save - for unsaved cart items)
         const orderData = {
-            type: cartItems.length > 0 ? 'kot' : 'bill',
-            items: cartItems.length > 0 ? cartItems : submittedItems.map(si => ({
-                name: si.name_snapshot || si.menu_item?.name || 'Item',
-                price: si.price_snapshot || si.price,
-                quantity: si.quantity,
-                modifiers: si.selected_modifiers || [],
-                notes: si.notes
-            })),
-            subtotal: cartItems.length > 0 ? subtotal : (currentOrder?.total_amount || 0),
-            tax: cartItems.length > 0 ? tax : 0, // Simplified tax for bill re-print
-            total: cartItems.length > 0 ? total : (currentOrder?.total_amount || 0),
+            type: 'kot',
+            items: cartItems,
+            subtotal: subtotal,
+            tax: tax,
+            total: total,
             customer: selectedCustomer,
             tableName: tableName,
             orderType: isWalkIn ? (isPhoneOrder ? 'Phone Order' : 'Walk-In') : 'Table Order',

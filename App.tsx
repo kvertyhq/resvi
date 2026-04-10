@@ -55,6 +55,7 @@ import POSPhoneOrderSetupPage from './pages/pos/POSPhoneOrderSetupPage';
 import POSReportsPage from './pages/pos/POSReportsPage';
 import POSReportPrintPage from './pages/pos/POSReportPrintPage';
 import POSPrintLocalPage from './pages/pos/POSPrintLocalPage';
+import POSPrintKOTPage from './pages/pos/POSPrintKOTPage';
 import { POSProvider, usePOS } from './context/POSContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { SipProvider } from './context/SipContext';
@@ -272,6 +273,11 @@ function App() {
                   <Route path="/pos/print-local" element={
                     <RequirePOSAuth>
                       <POSPrintLocalPage />
+                    </RequirePOSAuth>
+                  } />
+                  <Route path="/pos/print-kot/:orderId" element={
+                    <RequirePOSAuth>
+                      <POSPrintKOTPage />
                     </RequirePOSAuth>
                   } />
 

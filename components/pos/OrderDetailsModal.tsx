@@ -1,5 +1,8 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Printer, ChefHat } from 'lucide-react';
+import { useSettings } from '../../context/SettingsContext';
+import { useAlert } from '../../context/AlertContext';
+import { receiptService } from '../../services/ReceiptService';
 
 interface OrderItem {
     id: string;
@@ -38,6 +41,9 @@ interface OrderDetailsModalProps {
 }
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, order, currency }) => {
+    const { settings } = useSettings();
+    const { showAlert } = useAlert();
+
     if (!isOpen || !order) return null;
 
     const subtotal = order.order_items?.reduce((sum, item) => sum + (item.price_snapshot * item.quantity), 0) || 0;
@@ -191,12 +197,33 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="w-full py-3 bg-[var(--theme-color)] text-white rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg"
+                        className="flex-1 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors shadow-sm"
                     >
-                        Close Details
+                        Close
+                    </button>
+                    <button
+                        onClick={() => {
+                            receiptService.printKitchenTickets(order.id, settings?.id, undefined, showAlert);
+                        }}
+                        className="flex-1 py-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800/50 rounded-xl font-bold hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors shadow-sm flex items-center justify-center gap-2"
+                        title="Print Kitchen Ticket (KOT)"
+                    >
+                        <ChefHat className="h-5 w-5" />
+                        Print KOT
+                    </button>
+                    <button
+                        onClick={() => {
+                            const primaryMethod = order.payment_status === 'paid' ? 'card' : undefined; 
+                            receiptService.printOrder(order.id, settings?.id, true, primaryMethod, showAlert);
+                        }}
+                        className="flex-1 py-3 bg-[var(--theme-color)] text-white rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg flex items-center justify-center gap-2"
+                        title="Print Customer Receipt"
+                    >
+                        <Printer className="h-5 w-5" />
+                        Receipt
                     </button>
                 </div>
             </div>

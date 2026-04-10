@@ -60,6 +60,10 @@ type Settings = {
     button_color?: string;
     theme_color?: string;
   };
+  caller_id_config?: {
+    did?: string;
+    domain?: string;
+  };
   website_settings?: {
     watermark_text?: string;
     cover_page_url?: string;

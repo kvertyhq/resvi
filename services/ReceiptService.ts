@@ -241,10 +241,10 @@ class ReceiptService {
 
     private async printBrowser(orderId: string, autoPrint: boolean = false, stationId?: string, round?: number, isKOT: boolean = false) {
         // Open the public receipt page or Kitchen Ticket in a popup window
-        let url = isKOT 
-            ? `#/pos/print-kot/${orderId}?${autoPrint ? 'autoprint=true' : ''}` 
+        let url = isKOT
+            ? `#/pos/print-kot/${orderId}?${autoPrint ? 'autoprint=true' : ''}`
             : `#/r/${orderId}?${autoPrint ? 'autoprint=true' : ''}`;
-            
+
         if (stationId) {
             url += `&station_id=${stationId}`;
         }
@@ -441,18 +441,18 @@ class ReceiptService {
 
                 // Format: Qty(4) + Name(X) + Sym(1) + Price(9) = lineWidth
                 const qtyStr = `${item.quantity}x `.padEnd(4);
-                
+
                 if (isKOT) {
                     // Double width and double height for Kitchen Items
                     const rowLimit = Math.floor(lineWidth / 2);
                     const linesStr = [];
                     let remaining = itemName;
-                    
+
                     const firstChunk = remaining.slice(0, rowLimit - qtyStr.length);
                     linesStr.push(qtyStr + firstChunk);
                     remaining = remaining.slice(rowLimit - qtyStr.length);
-                    
-                    while(remaining.length > 0) {
+
+                    while (remaining.length > 0) {
                         const chunk = remaining.slice(0, rowLimit - 4); // 4 spaces indent
                         linesStr.push("    " + chunk);
                         remaining = remaining.slice(rowLimit - 4);
@@ -602,7 +602,7 @@ class ReceiptService {
                     port: 9100,
                     data: Array.from(new Uint8Array(data))
                 });
-                if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
+                // if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
             } else {
                 console.error('Network print failed: invoke is not available');
                 if (showAlert) showAlert('Printer Error', 'Network printing requires the desktop application.', 'error');

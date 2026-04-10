@@ -20,6 +20,7 @@ import SettingsSMS from '../../components/admin/settings/SettingsSMS';
 import SettingsIntegrations from '../../components/admin/settings/SettingsIntegrations';
 import SettingsReceipts from '../../components/admin/settings/SettingsReceipts';
 import SettingsPOS from '../../components/admin/settings/SettingsPOS';
+import SettingsCallerID from '../../components/admin/settings/SettingsCallerID';
 
 import { Users } from 'lucide-react';
 
@@ -214,6 +215,10 @@ const SettingsPage: React.FC = () => {
                             show_kds: true,
                             show_reports: true,
                             show_calls: true
+                        },
+                        caller_id_config: settings.caller_id_config || {
+                            did: '',
+                            domain: ''
                         }
                     });
 
@@ -319,7 +324,8 @@ const SettingsPage: React.FC = () => {
         { id: 'notifications', label: 'Notifications' },
         { id: 'integrations', label: 'Integrations' },
         { id: 'receipts', label: 'Receipts' },
-        { id: 'pos', label: 'POS Config' }
+        { id: 'pos', label: 'POS Config' },
+        { id: 'caller_id', label: 'Caller ID' }
     ];
 
     if (!selectedRestaurantId) {
@@ -500,6 +506,11 @@ const SettingsPage: React.FC = () => {
                                 {activeTab === 'pos' && (
                                     <div className="space-y-8 animate-fadeIn">
                                         <SettingsPOS formData={formData} setFormData={setFormData} />
+                                    </div>
+                                )}
+                                {activeTab === 'caller_id' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsCallerID formData={formData} setFormData={setFormData} />
                                     </div>
                                 )}
                             </div>

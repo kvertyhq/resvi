@@ -50,6 +50,14 @@
     .animate-fade-in {
         animation: fadeIn 0.5s ease-out forwards;
     }
+
+    .animate-slide-in-right {
+        animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .animate-pulse-ring {
+        animation: pulseRing 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
 }
 
 @keyframes fadeIn {
@@ -61,5 +69,26 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulseRing {
+    0% {
+        transform: scale(0.33);
+    }
+    80%, 100% {
+        opacity: 0;
     }
 }

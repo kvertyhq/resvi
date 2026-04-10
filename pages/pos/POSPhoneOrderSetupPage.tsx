@@ -411,28 +411,35 @@ const POSPhoneOrderSetupPage: React.FC = () => {
 
                         {orderType === 'collection' && (
                             <div className="animate-fade-in space-y-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <h3 className="font-bold text-gray-900 dark:text-white pb-2 border-b border-gray-200 dark:border-gray-700 text-sm">Collection Details</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {/* HIDDEN: Date and Time selection as per user request */}
-                                    {/* <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Collection Date</label>
-                                        <DatePicker
-                                            value={localDate}
-                                            onChange={setLocalDate}
-                                            min={new Date().toISOString().split('T')[0]}
-                                            placeholder="Select collection date"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Time Slot</label>
-                                        <div className="relative">
-                                            <Clock className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                                            <select value={localTime} onChange={e => setLocalTime(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none appearance-none text-sm">
-                                                <option value="" disabled>Select a time</option>
-                                                {availableSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
-                                            </select>
+                                <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="font-bold text-gray-900 dark:text-white text-sm">Collection Details</h3>
+                                    <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full font-bold uppercase">Ready for Pickup</span>
+                                </div>
+                                
+                                <div className="space-y-3 pt-1">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
                                         </div>
-                                    </div> */}
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Customer</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{customer?.name || customer?.full_name || 'Guest'}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Estimated Time</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">ASAP (Standard {settings?.collection_time_estimate || 20} mins)</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}

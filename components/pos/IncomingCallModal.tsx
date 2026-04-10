@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Phone, PhoneOff, User } from 'lucide-react';
+import { Phone, PhoneOff, User, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSip } from '../../context/SipContext';
 import { supabase } from '../../supabaseClient';
@@ -15,11 +15,15 @@ interface CustomerInfo {
 export const IncomingCallModal: React.FC = () => {
     const { callState: sipCallState } = useSip();
     const { staff } = usePOS();
-    const [realtimeCall, setRealtimeCall] = useState<{ callerId: string } | null>(null);
+    
+    // Multi-call stack
+    const [activeCalls, setActiveCalls] = useState<any[]>([]);
     const [customer, setCustomer] = useState<CustomerInfo | null>(null);
     const [loading, setLoading] = useState(false);
-    const [isDismissed, setIsDismissed] = useState(false);
     const navigate = useNavigate();
+
+    // current call being viewed
+    const currentCall = activeCalls[0] || null;
 
     // Supabase Realtime Listener
     useEffect(() => {
@@ -35,66 +39,80 @@ export const IncomingCallModal: React.FC = () => {
             }, (payload: any) => {
                 const newLog = payload.new;
 
-                // Only trigger for inbound calls that are missed or 'called' (the new default)
                 if (newLog.direction === 'inbound' && (newLog.status === 'missed' || newLog.status === 'called')) {
-                    console.log('New incoming call detected via Realtime:', payload);
-                    setRealtimeCall({
-                        callerId: newLog.caller_number,
-                        callLogId: newLog.id
+                    setActiveCalls(prev => {
+                        // Avoid duplicates
+                        if (prev.some(c => c.callLogId === newLog.id || (c.callerId === newLog.caller_number && Date.now() - c.timestamp < 10000))) {
+                            return prev;
+                        }
+                        return [...prev, {
+                            callerId: newLog.caller_number,
+                            callLogId: newLog.id,
+                            timestamp: Date.now()
+                        }];
                     });
-                    setIsDismissed(false); // Reset dismiss state for new call
                 }
             })
-            .subscribe((status) => {
-                console.log(`Realtime channel status for restaurant ${staff.restaurant_id}:`, status);
-            });
+            .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
     }, [staff?.restaurant_id]);
 
+    // SIP Integration
+    useEffect(() => {
+        if (sipCallState.isRinging && sipCallState.callerId) {
+            setActiveCalls(prev => {
+                // Avoid duplicates with realtime logs (check callerId and recent time)
+                if (prev.some(c => c.callerId === sipCallState.callerId && Date.now() - c.timestamp < 10000)) {
+                    return prev;
+                }
+                return [...prev, {
+                    callerId: sipCallState.callerId,
+                    callLogId: sipCallState.callId || null,
+                    timestamp: Date.now()
+                }];
+            });
+        }
+    }, [sipCallState.isRinging, sipCallState.callerId, sipCallState.callId]);
 
-    // Derived State: Is there any ringing call?
-    const isRinging = sipCallState.isRinging || (realtimeCall !== null && !isDismissed);
-    const currentCallerId = sipCallState.callerId || realtimeCall?.callerId;
-
+    // Fetch customer info for top call
     useEffect(() => {
         const fetchCustomer = async () => {
-            if (isRinging && currentCallerId) {
+            if (currentCall) {
                 setLoading(true);
                 try {
-                    // Attempt to find customer in profiles by phone number
                     const { data, error } = await supabase
                         .from('profiles')
                         .select('id, full_name, phone')
-                        .eq('phone', currentCallerId)
+                        .eq('phone', currentCall.callerId)
                         .eq('restaurant_id', staff?.restaurant_id)
-                        .single();
+                        .maybeSingle();
 
                     if (!error && data) {
                         setCustomer({
                             id: data.id,
                             name: data.full_name || 'Guest',
-                            phone: data.phone || currentCallerId
+                            phone: data.phone || currentCall.callerId
                         });
-                    } else {
+                    } else if (!data) {
                         // Create a new guest profile instantly for this caller
                         const { data: newProfile, error: insertError } = await supabase
                             .from('profiles')
                             .insert({
                                 full_name: 'Guest',
-                                phone: currentCallerId,
+                                phone: currentCall.callerId,
                                 restaurant_id: staff?.restaurant_id
                             })
                             .select('id, full_name, phone')
-                            .single();
+                            .maybeSingle();
 
                         if (!insertError && newProfile) {
                             setCustomer({
                                 id: newProfile.id,
                                 name: newProfile.full_name || 'Guest',
-                                phone: newProfile.phone || currentCallerId
+                                phone: newProfile.phone || currentCall.callerId
                             });
                         } else {
                             setCustomer(null);
@@ -110,17 +128,12 @@ export const IncomingCallModal: React.FC = () => {
             }
         };
 
-        if (!isRinging) {
-            setIsDismissed(false);
-            setRealtimeCall(null);
-        }
-
         fetchCustomer();
-    }, [isRinging, currentCallerId]);
+    }, [currentCall?.callerId, staff?.restaurant_id]);
 
-    // Web Audio Ringtone - Limited to 5 seconds
+    // Ringtone - Plays if ANY call is active
     useEffect(() => {
-        if (!isRinging || isDismissed) return;
+        if (activeCalls.length === 0) return;
 
         let ctx: AudioContext | null = null;
         let interval: NodeJS.Timeout;
@@ -138,37 +151,28 @@ export const IncomingCallModal: React.FC = () => {
                     if (ctx) ctx.close().catch(e => console.error(e));
                     return;
                 }
-
                 if (ctx.state === 'suspended') ctx.resume();
-
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(440, ctx.currentTime);
                 osc.frequency.setValueAtTime(480, ctx.currentTime + 0.05);
-
                 gain.gain.setValueAtTime(0, ctx.currentTime);
                 gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01);
                 gain.gain.setValueAtTime(0.3, ctx.currentTime + 0.4);
                 gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.41);
-
                 gain.gain.setValueAtTime(0, ctx.currentTime + 0.6);
                 gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.61);
                 gain.gain.setValueAtTime(0.3, ctx.currentTime + 1.0);
                 gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.01);
-
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 1.1);
             };
 
             playRing();
-            interval = setInterval(playRing, 2000); // Repeat more frequently for the 5s window
-
-            // Hard stop after 5 seconds
+            interval = setInterval(playRing, 2000);
             const timeout = setTimeout(() => {
                 if (interval) clearInterval(interval);
                 if (ctx && ctx.state !== 'closed') ctx.close().catch(e => console.error(e));
@@ -179,77 +183,116 @@ export const IncomingCallModal: React.FC = () => {
                 if (interval) clearInterval(interval);
                 if (ctx && ctx.state !== 'closed') ctx.close().catch(e => console.error(e));
             };
-
         } catch (e) {
             console.error("Web Audio API failed:", e);
         }
-    }, [isRinging, isDismissed]);
+    }, [activeCalls.length > 0]);
 
-    if (!isRinging || isDismissed) {
+    if (activeCalls.length === 0) {
         return null;
     }
 
     const handleStartOrder = () => {
-        setIsDismissed(true);
+        if (!currentCall) return;
+        const callToProcess = currentCall;
+        // Remove from queue
+        setActiveCalls(prev => prev.filter(c => c !== callToProcess));
+        
         navigate('/pos/phone-setup', {
             state: {
-                customer: customer || { phone: currentCallerId, full_name: 'Guest Caller' },
+                customer: customer || { phone: callToProcess.callerId, full_name: 'Guest Caller' },
                 isPhoneOrder: true,
-                callLogId: realtimeCall?.callLogId || sipCallState.callId || null
+                callLogId: callToProcess.callLogId
             }
         });
     };
 
     const handleDismiss = () => {
-        setIsDismissed(true);
-        setRealtimeCall(null);
+        setActiveCalls(prev => prev.slice(1)); // Remove top call
     };
 
     return (
-        <div className="fixed top-20 right-4 md:right-8 z-[100] flex flex-col items-end pointer-events-none">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm border-2 border-brand-gold pointer-events-auto transform transition-all translate-x-0">
-                <div className="flex flex-col items-center">
-                    <div className="h-14 w-14 bg-brand-gold/20 text-brand-gold rounded-full flex items-center justify-center mb-4 animate-bounce">
-                        <Phone size={28} />
-                    </div>
-
-                    <h2 className="text-xl font-bold mb-1 text-center text-gray-800 dark:text-white">Incoming Call</h2>
-
-                    <div className="text-center mb-6 w-full">
-                        <p className="text-lg font-mono text-gray-600 dark:text-gray-300 font-bold tracking-wider">{currentCallerId}</p>
-                        {loading ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Looking up customer...</p>
-                        ) : customer ? (
-                            <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center justify-center gap-2 text-green-800 dark:text-green-300 w-full overflow-hidden">
-                                <User size={18} className="flex-shrink-0" />
-                                <span className="font-semibold truncate">{customer.name}</span>
+        <div className="fixed top-24 right-6 md:right-10 z-[300] flex flex-col items-end pointer-events-none">
+            <div className="relative pointer-events-auto group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-brand-gold/40 to-[var(--theme-color)]/40 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                
+                <div key={currentCall?.timestamp} className="relative bg-gray-900/80 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[320px] border border-white/10 overflow-hidden animate-slide-in-right">
+                    <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-[var(--theme-color)]/5 rounded-full blur-3xl"></div>
+                    
+                    <div className="flex flex-col items-center">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-[var(--theme-color)]/30 rounded-full animate-pulse-ring"></div>
+                            <div className="relative h-16 w-16 bg-[var(--theme-color)] text-white rounded-full flex items-center justify-center shadow-lg shadow-[var(--theme-color)]/20">
+                                <Phone size={32} className="animate-bounce" style={{ animationDuration: '2s' }} />
+                                {activeCalls.length > 1 && (
+                                    <div className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full border-2 border-gray-900 shadow-lg">
+                                        +{activeCalls.length - 1}
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-2 bg-gray-100 dark:bg-gray-700/50 p-2 rounded-lg inline-block w-full text-center">Unknown Caller</p>
-                        )}
+                        </div>
+
+                        <div className="text-center w-full space-y-1 mb-6">
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                <p className="text-[10px] font-black text-[var(--theme-color)] uppercase tracking-[0.2em] opacity-80">
+                                    {activeCalls.length > 1 ? `Incoming Call (1 of ${activeCalls.length})` : 'Incoming Order Call'}
+                                </p>
+                            </div>
+                            <h2 className="text-2xl font-black text-white tracking-tight">{currentCall?.callerId}</h2>
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
+                                Received at {new Date(currentCall?.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            
+                            {loading ? (
+                                <div className="flex items-center justify-center gap-2 mt-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                    <div className="w-4 h-4 border-2 border-[var(--theme-color)] border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-xs text-gray-400 font-medium">Identifying...</p>
+                                </div>
+                            ) : customer ? (
+                                <div className="mt-4 p-3 bg-gradient-to-br from-white/10 to-transparent rounded-xl border border-white/10 flex items-center gap-3 text-left w-full shadow-inner animate-fade-in">
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--theme-color)]/20 text-[var(--theme-color)] flex items-center justify-center flex-shrink-0">
+                                        <User size={20} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] text-[var(--theme-color)] font-bold uppercase tracking-wider">Identified</p>
+                                        <p className="text-sm font-bold text-white truncate">{customer.name}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/5 flex items-center gap-3 text-left w-full animate-fade-in">
+                                    <div className="w-10 h-10 rounded-lg bg-gray-700 text-gray-400 flex items-center justify-center flex-shrink-0">
+                                        <User size={20} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">New Caller</p>
+                                        <p className="text-sm font-bold text-gray-300">Guest Order</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 w-full">
+                            <button
+                                onClick={handleStartOrder}
+                                className="relative group w-full h-14 bg-[var(--theme-color)] hover:opacity-90 text-white font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-3 shadow-xl shadow-[var(--theme-color)]/20 active:scale-[0.97]"
+                            >
+                                <ShoppingCart size={20} className="group-hover:translate-x-1 transition-transform" />
+                                <span className="uppercase tracking-widest text-xs">Start New Order</span>
+                            </button>
+                            
+                            <button
+                                onClick={handleDismiss}
+                                className="w-full h-12 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-xs border border-white/5 group"
+                            >
+                                <PhoneOff size={16} className="group-hover:rotate-12 transition-transform" />
+                                <span className="uppercase tracking-widest">
+                                    {activeCalls.length > 1 ? 'Next Call' : 'Dismiss Call'}
+                                </span>
+                            </button>
+                        </div>
                     </div>
-
-                    <div className="flex flex-col gap-3 w-full mt-4">
-                        <button
-                            onClick={handleStartOrder}
-                            className="w-full h-12 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 text-base active:scale-[0.98] group"
-                        >
-                            <User size={20} className="group-hover:scale-110 transition-transform" />
-                            <span>Start Order</span>
-                        </button>
-                        <button
-                            onClick={handleDismiss}
-                            className="w-full h-12 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-600 active:scale-[0.98]"
-                        >
-                            <PhoneOff size={18} />
-                            <span>Dismiss Call</span>
-                        </button>
-                    </div>
-
-
                 </div>
             </div>
         </div>
     );
 };
-

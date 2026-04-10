@@ -4,7 +4,8 @@ import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import {
     Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing,
     ShoppingCart, Search, User, Users, Clock,
-    ChevronLeft, ChevronRight, CheckCircle2, ExternalLink, CheckCheck, RotateCw
+    ChevronLeft, ChevronRight, CheckCircle2, ExternalLink, CheckCheck, RotateCw,
+    Pencil, X, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
@@ -66,6 +67,11 @@ const POSCallHistoryPage: React.FC = () => {
 
     // Mobile view
     const [mobileView, setMobileView] = useState<'history' | 'customers' | 'orders'>('orders');
+
+    // Editing State
+    const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
+    const [editName, setEditName] = useState('');
+    const [updatingName, setUpdatingName] = useState(false);
 
     useEffect(() => {
         if (settings?.id) {
@@ -160,6 +166,28 @@ const POSCallHistoryPage: React.FC = () => {
         }
         setCustomerLoading(false);
     }, [settings?.id, customerPage, customerSearch]);
+
+    const handleUpdateName = async (customerId: string) => {
+        if (!editName.trim()) return;
+        setUpdatingName(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ full_name: editName.trim() })
+                .eq('id', customerId);
+
+            if (error) throw error;
+
+            showAlert('Success', 'Customer name updated', 'success');
+            setEditingCustomer(null);
+            fetchCustomers(); // Refresh list
+        } catch (err: any) {
+            console.error('Error updating name:', err);
+            showAlert('Error', 'Failed to update name', 'danger');
+        } finally {
+            setUpdatingName(false);
+        }
+    };
 
     const fetchPhoneOrders = async () => {
         if (!settings?.id) return;
@@ -703,7 +731,47 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 {customer.full_name?.charAt(0) || <User size={20} />}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="font-bold text-gray-900 dark:text-white truncate">{customer.full_name}</div>
+                                                                {editingCustomer?.id === customer.id ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            autoFocus
+                                                                            value={editName}
+                                                                            onChange={(e) => setEditName(e.target.value)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') handleUpdateName(customer.id);
+                                                                                if (e.key === 'Escape') setEditingCustomer(null);
+                                                                            }}
+                                                                            className="w-full bg-white dark:bg-gray-900 border border-[var(--theme-color)] rounded px-2 py-1 text-sm outline-none"
+                                                                        />
+                                                                        <button 
+                                                                            onClick={() => handleUpdateName(customer.id)}
+                                                                            disabled={updatingName}
+                                                                            className="text-green-600 hover:text-green-700"
+                                                                        >
+                                                                            <Check size={16} />
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => setEditingCustomer(null)}
+                                                                            className="text-gray-400 hover:text-gray-600"
+                                                                        >
+                                                                            <X size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-between group/name">
+                                                                        <div className="font-bold text-gray-900 dark:text-white truncate flex-1">{customer.full_name}</div>
+                                                                        <button 
+                                                                            onClick={() => {
+                                                                                setEditingCustomer(customer);
+                                                                                setEditName(customer.full_name || '');
+                                                                            }}
+                                                                            className="opacity-0 group-hover/name:opacity-100 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all ml-1"
+                                                                        >
+                                                                            <Pencil size={12} className="text-gray-400" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                                 <div className="text-xs text-gray-500 font-medium">{customer.phone}</div>
                                                             </div>
                                                         </div>

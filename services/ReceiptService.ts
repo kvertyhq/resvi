@@ -444,12 +444,25 @@ class ReceiptService {
                 
                 if (isKOT) {
                     // Double width and double height for Kitchen Items
-                    data = [
-                        ...data,
-                        ...[27, 33, 48], // Double width & height
-                        ...encoder.encode(`${qtyStr}${itemName}`.slice(0, lineWidth / 2) + "\n"),
-                        ...[27, 33, 0], // Normal size
-                    ];
+                    const rowLimit = Math.floor(lineWidth / 2);
+                    const linesStr = [];
+                    let remaining = itemName;
+                    
+                    const firstChunk = remaining.slice(0, rowLimit - qtyStr.length);
+                    linesStr.push(qtyStr + firstChunk);
+                    remaining = remaining.slice(rowLimit - qtyStr.length);
+                    
+                    while(remaining.length > 0) {
+                        const chunk = remaining.slice(0, rowLimit - 4); // 4 spaces indent
+                        linesStr.push("    " + chunk);
+                        remaining = remaining.slice(rowLimit - 4);
+                    }
+
+                    data.push(...[27, 33, 48]); // Double width & height
+                    linesStr.forEach((l: string) => {
+                        data.push(...encoder.encode(`${l}\n`));
+                    });
+                    data.push(...[27, 33, 0]); // Normal size
                 } else {
                     const nameWidth = lineWidth - 4 - 1 - 9;
                     const nameStr = itemName.slice(0, nameWidth).padEnd(nameWidth);

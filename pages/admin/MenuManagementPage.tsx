@@ -1953,12 +1953,20 @@ const MenuManagementPage: React.FC = () => {
                                                     <div className="relative group">
                                                         <input 
                                                             type="color" 
-                                                            value={categoryForm.color || '#3b82f6'} 
+                                                            value={categoryForm.color || '#ffffff'} 
                                                             onChange={(e) => setCategoryForm(prev => ({ ...prev, color: e.target.value }))}
-                                                            className="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer rounded-md overflow-hidden"
+                                                            className="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer rounded-md overflow-hidden opacity-0 absolute inset-0 z-10"
                                                         />
-                                                        <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 pointer-events-none">
-                                                            <Edit className="w-2 h-2 text-gray-500" />
+                                                        <div 
+                                                            className={`w-10 h-10 rounded-md border-2 flex items-center justify-center transition-all ${!categoryForm.color ? 'border-gray-200 bg-white' : 'border-transparent'}`}
+                                                            style={{ backgroundColor: categoryForm.color || 'transparent' }}
+                                                        >
+                                                            {!categoryForm.color && (
+                                                                <div className="w-full h-[2px] bg-red-400/50 rotate-45"></div>
+                                                            )}
+                                                            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 pointer-events-none z-20">
+                                                                <Edit className="w-2 h-2 text-gray-500" />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <input 

@@ -10,6 +10,7 @@ interface MenuCategory {
     description: string;
     order_index: number;
     tax_rate: number;
+    color?: string;
     created_at?: string;
 
     updated_at?: string;
@@ -27,7 +28,8 @@ const CategoryManagementPage: React.FC = () => {
         name: '',
         description: '',
         order_index: 0,
-        tax_rate: 0
+        tax_rate: 0,
+        color: ''
     });
 
 
@@ -62,7 +64,7 @@ const CategoryManagementPage: React.FC = () => {
             setCategoryForm(category);
         } else {
             setEditingCategory(null);
-            setCategoryForm({ name: '', description: '', order_index: categories.length, tax_rate: 0 });
+            setCategoryForm({ name: '', description: '', order_index: categories.length, tax_rate: 0, color: '' });
         }
 
         setIsModalOpen(true);
@@ -119,6 +121,7 @@ const CategoryManagementPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Rate (%)</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
 
                             </tr>
@@ -130,6 +133,16 @@ const CategoryManagementPage: React.FC = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cat.name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{cat.description}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(cat.tax_rate || 0).toFixed(1)}%</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {cat.color ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-4 h-4 rounded-full border border-gray-200" style={{ backgroundColor: cat.color }}></div>
+                                                <span className="text-xs font-mono lowercase">{cat.color}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 italic">Default</span>
+                                        )}
+                                    </td>
 
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button onClick={() => openCategoryModal(cat)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
@@ -173,6 +186,54 @@ const CategoryManagementPage: React.FC = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
                                     <input type="number" name="tax_rate" step="0.1" value={categoryForm.tax_rate} onChange={handleCategoryInputChange} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" placeholder="e.g. 10" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Category Color (POS Tabs)</label>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {[
+                                            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
+                                            '#ec4899', '#06b6d4', '#4b5563', '#000000', '#78350f'
+                                        ].map(color => (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                onClick={() => setCategoryForm(prev => ({ ...prev, color }))}
+                                                className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${categoryForm.color === color ? 'border-brand-gold scale-125' : 'border-transparent'}`}
+                                                style={{ backgroundColor: color }}
+                                                title={color}
+                                            />
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => setCategoryForm(prev => ({ ...prev, color: '' }))}
+                                            className={`w-8 h-8 rounded-full border-2 border-gray-200 bg-white flex items-center justify-center transition-transform hover:scale-110 ${!categoryForm.color ? 'border-brand-gold scale-125' : ''}`}
+                                            title="Default Color"
+                                        >
+                                            <div className="w-full h-[2px] bg-red-400 rotate-45"></div>
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative group">
+                                            <input 
+                                                type="color" 
+                                                value={categoryForm.color || '#3b82f6'} 
+                                                onChange={(e) => setCategoryForm(prev => ({ ...prev, color: e.target.value }))}
+                                                className="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer rounded-md overflow-hidden"
+                                            />
+                                            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 pointer-events-none">
+                                                <Edit className="w-2 h-2 text-gray-500" />
+                                            </div>
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            name="color" 
+                                            value={categoryForm.color || ''} 
+                                            onChange={handleCategoryInputChange} 
+                                            placeholder="#HEXCODE"
+                                            className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold font-mono uppercase"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="flex justify-end space-x-3 pt-4">

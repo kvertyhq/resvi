@@ -120,7 +120,7 @@ const RedirectHandler = () => {
 };
 
 function App() {
-  const { settings, loading } = useSettings();
+  const { settings, loading, requiresSetup } = useSettings();
   const { showPrompt, showAlert } = useAlert();
 
 
@@ -134,8 +134,6 @@ function App() {
   if (loading) {
     return <SplashScreen logo={settings?.logo_url} loading={loading} />;
   }
-
-  const { requiresSetup } = useSettings();
 
   if (requiresSetup) {
     return <StartupSetup />;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -21,7 +21,7 @@ import NotificationModal from '../../components/pos/NotificationModal';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { receiptService } from '../../services/ReceiptService';
-import { Pause, X, Trash2, Printer, Check, Send, ShoppingCart, CreditCard } from 'lucide-react';
+import { Pause, X, Trash2, Printer, Check, Send, ShoppingCart, CreditCard, Pencil } from 'lucide-react';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -125,6 +125,12 @@ const POSOrderPage: React.FC = () => {
     const [heldOrders, setHeldOrders] = useState<any[]>([]);
     const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
     const [isHoldingOrder, setIsHoldingOrder] = useState(false);
+
+    // Cart Auto-scroll
+    const cartEndRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        cartEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [cartItems.length]);
 
     // Totals Calculation
     const subtotal = useMemo(() => {
@@ -355,13 +361,22 @@ const POSOrderPage: React.FC = () => {
     };
 
     const handleItemClick = (item: any) => {
-        // ALWAYS add directly now as per request
-        // Default to first variant price if exist, otherwise base price
-        const initialPrice = (item.price_variants && item.price_variants.length > 0) 
-            ? item.price_variants[0].price 
-            : item.price;
-            
-        addToCart(item, [], initialPrice);
+        // Revert back to original flow: open modal if item has options
+        const hasOptions = itemModifiersMap.has(item.id) || (item.price_variants && item.price_variants.length > 1) || item.flags?.includes('half_half');
+        
+        if (hasOptions) {
+            setInitialModalData({});
+            setEditingTempId(null);
+            setItemForModal(item);
+            setIsModalOpen(true);
+        } else {
+            // Direct add for items without options
+            const initialPrice = (item.price_variants && item.price_variants.length > 0) 
+                ? item.price_variants[0].price 
+                : item.price;
+                
+            addToCart(item, [], initialPrice);
+        }
     };
 
     const handleEditCartItem = (tempId: string) => {
@@ -1011,10 +1026,10 @@ const POSOrderPage: React.FC = () => {
                 menuItem={itemForModal}
                 onAddToCart={addToCart}
                 currency={settings?.currency}
-                initialVariant={initialModalData.variant}
-                initialSelections={initialModalData.selections}
-                initialExclusions={initialModalData.exclusions}
-                initialReplacers={initialModalData.replacers}
+                initialVariant={initialModalData?.variant}
+                initialSelections={initialModalData?.selections}
+                initialExclusions={initialModalData?.exclusions}
+                initialReplacers={initialModalData?.replacers}
             />
 
             <OrderUpdatedModal
@@ -1281,57 +1296,69 @@ const POSOrderPage: React.FC = () => {
                             ))}
 
                             {/* Render New/Local Items */}
-                            {cartItems.map((item) => (
+                            {cartItems.map((item) => {
+                                const menuItem = menuItems.find(mi => mi.id === item.id);
+                                const hasOptions = menuItem ? (itemModifiersMap.has(item.id) || (menuItem.price_variants && menuItem.price_variants.length > 1) || menuItem.flags?.includes('half_half')) : false;
+
+                                return (
                                 <div key={item.tempId} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between group animate-fadeIn transition-colors shadow-sm relative overflow-hidden">
                                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--theme-color)]"></div>
                                     <div className="flex-1">
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-gray-900 dark:text-white font-bold">{item.name}</span>
-                                                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">New</span>
+                                        <div className="flex flex-col gap-3">
+                                            {/* Row 1: Name and Cost */}
+                                            <div className="flex justify-between items-start gap-4">
+                                                <span className="text-gray-900 dark:text-white font-bold leading-tight flex-1">{item.name}</span>
+                                                <span className="text-gray-900 dark:text-white font-mono font-bold text-lg whitespace-nowrap">
+                                                    {settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}
+                                                </span>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2">
-                                                <div className="flex items-center gap-2">
-                                                     <button
-                                                        onClick={() => handleEditCartItem(item.tempId)}
-                                                        className="text-blue-500 hover:text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-blue-100 dark:border-blue-800"
+                                            
+                                            {/* Row 2: Actions and Quantity */}
+                                            <div className="flex justify-between items-center">
+                                                {/* Action Buttons */}
+                                                <div className="flex items-center gap-3">
+                                                    {hasOptions && (
+                                                        <button
+                                                            onClick={() => handleEditCartItem(item.tempId)}
+                                                            className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 rounded-xl transition-colors border border-blue-100 dark:border-blue-800 shadow-sm"
+                                                            title="Edit Item Options"
+                                                        >
+                                                            <Pencil size={20} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => removeFromCart(item.tempId)}
+                                                        className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded-xl transition-colors border border-red-100 dark:border-red-800 shadow-sm"
+                                                        title="Remove Item"
                                                     >
-                                                        Edit
+                                                        <Trash2 size={20} />
                                                     </button>
-                                                    <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
                                                 </div>
 
                                                 {/* Quantity Controls */}
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-3">
                                                     <button
                                                         onClick={() => decrementQuantity(item.tempId)}
-                                                        className="w-6 h-6 flex items-center justify-center bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded transition-colors"
+                                                        className="w-10 h-10 flex items-center justify-center bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded-xl transition-colors shadow-sm"
                                                         title="Decrease quantity"
                                                     >
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
                                                         </svg>
                                                     </button>
-                                                    <span className="w-8 text-center text-sm font-bold text-gray-900 dark:text-white">
+                                                    <span className="w-6 text-center text-lg font-bold text-gray-900 dark:text-white">
                                                         {item.quantity}
                                                     </span>
                                                     <button
                                                         onClick={() => incrementQuantity(item.tempId)}
-                                                        className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                        className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors shadow-sm"
                                                         title="Increase quantity"
                                                     >
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
                                                         </svg>
                                                     </button>
                                                 </div>
-
-                                                <button
-                                                    onClick={() => removeFromCart(item.tempId)}
-                                                    className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium"
-                                                >
-                                                    Remove
-                                                </button>
                                             </div>
                                         </div>
 
@@ -1368,8 +1395,10 @@ const POSOrderPage: React.FC = () => {
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                 </div>
+                                );
+                            })}
+                            <div ref={cartEndRef} />
                         </div>
                     )}
                 </div>

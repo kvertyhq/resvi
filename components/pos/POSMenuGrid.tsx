@@ -37,6 +37,7 @@ const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick, onModifie
                         />
                     )}
 
+                    {/* Modifier Icon hidden temporarily as per request 
                     {item.hasOptions && (
                         <div 
                             className="absolute top-0 right-0 z-20 p-3 text-orange-400 opacity-80 hover:opacity-100 transition-opacity hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-bl-xl" 
@@ -49,6 +50,7 @@ const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick, onModifie
                             <SlidersHorizontal size={20} />
                         </div>
                     )}
+                    */}
 
                     <div className="relative z-10 w-full flex flex-col h-full">
                         <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight line-clamp-2">{item.name}</h3>

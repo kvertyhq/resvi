@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import { SlidersHorizontal } from 'lucide-react';
 
 interface MenuItem {
     id: string;
@@ -8,15 +9,17 @@ interface MenuItem {
     description: string;
     price: number;
     image_url?: string;
+    hasOptions?: boolean;
 }
 
 
 interface POSMenuGridProps {
     items: MenuItem[];
     onItemClick: (item: MenuItem) => void;
+    onModifierClick?: (item: MenuItem) => void;
 }
 
-const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick }) => {
+const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick, onModifierClick }) => {
     const { settings } = useSettings();
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 overflow-y-auto pb-20">
@@ -32,6 +35,19 @@ const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick }) => {
                             className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity bg-cover bg-center"
                             style={{ backgroundImage: `url(${item.image_url})` }}
                         />
+                    )}
+
+                    {item.hasOptions && (
+                        <div 
+                            className="absolute top-0 right-0 z-20 p-3 text-orange-400 opacity-80 hover:opacity-100 transition-opacity hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-bl-xl" 
+                            title="Open customization"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onModifierClick) onModifierClick(item);
+                            }}
+                        >
+                            <SlidersHorizontal size={20} />
+                        </div>
                     )}
 
                     <div className="relative z-10 w-full flex flex-col h-full">

@@ -91,6 +91,13 @@ const POSOrderPage: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [itemForModal, setItemForModal] = useState<any>(null);
+    const [editingTempId, setEditingTempId] = useState<string | null>(null);
+    const [initialModalData, setInitialModalData] = useState<{
+        variant?: any;
+        selections?: any;
+        exclusions?: any;
+        replacers?: any;
+    }>({});
 
     // Discount State
     const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('percentage');
@@ -348,20 +355,78 @@ const POSOrderPage: React.FC = () => {
     };
 
     const handleItemClick = (item: any) => {
-        const hasModifiers = itemModifiersMap.has(item.id);
-        const hasVariants = item.price_variants && item.price_variants.length > 1;
+        // ALWAYS add directly now as per request
+        // Default to first variant price if exist, otherwise base price
+        const initialPrice = (item.price_variants && item.price_variants.length > 0) 
+            ? item.price_variants[0].price 
+            : item.price;
+            
+        addToCart(item, [], initialPrice);
+    };
 
-        if (hasModifiers || hasVariants) {
-            // Open Modal
-            setItemForModal(item);
-            setIsModalOpen(true);
-        } else {
-            // Add directly
-            addToCart(item, [], item.price);
-        }
+    const handleEditCartItem = (tempId: string) => {
+        const item = cartItems.find(i => i.tempId === tempId);
+        if (!item) return;
+
+        const menuItem = menuItems.find(mi => mi.id === item.id);
+        if (!menuItem) return;
+
+        // Map flat data back to modal structures
+        const initialVariant = menuItem.price_variants?.find((v: any) => 
+            `${menuItem.name} (${v.name})` === item.name
+        );
+
+        const selections: any = {};
+        item.modifiers.forEach((m: any) => {
+            if (!selections[m.modifier_group_id]) selections[m.modifier_group_id] = {};
+            selections[m.modifier_group_id][m.modifier_item_id] = {
+                modifier_group_id: m.modifier_group_id,
+                modifier_group_name: m.modifier_group_name,
+                modifier_item_id: m.modifier_item_id,
+                name: m.name,
+                location: m.location || 'whole',
+                intensity: m.intensity || 'normal'
+            };
+        });
+
+        const replacers: any = {};
+        item.selected_replacers?.forEach((r: any) => {
+            if (!replacers[r.group_id]) replacers[r.group_id] = {};
+            replacers[r.group_id][r.id] = true;
+        });
+
+        setInitialModalData({
+            variant: initialVariant,
+            selections,
+            exclusions: item.excluded_toppings,
+            replacers
+        });
+
+        setEditingTempId(tempId);
+        setItemForModal(menuItem);
+        setIsModalOpen(true);
     };
 
     const addToCart = (item: any, modifiers: any[], finalPrice: number, excludedToppings?: any[], selectedReplacers?: any[]) => {
+        if (editingTempId) {
+            // Update existing item
+            setCartItems(prev => prev.map(cartItem => 
+                cartItem.tempId === editingTempId 
+                    ? {
+                        ...cartItem,
+                        name: item.name,
+                        price: finalPrice,
+                        modifiers: modifiers,
+                        excluded_toppings: excludedToppings,
+                        selected_replacers: selectedReplacers
+                      }
+                    : cartItem
+            ));
+            setEditingTempId(null);
+            setInitialModalData({});
+            return;
+        }
+
         // Check if item with same ID, price, and modifiers already exists
         const existingItemIndex = cartItems.findIndex(cartItem => {
             if (cartItem.id !== item.id || cartItem.price !== finalPrice) return false;
@@ -938,10 +1003,18 @@ const POSOrderPage: React.FC = () => {
             {/* Modal */}
             <POSModifierModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingTempId(null);
+                    setInitialModalData({});
+                }}
                 menuItem={itemForModal}
                 onAddToCart={addToCart}
                 currency={settings?.currency}
+                initialVariant={initialModalData.variant}
+                initialSelections={initialModalData.selections}
+                initialExclusions={initialModalData.exclusions}
+                initialReplacers={initialModalData.replacers}
             />
 
             <OrderUpdatedModal
@@ -1099,7 +1172,19 @@ const POSOrderPage: React.FC = () => {
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
                                     </div>
                                 )}
-                                <POSMenuGrid items={filteredItems} onItemClick={handleItemClick} />
+                                <POSMenuGrid 
+                                    items={filteredItems.map(item => ({
+                                        ...item,
+                                        hasOptions: itemModifiersMap.has(item.id) || (item.price_variants && item.price_variants.length > 1)
+                                    }))} 
+                                    onItemClick={handleItemClick} 
+                                    onModifierClick={(item) => {
+                                        setEditingTempId(null);
+                                        setInitialModalData({});
+                                        setItemForModal(item);
+                                        setIsModalOpen(true);
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
@@ -1206,7 +1291,15 @@ const POSOrderPage: React.FC = () => {
                                                 <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">New</span>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
-                                                <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
+                                                <div className="flex items-center gap-2">
+                                                     <button
+                                                        onClick={() => handleEditCartItem(item.tempId)}
+                                                        className="text-blue-500 hover:text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-blue-100 dark:border-blue-800"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <span className="text-gray-900 dark:text-white font-mono">{settings?.currency || '$'}{(item.price * item.quantity).toFixed(2)}</span>
+                                                </div>
 
                                                 {/* Quantity Controls */}
                                                 <div className="flex items-center gap-1">

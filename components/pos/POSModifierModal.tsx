@@ -42,9 +42,16 @@ interface POSModifierModalProps {
     onClose: () => void;
     onAddToCart: (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: ExcludedTopping[], selectedReplacers?: any[]) => void;
     currency?: string;
+    initialVariant?: any;
+    initialSelections?: Record<string, Record<string, Partial<SelectedModifier>>>;
+    initialExclusions?: ExcludedTopping[];
+    initialReplacers?: Record<string, Record<string, boolean>>;
 }
 
-const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, onClose, onAddToCart, currency = '£' }) => {
+const POSModifierModal: React.FC<POSModifierModalProps> = ({
+    menuItem, isOpen, onClose, onAddToCart, currency = '£',
+    initialVariant, initialSelections, initialExclusions, initialReplacers
+}) => {
     const { showAlert } = useAlert();
     const {
         modifierGroups: allGroups,
@@ -138,21 +145,26 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
 
     useEffect(() => {
         if (isOpen && menuItem) {
-            const variants = menuItem.price_variants || [];
-            if (variants.length > 0) {
-                setSelectedVariant(variants[0]);
-                setTotalPrice(Number(variants[0].price || 0));
+            // Priority: Initial values (from cart edit) > Menu Item defaults
+            if (initialVariant) {
+                setSelectedVariant(initialVariant);
             } else {
-                setSelectedVariant(null);
-                setTotalPrice(Number(menuItem.price || 0));
+                const variants = menuItem.price_variants || [];
+                if (variants.length > 0) {
+                    setSelectedVariant(variants[0]);
+                } else {
+                    setSelectedVariant(null);
+                }
             }
-            setSelections({});
+
+            setSelections(initialSelections || {});
+            setExcludedToppings(initialExclusions || []);
+            setSelectedReplacers(initialReplacers || {});
+            
             setExpandedCustomise({});
-            setExcludedToppings([]);
-            setSelectedReplacers({});
             setReplacementPickerFor(null);
         }
-    }, [isOpen, menuItem]);
+    }, [isOpen, menuItem, initialVariant, initialSelections, initialExclusions, initialReplacers]);
 
     // Recalculate total
     useEffect(() => {
@@ -729,7 +741,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({ menuItem, isOpen, o
                         style={{ backgroundColor: 'var(--theme-color)' }}
                         className="w-full text-white font-bold py-4 rounded-xl shadow-lg transition-all flex justify-between px-8 hover:brightness-110"
                     >
-                        <span>Add to Order</span>
+                        <span>{initialSelections ? 'Update Item' : 'Add to Order'}</span>
                         <span>{currency}{totalPrice.toFixed(2)}</span>
                     </button>
                 </div>

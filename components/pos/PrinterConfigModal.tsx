@@ -9,6 +9,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch, exit } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAlert } from '../../context/AlertContext';
+import { receiptService } from '../../services/ReceiptService';
 import pkg from '../../package.json';
 
 interface PrinterSettings {
@@ -292,7 +293,7 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                                     </div>
                                 )}
 
-                                <div className="pt-2">
+                                <div className="pt-2 grid grid-cols-2 gap-2">
                                     <button
                                         onClick={handleTestPrint}
                                         disabled={isPrintingTest || !settings.networkIp}
@@ -300,6 +301,20 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
                                     >
                                         {isPrintingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                                         Run Test Print
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await receiptService.openCashDrawer(settings);
+                                            } catch (error) {
+                                                console.error('Test drawer failed:', error);
+                                            }
+                                        }}
+                                        disabled={!settings.networkIp}
+                                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-brand-gold hover:text-brand-gold transition-all"
+                                    >
+                                        <LogOut className="w-4 h-4 rotate-90" />
+                                        Test Drawer
                                     </button>
                                 </div>
 

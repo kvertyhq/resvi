@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Outlet, useNavigate, NavLink } from 'react-router-dom';
+import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { usePOS } from '../../context/POSContext';
 import { useOffline } from '../../context/OfflineContext';
 import { useAdmin } from '../../context/AdminContext';
@@ -15,6 +15,7 @@ const POSLayout: React.FC = () => {
     const { isOnline, queueLength, sync } = useOffline();
     const { settings } = useSettings();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [showPrinterModal, setShowPrinterModal] = React.useState(false);
     const [showMobileMenu, setShowMobileMenu] = React.useState(false);
@@ -102,6 +103,13 @@ const POSLayout: React.FC = () => {
         navigate('/pos/login');
     };
 
+    // 3. Handle Disabled Tables Redirect
+    useEffect(() => {
+        if (!posLoading && settings?.pos_settings?.show_tables === false && (location.pathname === '/pos' || location.pathname === '/pos/')) {
+            navigate('/pos/walk-in', { replace: true });
+        }
+    }, [settings, location.pathname, posLoading, navigate]);
+
     if (adminLoading || posLoading) {
         return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading POS...</div>;
     }
@@ -118,10 +126,12 @@ const POSLayout: React.FC = () => {
                 <div className="mb-8 font-bold text-xl" style={{ color: 'var(--theme-color)' }}>POS</div>
 
                 <nav className="flex-1 w-full flex flex-col items-center gap-6">
-                    <NavLink to="/pos" end style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}} className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg scale-110' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
-                        <span className="sr-only">Tables</span>
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                    </NavLink>
+                    {settings?.pos_settings?.show_tables !== false && (
+                        <NavLink to="/pos" end style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}} className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg scale-110' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
+                            <span className="sr-only">Tables</span>
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                        </NavLink>
+                    )}
 
                     <NavLink
                         to="/pos/walk-in"
@@ -148,32 +158,38 @@ const POSLayout: React.FC = () => {
                         )}
                     </NavLink>
 
-                    <NavLink
-                        to="/pos/kds"
-                        style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
-                        className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                        title="Kitchen Display"
-                    >
-                        <span className="font-bold text-lg">KDS</span>
-                    </NavLink>
+                    {settings?.pos_settings?.show_kds !== false && (
+                        <NavLink
+                            to="/pos/kds"
+                            style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
+                            className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                            title="Kitchen Display"
+                        >
+                            <span className="font-bold text-lg">KDS</span>
+                        </NavLink>
+                    )}
 
-                    <NavLink
-                        to="/pos/reports"
-                        style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
-                        className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                        title="Reports & History"
-                    >
-                        <BarChart3 size={24} />
-                    </NavLink>
+                    {settings?.pos_settings?.show_reports !== false && (
+                        <NavLink
+                            to="/pos/reports"
+                            style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
+                            className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                            title="Reports & History"
+                        >
+                            <BarChart3 size={24} />
+                        </NavLink>
+                    )}
 
-                    <NavLink
-                        to="/pos/calls"
-                        style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
-                        className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                        title="Call History"
-                    >
-                        <PhoneIncoming size={24} />
-                    </NavLink>
+                    {settings?.pos_settings?.show_calls !== false && (
+                        <NavLink
+                            to="/pos/calls"
+                            style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
+                            className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                            title="Call History"
+                        >
+                            <PhoneIncoming size={24} />
+                        </NavLink>
+                    )}
                 </nav>
 
                 {/* User Profile / Logout */}
@@ -251,10 +267,12 @@ const POSLayout: React.FC = () => {
 
             {/* Mobile Bottom Nav */}
             <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center p-1 sm:p-2 z-50 overflow-x-auto hide-scrollbar">
-                <NavLink to="/pos" end style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Tables</span>
-                </NavLink>
+                {settings?.pos_settings?.show_tables !== false && (
+                    <NavLink to="/pos" end style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                        <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Tables</span>
+                    </NavLink>
+                )}
 
                 <NavLink to="/pos/walk-in" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
@@ -271,20 +289,26 @@ const POSLayout: React.FC = () => {
                     )}
                 </NavLink>
 
-                <NavLink to="/pos/kds" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <span className="font-bold text-lg sm:text-xl leading-none">KDS</span>
-                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Kitchen</span>
-                </NavLink>
+                {settings?.pos_settings?.show_kds !== false && (
+                    <NavLink to="/pos/kds" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                        <span className="font-bold text-lg sm:text-xl leading-none">KDS</span>
+                        <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Kitchen</span>
+                    </NavLink>
+                )}
 
-                <NavLink to="/pos/reports" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Reports</span>
-                </NavLink>
+                {settings?.pos_settings?.show_reports !== false && (
+                    <NavLink to="/pos/reports" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                        <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Reports</span>
+                    </NavLink>
+                )}
 
-                <NavLink to="/pos/calls" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
-                    <PhoneIncoming className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Calls</span>
-                </NavLink>
+                {settings?.pos_settings?.show_calls !== false && (
+                    <NavLink to="/pos/calls" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                        <PhoneIncoming className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Calls</span>
+                    </NavLink>
+                )}
 
                 {/* Mobile Menu/Profile Trigger */}
                 <button onClick={() => setShowMobileMenu(true)} className="flex flex-col items-center p-1 sm:p-2 text-gray-500 dark:text-gray-400 hover:text-[var(--theme-color)] flex-shrink-0 min-w-[3.5rem]">

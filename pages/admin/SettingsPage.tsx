@@ -19,6 +19,7 @@ import SettingsTableManagement from '../../components/admin/settings/SettingsTab
 import SettingsSMS from '../../components/admin/settings/SettingsSMS';
 import SettingsIntegrations from '../../components/admin/settings/SettingsIntegrations';
 import SettingsReceipts from '../../components/admin/settings/SettingsReceipts';
+import SettingsPOS from '../../components/admin/settings/SettingsPOS';
 
 import { Users } from 'lucide-react';
 
@@ -110,7 +111,13 @@ const SettingsPage: React.FC = () => {
         },
         google_analytics_id: '',
         bookings_enabled: true,
-        show_tax: true
+        show_tax: true,
+        pos_settings: {
+            show_tables: true,
+            show_kds: true,
+            show_reports: true,
+            show_calls: true
+        }
     });
 
     // New states for advanced settings
@@ -201,7 +208,13 @@ const SettingsPage: React.FC = () => {
                         },
                         google_analytics_id: settings.google_analytics_id || '',
                         bookings_enabled: settings.bookings_enabled !== false, // Default to true if undefined
-                        show_tax: settings.show_tax !== false // Default to true if undefined
+                        show_tax: settings.show_tax !== false, // Default to true if undefined
+                        pos_settings: settings.pos_settings || {
+                            show_tables: true,
+                            show_kds: true,
+                            show_reports: true,
+                            show_calls: true
+                        }
                     });
 
                     setCollectionTimeSlots(settings.collection_time_slots || {});
@@ -305,7 +318,8 @@ const SettingsPage: React.FC = () => {
         { id: 'bookings', label: 'Bookings' },
         { id: 'notifications', label: 'Notifications' },
         { id: 'integrations', label: 'Integrations' },
-        { id: 'receipts', label: 'Receipts' }
+        { id: 'receipts', label: 'Receipts' },
+        { id: 'pos', label: 'POS Config' }
     ];
 
     if (!selectedRestaurantId) {
@@ -481,6 +495,11 @@ const SettingsPage: React.FC = () => {
                                 {activeTab === 'receipts' && (
                                     <div className="space-y-8 animate-fadeIn">
                                         <SettingsReceipts />
+                                    </div>
+                                )}
+                                {activeTab === 'pos' && (
+                                    <div className="space-y-8 animate-fadeIn">
+                                        <SettingsPOS formData={formData} setFormData={setFormData} />
                                     </div>
                                 )}
                             </div>

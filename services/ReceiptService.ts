@@ -53,18 +53,30 @@ class ReceiptService {
     /**
      * Open cash drawer using ESC/POS commands
      */
-    async openCashDrawer(): Promise<void> {
-        console.log('🔓 Opening cash drawer with ESC/POS command:', ESC_POS_COMMANDS.DRAWER_KICK);
+    async openCashDrawer(settings?: PrinterSettings): Promise<void> {
+        const activeSettings = settings || this.getSettings();
+        console.log(`🔓 Attempting to open cash drawer [Mode: ${activeSettings.type}]`);
 
-        // Note: For actual ESC/POS implementation in network/bluetooth drivers,
-        // we would send these bytes to the printer.
-        // For browser printing, this usually stays as a log/event unless a local relay is used.
-        if ((window as any).__TAURI_INTERNALS__) {
-            try {
-                // await invoke('open_drawer'); // If we have a dedicated command
-            } catch (e) {
-                console.error('Failed to open drawer via Tauri', e);
+        if (activeSettings.type === 'network' && activeSettings.networkIp) {
+            if ((window as any).__TAURI_INTERNALS__) {
+                try {
+                    console.log(`📡 Sending kick command to ${activeSettings.networkIp}:9100`);
+                    await invoke('print_raw_to_network', {
+                        ip: activeSettings.networkIp,
+                        port: 9100,
+                        data: ESC_POS_COMMANDS.DRAWER_KICK
+                    });
+                    console.log('✅ Cash drawer command sent successfully');
+                } catch (e) {
+                    console.error('❌ Failed to open drawer via Network/Tauri', e);
+                }
+            } else {
+                console.warn('⚠️ Cash drawer: Network trigger requires Tauri (desktop app).');
             }
+        } else if (activeSettings.type === 'browser') {
+            console.info('ℹ️ Cash drawer: Browser printing detected. Most browsers cannot trigger drawers directly without a local relay/driver.');
+        } else if (activeSettings.type === 'bluetooth') {
+            console.info('ℹ️ Cash drawer: Bluetooth trigger not yet implemented.');
         }
     }
 
@@ -126,7 +138,7 @@ class ReceiptService {
 
         // 2. Open Cash Drawer (Only once per order print sequence)
         if (shouldOpenDrawer) {
-            await this.openCashDrawer();
+            await this.openCashDrawer(settings);
         }
 
         // 3. Print Master Receipt

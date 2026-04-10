@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Printer, Bluetooth, Wifi, Monitor, Search, Loader2, RefreshCw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAlert } from '../../context/AlertContext';
+import { receiptService } from '../../services/ReceiptService';
+import { LogOut } from 'lucide-react';
 
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
@@ -201,14 +203,30 @@ const OrderPrinterSettingsModal: React.FC<OrderPrinterSettingsModalProps> = ({ i
                                 </div>
                             )}
 
-                            <button
-                                onClick={handleTestPrint}
-                                disabled={isPrintingTest || !settings.networkIp}
-                                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 py-3 rounded-xl text-sm font-semibold text-gray-500 hover:border-brand-gold hover:text-brand-gold hover:bg-brand-gold/5 transition-all"
-                            >
-                                {isPrintingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                                Test Printer Connection
-                            </button>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={handleTestPrint}
+                                    disabled={isPrintingTest || !settings.networkIp}
+                                    className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 py-3 rounded-xl text-sm font-semibold text-gray-500 hover:border-brand-gold hover:text-brand-gold hover:bg-brand-gold/5 transition-all"
+                                >
+                                    {isPrintingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                    Test Printer
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            await receiptService.openCashDrawer(settings);
+                                        } catch (error) {
+                                            console.error('Test drawer failed:', error);
+                                        }
+                                    }}
+                                    disabled={!settings.networkIp}
+                                    className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 py-3 rounded-xl text-sm font-semibold text-gray-500 hover:border-brand-gold hover:text-brand-gold hover:bg-brand-gold/5 transition-all"
+                                >
+                                    <LogOut className="w-4 h-4 rotate-90" />
+                                    Test Drawer
+                                </button>
+                            </div>
                         </div>
                     )}
 

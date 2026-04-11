@@ -474,16 +474,15 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-0.5">
                                                                     {formatDate(order.created_at, 'MMM d, h:mm a')}
-                                                                    {order.order_type && (
-                                                                        <span className="ml-1.5 capitalize font-medium text-[var(--theme-color)]">
-                                                                            · {order.order_type}
-                                                                        </span>
-                                                                    )}
                                                                 </div>
                                                             </div>
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
-                                                                {order.status}
-                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                {order.order_type && (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                                        {order.order_type.replace('_', ' ')}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
                                                         {order.profiles ? (
@@ -543,20 +542,20 @@ const POSCallHistoryPage: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 receiptService.printOrder(order.id, settings?.id, true, order.payment_method, showAlert);
                                                             }}
-                                                            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 shrink-0"
+                                                            className="p-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors border border-gray-200 dark:border-gray-600 shrink-0"
                                                             title="Print Receipt"
                                                         >
-                                                            <Printer size={20} />
+                                                            <Printer size={24} />
                                                         </button>
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 receiptService.printKitchenTickets(order.id, settings?.id, undefined, showAlert);
                                                             }}
-                                                            className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors border border-orange-200 dark:border-orange-800/50 shrink-0"
+                                                            className="p-3 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-xl transition-colors border border-orange-200 dark:border-orange-800/50 shrink-0"
                                                             title="Print Kitchen Ticket (KOT)"
                                                         >
-                                                            <ChefHat size={20} />
+                                                            <ChefHat size={24} />
                                                         </button>
                                                     </div>
                                                 </div>

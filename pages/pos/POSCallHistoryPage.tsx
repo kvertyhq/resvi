@@ -5,11 +5,12 @@ import {
     Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing,
     ShoppingCart, Search, User, Users, Clock,
     ChevronLeft, ChevronRight, CheckCircle2, ExternalLink, CheckCheck, RotateCw,
-    Pencil, X, Check
+    Pencil, X, Check, MapPin, Printer, ChefHat
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
+import { receiptService } from '../../services/ReceiptService';
 
 const CALLS_PER_PAGE = 12;
 const HISTORY_PER_PAGE = 12;
@@ -495,6 +496,14 @@ const POSCallHistoryPage: React.FC = () => {
                                                                         <Phone size={13} /> {order.profiles.phone}
                                                                     </div>
                                                                 )}
+                                                                {order.order_type === 'delivery' && (order.customer_address || order.customer_postcode) && (
+                                                                    <div className="flex items-start gap-1 mt-1.5 text-gray-500">
+                                                                        <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[var(--theme-color)]" />
+                                                                        <span className="text-xs leading-snug">
+                                                                            {order.customer_address}{order.customer_address && order.customer_postcode ? ', ' : ''}{order.customer_postcode}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <div className="text-sm text-gray-500 italic mb-3">Guest Customer</div>
@@ -510,7 +519,7 @@ const POSCallHistoryPage: React.FC = () => {
                                                         </div>
                                                     </button>
 
-                                                    {/* Mark Complete button — full-width strip at the bottom */}
+                                                    {/* Mark Complete button */}
                                                     <button
                                                         onClick={(e) => markOrderComplete(order, e)}
                                                         disabled={markingComplete === order.id}
@@ -526,6 +535,30 @@ const POSCallHistoryPage: React.FC = () => {
                                                         )}
                                                         Mark as {order.order_type === 'delivery' ? 'Delivered' : 'Completed'}
                                                     </button>
+
+                                                    {/* Print buttons row */}
+                                                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700/50 flex gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                receiptService.printOrder(order.id, settings?.id, true, order.payment_method, showAlert);
+                                                            }}
+                                                            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 shrink-0"
+                                                            title="Print Receipt"
+                                                        >
+                                                            <Printer size={20} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                receiptService.printKitchenTickets(order.id, settings?.id, undefined, showAlert);
+                                                            }}
+                                                            className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors border border-orange-200 dark:border-orange-800/50 shrink-0"
+                                                            title="Print Kitchen Ticket (KOT)"
+                                                        >
+                                                            <ChefHat size={20} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -876,6 +909,14 @@ const POSCallHistoryPage: React.FC = () => {
                                                 {selectedOrder.order_type}
                                             </div>
                                         )}
+                                        {selectedOrder.order_type === 'delivery' && (selectedOrder.customer_address || selectedOrder.customer_postcode) && (
+                                            <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                <MapPin size={14} className="mt-0.5 flex-shrink-0 text-[var(--theme-color)]" />
+                                                <span>
+                                                    {selectedOrder.customer_address}{selectedOrder.customer_address && selectedOrder.customer_postcode ? ', ' : ''}{selectedOrder.customer_postcode}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Notes */}
@@ -931,6 +972,23 @@ const POSCallHistoryPage: React.FC = () => {
                                             <span className="capitalize">{selectedOrder.payment_method || 'N/A'} · {selectedOrder.payment_status || 'unpaid'}</span>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Print buttons footer */}
+                                <div className="flex border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+                                    <button
+                                        onClick={() => receiptService.printOrder(selectedOrder.id, settings?.id, true, selectedOrder.payment_method, showAlert)}
+                                        className="flex-1 py-3 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                        <Printer size={16} /> Print Receipt
+                                    </button>
+                                    <div className="w-px bg-gray-200 dark:bg-gray-700" />
+                                    <button
+                                        onClick={() => receiptService.printKitchenTickets(selectedOrder.id, settings?.id, undefined, showAlert)}
+                                        className="flex-1 py-3 text-sm font-bold text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                        <ChefHat size={16} /> Print Kitchen
+                                    </button>
                                 </div>
                             </div>
                         </div>

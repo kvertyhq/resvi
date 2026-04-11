@@ -751,6 +751,7 @@ const POSOrderPage: React.FC = () => {
                 p_payment_method: method === 'unpaid' ? null : method,
                 p_payment_transaction_id: transactionId || null,
                 p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
+                p_customer_address: customerAddress || null,
                 p_customer_postcode: customerPostcode || null,
                 p_order_type: isPhoneOrder ? (phoneOrderType || 'takeaway') : 'takeaway',
                 p_order_source: isPhoneOrder ? 'phone' : 'pos',

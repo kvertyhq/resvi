@@ -52,6 +52,7 @@ const PublicReceiptPage: React.FC = () => {
                         price_snapshot,
                         selected_modifiers,
                         excluded_toppings,
+                        selected_replacers,
                         station_id,
                         round_number
                     )
@@ -178,6 +179,21 @@ const PublicReceiptPage: React.FC = () => {
                                                     → {excl.replacement.name} {excl.replacement.group_name ? `(${excl.replacement.group_name})` : ''}
                                                 </span>
                                             )}
+                                        </span>
+                                    </div>
+                                ))}
+                                {item.selected_replacers?.map((repl: any, j: number) => (
+                                    <div key={`repl-${j}`} className="flex justify-between text-xs text-red-600 pl-4 italic">
+                                        <span>
+                                            ✕ {repl.is_exclusion_only
+                                                ? repl.name
+                                                : (repl.ingredient_name?.toLowerCase().startsWith('no') 
+                                                    ? `${repl.ingredient_name} → ${repl.name}`
+                                                    : `No ${repl.ingredient_name} → ${repl.name}`)
+                                            }
+                                        </span>
+                                        <span className="text-gray-400">
+                                            {stationId || !repl.price_adjustment ? '' : repl.price_adjustment.toFixed(2)}
                                         </span>
                                     </div>
                                 ))}

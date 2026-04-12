@@ -46,11 +46,12 @@ interface POSModifierModalProps {
     initialSelections?: Record<string, Record<string, Partial<SelectedModifier>>>;
     initialExclusions?: ExcludedTopping[];
     initialReplacers?: Record<string, Record<string, boolean>>;
+    initialReplacersArray?: any[];
 }
 
 const POSModifierModal: React.FC<POSModifierModalProps> = ({
     menuItem, isOpen, onClose, onAddToCart, currency = '£',
-    initialVariant, initialSelections, initialExclusions, initialReplacers
+    initialVariant, initialSelections, initialExclusions, initialReplacers, initialReplacersArray
 }) => {
     const { showAlert } = useAlert();
     const {
@@ -70,8 +71,13 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
     const [expandedCustomise, setExpandedCustomise] = useState<Record<string, boolean>>({});
 
     // --- Replacement State ---
-    // Stores selected replacers: { groupId: { itemId: true } }
+    // Stores selected replacers: { groupId: { itemId: true } } (legacy groups without ingredient_name)
     const [selectedReplacers, setSelectedReplacers] = useState<Record<string, Record<string, boolean>>>({});
+
+    // --- Ingredient-based Replacer State ---
+    // Key: menu_item_replacers entry id, Value: selected replacer item id (or undefined = just excluded)
+    const [ingredientExclusions, setIngredientExclusions] = useState<Record<string, string | undefined>>({});
+    const [replacerPopupEntry, setReplacerPopupEntry] = useState<any>(null);
 
     // --- Topping Exclusion State ---
     const [excludedToppings, setExcludedToppings] = useState<ExcludedTopping[]>([]);
@@ -111,12 +117,29 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             .sort((a, b) => (linkMap.get(a.id) ?? 0) - (linkMap.get(b.id) ?? 0));
     }, [menuItem, allLinks, allCatLinks, allGroups, allItems]);
 
-    // Filter and assemble replacer groups for the current item
+    // Build ingredient entries from menu_item_replacers with ingredient_name
+    const ingredientEntries = useMemo(() => {
+        if (!menuItem || !allItemReplLinks || !allReplGroups || !allReplItems) return [];
+        return allItemReplLinks
+            .filter(l => l.menu_item_id === menuItem.id && l.ingredient_name)
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+            .map(l => ({
+                ...l,
+                group: allReplGroups.find((g: any) => g.id === l.replacer_group_id),
+                groupItems: allReplItems.filter((i: any) => i.replacer_group_id === l.replacer_group_id)
+            }));
+    }, [menuItem, allItemReplLinks, allReplGroups, allReplItems]);
+
+    // Legacy: replacer groups for entries WITHOUT ingredient_name (fallback)
     const replacerGroups = useMemo(() => {
         if (!menuItem || !allReplGroups || !allReplItems || !allItemReplLinks) return [];
 
-        const linkedGroupIds = allItemReplLinks
-            .filter(l => l.menu_item_id === menuItem.id)
+        const legacyLinks = allItemReplLinks
+            .filter(l => l.menu_item_id === menuItem.id && !l.ingredient_name);
+
+        if (legacyLinks.length === 0) return [];
+
+        const linkedGroupIds = legacyLinks
             .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
             .map(l => l.replacer_group_id);
 
@@ -160,11 +183,28 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             setSelections(initialSelections || {});
             setExcludedToppings(initialExclusions || []);
             setSelectedReplacers(initialReplacers || {});
-            
+
+            // Auto-fill ingredient-based replacers
+            const exclusions: Record<string, string | undefined> = {};
+            if (initialReplacersArray) {
+                ingredientEntries.forEach(entry => {
+                    const match = initialReplacersArray.find(r => r.ingredient_name === entry.ingredient_name);
+                    if (match) {
+                        if (match.is_exclusion_only) {
+                            exclusions[entry.id] = undefined;
+                        } else {
+                            exclusions[entry.id] = match.id;
+                        }
+                    }
+                });
+            }
+            setIngredientExclusions(exclusions);
+            setReplacerPopupEntry(null);
+
             setExpandedCustomise({});
             setReplacementPickerFor(null);
         }
-    }, [isOpen, menuItem, initialVariant, initialSelections, initialExclusions, initialReplacers]);
+    }, [isOpen, menuItem, initialVariant, initialSelections, initialExclusions, initialReplacers, initialReplacersArray, ingredientEntries]);
 
     // Recalculate total
     useEffect(() => {
@@ -193,7 +233,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             }
         });
 
-        // Add Replacers Total
+        // Add Legacy Replacers Total
         let replacersTotal = 0;
         Object.keys(selectedReplacers).forEach(groupId => {
             const group = replacerGroups.find(g => g.id === groupId);
@@ -207,8 +247,20 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             }
         });
 
-        setTotalPrice(basePrice + modifiersTotal + replacersTotal);
-    }, [selections, modifierGroups, selectedReplacers, replacerGroups, menuItem, selectedVariant]);
+        // Add Ingredient-based Replacers Total
+        let ingredientReplacersTotal = 0;
+        Object.entries(ingredientExclusions).forEach(([entryId, replacerItemId]) => {
+            if (replacerItemId) {
+                const entry = ingredientEntries.find(e => e.id === entryId);
+                const item = entry?.groupItems.find((i: any) => i.id === replacerItemId);
+                if (item) {
+                    ingredientReplacersTotal += Number(item.price_adjustment || 0);
+                }
+            }
+        });
+
+        setTotalPrice(basePrice + modifiersTotal + replacersTotal + ingredientReplacersTotal);
+    }, [selections, modifierGroups, selectedReplacers, replacerGroups, ingredientExclusions, ingredientEntries, menuItem, selectedVariant]);
 
     const loading = menuLoading;
 
@@ -364,6 +416,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             : menuItem;
 
         const flatReplacers: any[] = [];
+
+        // Legacy group-based replacers
         Object.keys(selectedReplacers).forEach(groupId => {
             const group = replacerGroups.find(g => g.id === groupId);
             if (group) {
@@ -379,6 +433,36 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                         });
                     }
                 });
+            }
+        });
+
+        // Ingredient-based replacers
+        Object.entries(ingredientExclusions).forEach(([entryId, replacerItemId]) => {
+            const entry = ingredientEntries.find(e => e.id === entryId);
+            if (entry) {
+                if (replacerItemId) {
+                    const item = entry.groupItems.find((i: any) => i.id === replacerItemId);
+                    if (item) {
+                        flatReplacers.push({
+                            id: item.id,
+                            group_id: entry.replacer_group_id,
+                            name: item.name,
+                            price_adjustment: item.price_adjustment,
+                            target_modifier_item_id: item.target_modifier_item_id,
+                            ingredient_name: entry.ingredient_name
+                        });
+                    }
+                } else {
+                    // Excluded without replacement
+                    flatReplacers.push({
+                        id: entryId,
+                        group_id: entry.replacer_group_id,
+                        name: `${entry.ingredient_name}`,
+                        price_adjustment: 0,
+                        ingredient_name: entry.ingredient_name,
+                        is_exclusion_only: true
+                    });
+                }
             }
         });
 
@@ -521,7 +605,55 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                         </div>
                     )}
 
-                    {/* Replacer Groups Section */}
+                    {/* Ingredient-based Replacers */}
+                    {ingredientEntries.length > 0 && (
+                        <div className="border-b border-gray-700 pb-6">
+                            <h3 className="font-bold text-lg text-white mb-4">Customise Ingredients</h3>
+                            <div className="grid grid-cols-3 gap-2">
+                                {ingredientEntries.map(entry => {
+                                    const isExcluded = entry.id in ingredientExclusions;
+                                    const replacementId = ingredientExclusions[entry.id];
+                                    const replacementItem = replacementId
+                                        ? entry.groupItems.find((i: any) => i.id === replacementId)
+                                        : null;
+                                    return (
+                                        <button
+                                            key={entry.id}
+                                            onClick={() => {
+                                                if (isExcluded) {
+                                                    setIngredientExclusions(prev => {
+                                                        const next = { ...prev };
+                                                        delete next[entry.id];
+                                                        return next;
+                                                    });
+                                                } else {
+                                                    setIngredientExclusions(prev => ({ ...prev, [entry.id]: undefined }));
+                                                    setReplacerPopupEntry(entry);
+                                                }
+                                            }}
+                                            className={`p-3 rounded-xl text-sm font-bold transition-all border-2 text-center ${isExcluded
+                                                ? 'bg-red-600 border-red-500 text-white'
+                                                : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            {isExcluded
+                                                ? (entry.ingredient_name?.toLowerCase().startsWith('no')
+                                                    ? entry.ingredient_name.toUpperCase()
+                                                    : `${entry.ingredient_name}`)
+                                                : entry.ingredient_name}
+                                            {replacementItem && (
+                                                <div className="text-sm mt-0.5 font-bold opacity-90">
+                                                    → {replacementItem.name}
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Legacy Replacer Groups (entries without ingredient_name) */}
                     {replacerGroups.length > 0 && (
                         <div className="border-b border-gray-700 pb-6">
                             <h3 className="font-bold text-lg text-white mb-4">Replacements & Swaps</h3>
@@ -727,13 +859,28 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                 {/* Footer */}
                 <div className="p-4 border-t border-gray-700 bg-gray-900 rounded-b-2xl">
                     {/* Summary of exclusions */}
-                    {excludedToppings.length > 0 && (
+                    {(excludedToppings.length > 0 || Object.keys(ingredientExclusions).length > 0) && (
                         <div className="mb-3 flex flex-wrap gap-1.5">
                             {excludedToppings.map(e => (
                                 <span key={e.id} className="text-[10px] px-2 py-0.5 rounded-full bg-red-900 text-red-300 font-semibold">
                                     NO {e.name}{e.replacement ? ` → ${e.replacement.name}` : ''}
                                 </span>
                             ))}
+                            {Object.entries(ingredientExclusions).map(([entryId, replacerItemId]) => {
+                                const entry = ingredientEntries.find(e => e.id === entryId);
+                                if (!entry) return null;
+                                const replacementItem = replacerItemId
+                                    ? entry.groupItems.find((i: any) => i.id === replacerItemId)
+                                    : null;
+                                return (
+                                    <span key={entryId} className="text-[10px] px-2 py-0.5 rounded-full bg-red-900 text-red-300 font-semibold">
+                                        {entry.ingredient_name?.toLowerCase().startsWith('no')
+                                            ? entry.ingredient_name.toUpperCase()
+                                            : `${entry.ingredient_name}`}
+                                        {replacementItem ? ` → ${replacementItem.name}` : ''}
+                                    </span>
+                                );
+                            })}
                         </div>
                     )}
                     <button
@@ -746,6 +893,55 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Replacer Popup Overlay */}
+            {replacerPopupEntry && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-60 p-4">
+                    <div className="bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
+                        <div className="px-4 py-3 border-b border-gray-700">
+                            <h3 className="font-bold text-white uppercase tracking-wider text-sm">
+                                {replacerPopupEntry.group?.name || 'Select Replacement'}
+                            </h3>
+                        </div>
+                        <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
+                            {replacerPopupEntry.groupItems.map((item: any) => {
+                                const isSelected = ingredientExclusions[replacerPopupEntry.id] === item.id;
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            setIngredientExclusions(prev => ({
+                                                ...prev,
+                                                [replacerPopupEntry.id]: isSelected ? undefined : item.id
+                                            }));
+                                        }}
+                                        className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center ${isSelected
+                                            ? 'bg-white text-gray-900 border-white shadow-lg'
+                                            : 'bg-gray-700 border-transparent text-gray-200 hover:bg-gray-600'
+                                            }`}
+                                    >
+                                        {item.name}
+                                        {item.price_adjustment > 0 && (
+                                            <div className="text-[10px] mt-0.5 opacity-70">
+                                                +{currency}{Number(item.price_adjustment).toFixed(2)}
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="p-4 border-t border-gray-700">
+                            <button
+                                onClick={() => setReplacerPopupEntry(null)}
+                                className="w-full py-3 rounded-xl font-bold text-white text-lg"
+                                style={{ backgroundColor: 'var(--theme-color)' }}
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

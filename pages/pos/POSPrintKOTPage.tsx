@@ -214,6 +214,21 @@ const POSPrintKOTPage: React.FC = () => {
                                                 " {item.notes} "
                                             </div>
                                         )}
+
+                                        {/* Ingredient Replacers */}
+                                        {Array.isArray(item.selected_replacers) && item.selected_replacers.map((repl: any, idx: number) => (
+                                            <div key={`repl-${idx}`} className="text-2xl font-black text-red-600 uppercase flex items-start gap-2">
+                                                <span className="text-red-400">✕</span>
+                                                <span>
+                                                    {repl.is_exclusion_only
+                                                        ? repl.name
+                                                        : (repl.ingredient_name?.toLowerCase().startsWith('no') 
+                                                            ? `${repl.ingredient_name} → ${repl.name}`
+                                                            : `No ${repl.ingredient_name} → ${repl.name}`)
+                                                    }
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>

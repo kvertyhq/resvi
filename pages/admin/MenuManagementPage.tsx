@@ -168,8 +168,8 @@ const MenuManagementPage: React.FC = () => {
     // Linked modifier groups: groupId -> order_index
     const [selectedModifierOrders, setSelectedModifierOrders] = useState<Map<string, number>>(new Map());
 
-    // Linked replacer groups: groupId -> order_index
-    const [selectedReplacerOrders, setSelectedReplacerOrders] = useState<Map<string, number>>(new Map());
+    // Linked replacer entries: each has an ingredient name + replacer group
+    const [itemReplacerEntries, setItemReplacerEntries] = useState<{ ingredient_name: string; replacer_group_id: string; order_index: number }[]>([]);
 
     // Default toppings that come pre-loaded with this item (array of modifier_item IDs)
     const [defaultToppingIds, setDefaultToppingIds] = useState<Set<string>>(new Set());
@@ -861,7 +861,7 @@ const MenuManagementPage: React.FC = () => {
         setAiFeedback('');
         setSelectedAddonIds(new Set());
         setSelectedModifierOrders(new Map());
-        setSelectedReplacerOrders(new Map());
+        setItemReplacerEntries([]);
         setDefaultToppingIds(new Set());
         setPriceVariants([]);
 
@@ -902,22 +902,25 @@ const MenuManagementPage: React.FC = () => {
                 setSelectedModifierOrders(map);
             }
 
-            // Fetch linked replacer groups
+            // Fetch linked replacer entries (with ingredient names)
             const { data: repsData } = await supabase
                 .from('menu_item_replacers')
-                .select('replacer_group_id, order_index')
-                .eq('menu_item_id', item.id);
+                .select('ingredient_name, replacer_group_id, order_index')
+                .eq('menu_item_id', item.id)
+                .order('order_index');
 
             if (repsData) {
-                const map = new Map<string, number>();
-                repsData.forEach(r => map.set(r.replacer_group_id, r.order_index ?? 0));
-                setSelectedReplacerOrders(map);
+                setItemReplacerEntries(repsData.map(r => ({
+                    ingredient_name: r.ingredient_name || '',
+                    replacer_group_id: r.replacer_group_id,
+                    order_index: r.order_index ?? 0
+                })));
             }
         } else {
             // Opening modal for a NEW item — reset all fields
             setEditingItem(null);
             setSelectedModifierOrders(new Map());
-            setSelectedReplacerOrders(new Map());
+            setItemReplacerEntries([]);
             setDefaultToppingIds(new Set());
             setItemForm({
                 name: '',
@@ -999,13 +1002,15 @@ const MenuManagementPage: React.FC = () => {
                 await supabase.from('menu_item_modifiers').insert(modifiersToInsert);
             }
 
-            // Update Replacers
+            // Update Replacers (with ingredient names)
             await supabase.from('menu_item_replacers').delete().eq('menu_item_id', itemId);
-            if (selectedReplacerOrders.size > 0) {
-                const replacersToInsert = Array.from(selectedReplacerOrders.entries()).map(([groupId, orderIdx]) => ({
+            const validEntries = itemReplacerEntries.filter(e => e.ingredient_name.trim() && e.replacer_group_id);
+            if (validEntries.length > 0) {
+                const replacersToInsert = validEntries.map((entry, idx) => ({
                     menu_item_id: itemId,
-                    replacer_group_id: groupId,
-                    order_index: orderIdx
+                    replacer_group_id: entry.replacer_group_id,
+                    ingredient_name: entry.ingredient_name.trim(),
+                    order_index: entry.order_index ?? idx
                 }));
                 await supabase.from('menu_item_replacers').insert(replacersToInsert);
             }
@@ -1088,12 +1093,13 @@ const MenuManagementPage: React.FC = () => {
                 if (modsError) console.error("Error copying modifiers:", modsError);
             }
 
-            // 4. Insert Replacers
-            const { data: replacersData } = await supabase.from('menu_item_replacers').select('replacer_group_id, order_index').eq('menu_item_id', item.id);
+            // 4. Insert Replacers (with ingredient names)
+            const { data: replacersData } = await supabase.from('menu_item_replacers').select('ingredient_name, replacer_group_id, order_index').eq('menu_item_id', item.id);
             if (replacersData && replacersData.length > 0) {
                 const replacersToInsert = replacersData.map(r => ({
                     menu_item_id: newItemId,
                     replacer_group_id: r.replacer_group_id,
+                    ingredient_name: r.ingredient_name,
                     order_index: r.order_index
                 }));
                 const { error: replacersError } = await supabase.from('menu_item_replacers').insert(replacersToInsert);
@@ -1807,7 +1813,6 @@ const MenuManagementPage: React.FC = () => {
                                                                         <thead className="bg-gray-100">
                                                                             <tr>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Swaps Out (Target)</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Adj.</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -1815,22 +1820,9 @@ const MenuManagementPage: React.FC = () => {
                                                                         </thead>
                                                                         <tbody className="divide-y divide-gray-200">
                                                                             {group.items.map(item => {
-                                                                                // Find the target modifier item to show its name
-                                                                                let targetName = "Unknown";
-                                                                                if (item.target_modifier_item_id) {
-                                                                                    // Search through modifierGroups
-                                                                                    for (const mg of modifierGroups) {
-                                                                                        const found = mg.items?.find(i => i.id === item.target_modifier_item_id);
-                                                                                        if (found) {
-                                                                                            targetName = found.name;
-                                                                                            break;
-                                                                                        }
-                                                                                    }
-                                                                                }
                                                                                 return (
                                                                                     <tr key={item.id} className="hover:bg-gray-50">
                                                                                         <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
-                                                                                        <td className="px-4 py-2 text-sm text-gray-500">{item.target_modifier_item_id ? <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full line-through">{targetName}</span> : <span className="text-gray-400 italic">None selected</span>}</td>
                                                                                         <td className="px-4 py-2 text-sm text-gray-600">£{(item.price_adjustment || 0).toFixed(2)}</td>
                                                                                         <td className="px-4 py-2 whitespace-nowrap">
                                                                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -2181,53 +2173,79 @@ const MenuManagementPage: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Replacer Groups Selection */}
+                                            {/* Replacer Ingredients */}
                                             <div className="border-t border-gray-200 pt-6">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Replacer Groups <span className="text-xs text-gray-400">(set order to control display position)</span></label>
-                                                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
-                                                    {replacerGroups.map(group => {
-                                                        const isChecked = selectedReplacerOrders.has(group.id);
-                                                        const orderVal = selectedReplacerOrders.get(group.id) ?? 0;
-                                                        return (
-                                                            <div key={group.id} className="flex items-center gap-3">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id={`replgroup-${group.id}`}
-                                                                    checked={isChecked}
-                                                                    onChange={(e) => {
-                                                                        const newMap = new Map(selectedReplacerOrders);
-                                                                        if (e.target.checked) {
-                                                                            newMap.set(group.id, newMap.size);
-                                                                        } else {
-                                                                            newMap.delete(group.id);
-                                                                        }
-                                                                        setSelectedReplacerOrders(newMap);
-                                                                    }}
-                                                                    className="h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold flex-shrink-0"
-                                                                />
-                                                                <label htmlFor={`replgroup-${group.id}`} className="text-sm text-gray-700 flex-1">
-                                                                    <span className="font-medium">{group.name}</span>
-                                                                </label>
-                                                                {isChecked && (
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-xs text-gray-500">Order:</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            min={0}
-                                                                            value={orderVal}
-                                                                            onChange={(e) => {
-                                                                                const newMap = new Map(selectedReplacerOrders);
-                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
-                                                                                setSelectedReplacerOrders(newMap);
-                                                                            }}
-                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {replacerGroups.length === 0 && <p className="text-sm text-gray-500">No replacer groups created.</p>}
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="block text-sm font-medium text-gray-700">Excludable Ingredients <span className="text-xs text-gray-400">(e.g. "Cheese" → linked to a replacer group)</span></label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setItemReplacerEntries(prev => [...prev, { ingredient_name: '', replacer_group_id: replacerGroups[0]?.id || '', order_index: prev.length }])}
+                                                        disabled={replacerGroups.length === 0}
+                                                        className="text-xs font-bold px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                                                    >
+                                                        <Plus size={12} /> Add Ingredient
+                                                    </button>
+                                                </div>
+                                                <div className="border border-gray-200 rounded-md bg-gray-50 overflow-hidden">
+                                                    {itemReplacerEntries.length === 0 ? (
+                                                        <p className="text-sm text-gray-500 p-4 text-center">
+                                                            {replacerGroups.length === 0
+                                                                ? 'No replacer groups created. Create one in the Replacers tab first.'
+                                                                : 'No ingredients added. Click "Add Ingredient" to define excludable ingredients.'}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="divide-y divide-gray-200">
+                                                            {itemReplacerEntries.map((entry, idx) => (
+                                                                <div key={idx} className="flex items-center gap-2 p-3">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Ingredient name (e.g. Cheese)"
+                                                                        value={entry.ingredient_name}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...itemReplacerEntries];
+                                                                            updated[idx] = { ...updated[idx], ingredient_name: e.target.value };
+                                                                            setItemReplacerEntries(updated);
+                                                                        }}
+                                                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-brand-gold focus:border-brand-gold"
+                                                                        required
+                                                                    />
+                                                                    <select
+                                                                        value={entry.replacer_group_id}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...itemReplacerEntries];
+                                                                            updated[idx] = { ...updated[idx], replacer_group_id: e.target.value };
+                                                                            setItemReplacerEntries(updated);
+                                                                        }}
+                                                                        className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:ring-brand-gold focus:border-brand-gold min-w-[140px]"
+                                                                    >
+                                                                        {replacerGroups.map(g => (
+                                                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        value={entry.order_index}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...itemReplacerEntries];
+                                                                            updated[idx] = { ...updated[idx], order_index: parseInt(e.target.value) || 0 };
+                                                                            setItemReplacerEntries(updated);
+                                                                        }}
+                                                                        className="w-14 border border-gray-300 rounded-md px-2 py-1.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
+                                                                        title="Display order"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setItemReplacerEntries(prev => prev.filter((_, i) => i !== idx))}
+                                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
+                                                                        title="Remove ingredient"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -2798,24 +2816,6 @@ const MenuManagementPage: React.FC = () => {
                                             onChange={e => setReplacerItemForm({ ...replacerItemForm, price_adjustment: parseFloat(e.target.value) || 0 })}
                                             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
                                         />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Swaps Out (Optional Target)</label>
-                                        <select
-                                            value={replacerItemForm.target_modifier_item_id || ''}
-                                            onChange={e => setReplacerItemForm({ ...replacerItemForm, target_modifier_item_id: e.target.value })}
-                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
-                                        >
-                                            <option value="">-- None (Just Add) --</option>
-                                            {modifierGroups.map(group => (
-                                                <optgroup key={group.id} label={`Modifiers: ${group.name}`}>
-                                                    {group.items?.map(item => (
-                                                        <option key={item.id} value={item.id}>{item.name}</option>
-                                                    ))}
-                                                </optgroup>
-                                            ))}
-                                        </select>
-                                        <p className="text-xs text-gray-500 mt-1">If selected, this ingredient is removed when the user chooses this replacement.</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center pt-2 border-t border-gray-200">

@@ -172,20 +172,46 @@ class ReceiptService {
      */
     async printKitchenTickets(orderId: string, restaurantId: string, round?: number, showAlert?: any) {
         const settings = this.getSettings();
+
+        // 1. Fetch order items to identify active stations
+        const { data: orderItems, error: itemsError } = await supabase
+            .from('order_items')
+            .select('station_id')
+            .eq('order_id', orderId);
+
+        if (itemsError) {
+            console.error('Error fetching order items for KOT filtering:', itemsError);
+            // Fallback: Continue without filtering if query fails
+        }
+
+        const activeStationIds = new Set(orderItems?.map(i => i.station_id).filter(Boolean) || []);
+        const hasItemsWithoutStation = orderItems?.some(i => !i.station_id) || false;
+
+        // 2. Fetch all configured stations
         const { data: stations } = await supabase
             .from('stations')
             .select('id, type')
             .eq('restaurant_id', restaurantId);
 
+        let printTriggered = false;
+
+        // 3. Print to specific stations that have items
         if (stations && stations.length > 0) {
             for (const station of stations) {
-                // We could filter station type here if we only want to print to certain stations
-                await new Promise(resolve => setTimeout(resolve, 500));
-                await this.printToDriver(orderId, settings, station.id, showAlert, round, true);
+                if (activeStationIds.has(station.id)) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await this.printToDriver(orderId, settings, station.id, showAlert, round, true);
+                    printTriggered = true;
+                }
             }
-        } else {
-            // Fallback: Default to master printer if no specific stations exist
-            await this.printToDriver(orderId, settings, undefined, showAlert, round, true);
+        }
+
+        // 4. Fallback: If items exist without a station, or if no station-specific tickets were printed,
+        // print a general "Master" Kitchen Ticket.
+        if (hasItemsWithoutStation || !printTriggered) {
+            if (activeStationIds.size === 0 || hasItemsWithoutStation) {
+                await this.printToDriver(orderId, settings, undefined, showAlert, round, true);
+            }
         }
     }
 
@@ -516,6 +542,37 @@ class ReceiptService {
                         data.push(...encoder.encode(exclStr.slice(0, nameWidth).padEnd(nameWidth) + "\n"));
                     });
                 }
+
+                // Selected Replacers
+                const replacers = item.selected_replacers || [];
+                if (Array.isArray(replacers) && replacers.length > 0) {
+                    replacers.forEach((repl: any) => {
+                        const nameWidth = lineWidth - 4 - 1 - 9;
+                        let replStr: string;
+                        if (repl.is_exclusion_only) {
+                            replStr = `  x ${repl.name}`;
+                        } else if (repl.ingredient_name) {
+                            const ingName = repl.ingredient_name.toLowerCase().startsWith('no') 
+                                ? repl.ingredient_name 
+                                : `No ${repl.ingredient_name}`;
+                            replStr = `  x ${ingName} -> ${repl.name}`;
+                        } else {
+                            replStr = `  ~ ${repl.name}`;
+                        }
+                        const replNameStr = replStr.slice(0, nameWidth).padEnd(nameWidth);
+                        const replPrice = Number(repl.price_adjustment || 0);
+                        const replPriceStr = replPrice > 0 ? replPrice.toFixed(2).padStart(9) : "".padStart(9);
+
+                        data.push(...encoder.encode("    "));
+                        data.push(...encoder.encode(replNameStr));
+                        if (replPrice > 0 && !isKOT) {
+                            data.push(...encoder.encode(" "));
+                            data.push(...encoder.encode(`${replPriceStr}\n`));
+                        } else {
+                            data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
+                        }
+                    });
+                }
             });
 
             // 4. Totals Breakdown (Skip for KOT)
@@ -731,6 +788,17 @@ class ReceiptService {
                         ${item.excluded_toppings?.map((excl: any) => `
                             <div class="small" style="padding-left: 10px; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
                                 - NO ${excl.name}
+                            </div>
+                        `).join('') || ''}
+                        ${item.selected_replacers?.map((repl: any) => `
+                            <div class="small" style="padding-left: 10px; color: #c00; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                <span>${repl.is_exclusion_only
+                                    ? `x ${repl.name}`
+                                    : repl.ingredient_name
+                                        ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
+                                        : `~ ${repl.name}`
+                                }</span>
+                                ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}
                             </div>
                         `).join('') || ''}
                     `).join('')}

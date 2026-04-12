@@ -9,9 +9,10 @@ interface OrderSuccessModalProps {
     orderId: string;
     dailyOrderNumber?: number;
     orderType: 'walkin' | 'table';
+    restaurantId?: string;
 }
 
-const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, orderId, dailyOrderNumber, orderType }) => {
+const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, orderId, dailyOrderNumber, orderType, restaurantId }) => {
     const { showAlert } = useAlert();
     if (!isOpen) return null;
 
@@ -54,6 +55,13 @@ const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({ isOpen, onClose, 
                     >
                         <Printer className="w-5 h-5" />
                         Print
+                    </button>
+                    <button
+                        onClick={() => restaurantId && receiptService.printKitchenTickets(orderId, restaurantId, undefined, showAlert)}
+                        className="flex-1 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold transition-colors shadow-lg flex items-center justify-center gap-2"
+                    >
+                        <Printer className="w-5 h-5" />
+                        Kitchen
                     </button>
                     <button
                         onClick={onClose}

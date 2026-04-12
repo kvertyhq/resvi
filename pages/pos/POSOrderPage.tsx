@@ -50,7 +50,7 @@ const POSOrderPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const mode = searchParams.get('mode');
     const specificOrderId = searchParams.get('orderId');
-    const { settings } = useSettings();
+    const { settings, restaurantId } = useSettings();
     const { showAlert, showConfirm } = useAlert();
     const { staff } = usePOS();
     const { user } = useAdmin();
@@ -414,7 +414,8 @@ const POSOrderPage: React.FC = () => {
             variant: initialVariant,
             selections,
             exclusions: item.excluded_toppings,
-            replacers
+            replacers,
+            replacersArray: item.selected_replacers
         });
 
         setEditingTempId(tempId);
@@ -1031,6 +1032,7 @@ const POSOrderPage: React.FC = () => {
                 initialSelections={initialModalData?.selections}
                 initialExclusions={initialModalData?.exclusions}
                 initialReplacers={initialModalData?.replacers}
+                initialReplacersArray={initialModalData?.replacersArray}
             />
 
             <OrderUpdatedModal
@@ -1291,6 +1293,23 @@ const POSOrderPage: React.FC = () => {
                                                 ))}
                                             </div>
                                         )}
+                                        {item.selected_replacers && item.selected_replacers.length > 0 && (
+                                            <div className="text-xs mt-1 pl-2 border-l-2 border-red-400 space-y-0.5">
+                                                {item.selected_replacers.map((r: any, i: number) => (
+                                                    <div key={i} className="text-red-400 font-medium">
+                                                        {r.is_exclusion_only
+                                                            ? `✕ ${r.name}`
+                                                            : r.ingredient_name
+                                                                ? `✕ ${r.ingredient_name.toLowerCase().startsWith('no') ? r.ingredient_name : `No ${r.ingredient_name}`} → ${r.name}`
+                                                                : `↔ ${r.name}`
+                                                        }
+                                                        {Number(r.price_adjustment) > 0 && (
+                                                            <span className="ml-1 text-gray-500">+{settings?.currency || '$'}{Number(r.price_adjustment).toFixed(2)}</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         {item.notes && <div className="text-xs text-orange-500 mt-1 italic">"{item.notes}"</div>}
                                     </div>
                                 </div>
@@ -1379,6 +1398,27 @@ const POSOrderPage: React.FC = () => {
                                                         {Number(mod.price) > 0 && (
                                                             <span className="font-mono text-gray-400">
                                                                 {settings?.currency || '$'}{Number(mod.price).toFixed(2)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {item.selected_replacers && item.selected_replacers.length > 0 && (
+                                            <div className="text-xs mt-2 space-y-1 border-t border-red-300 dark:border-red-800 pt-1">
+                                                {item.selected_replacers.map((r: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center">
+                                                        <span className="font-medium text-red-500 dark:text-red-400">
+                                                            {r.is_exclusion_only
+                                                                ? `✕ ${r.name}`
+                                                                : r.ingredient_name
+                                                                    ? `✕ ${r.ingredient_name.toLowerCase().startsWith('no') ? r.ingredient_name : `No ${r.ingredient_name}`} → ${r.name}`
+                                                                    : `↔ ${r.name}`
+                                                            }
+                                                        </span>
+                                                        {Number(r.price_adjustment) > 0 && (
+                                                            <span className="font-mono text-gray-400">
+                                                                {settings?.currency || '$'}{Number(r.price_adjustment).toFixed(2)}
                                                             </span>
                                                         )}
                                                     </div>
@@ -1591,6 +1631,7 @@ const POSOrderPage: React.FC = () => {
                     orderId={createdOrderId}
                     dailyOrderNumber={createdDailyOrderNumber}
                     orderType="walkin"
+                    restaurantId={restaurantId || settings?.id}
                 />
 
                 {/* Misc Item Modal */}

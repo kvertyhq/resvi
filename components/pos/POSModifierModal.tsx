@@ -285,6 +285,13 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                 if (!isMultiple) {
                     return { ...prev, [groupId]: { [itemId]: newModifier } };
                 }
+
+                // Check max selection
+                if (group?.max_selection && Object.keys(groupSelections).length >= group.max_selection) {
+                    showAlert('Limit Reached', `${group.name} allows a maximum of ${group.max_selection} selections.`, 'warning');
+                    return prev;
+                }
+
                 return { ...prev, [groupId]: { ...groupSelections, [itemId]: newModifier } };
             }
         });
@@ -348,7 +355,12 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
             if (isSelected) {
                 delete newGroup[itemId];
             } else {
-                if (!isMultiple) newGroup = {};
+                if (!isMultiple) {
+                    newGroup = {};
+                } else if (group?.max_selection && Object.keys(groupSelections).length >= group.max_selection) {
+                    showAlert('Limit Reached', `${group.name} allows a maximum of ${group.max_selection} selections.`, 'warning');
+                    return prev;
+                }
                 newGroup[itemId] = true;
 
                 // Handle target exclusion
@@ -716,6 +728,9 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                                     <span className="text-xs text-gray-500 uppercase font-semibold">
                                         {group.is_required && <span className="text-red-400 mr-2">Required</span>}
                                         {group.is_multiple ? 'Choose Multiple' : 'Select One'}
+                                        {group.max_selection > 0 && (
+                                            <span className="ml-2 text-[var(--theme-color)] opacity-80">(Max {group.max_selection})</span>
+                                        )}
                                     </span>
                                 </div>
 

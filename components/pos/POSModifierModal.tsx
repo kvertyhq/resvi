@@ -241,7 +241,11 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                 Object.keys(selectedReplacers[groupId]).forEach(itemId => {
                     const item = group.items.find(i => i.id === itemId);
                     if (item) {
-                        replacersTotal += Number(item.price_adjustment || 0);
+                        let itemPrice = Number(item.price_adjustment || 0);
+                        if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                            itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                        }
+                        replacersTotal += itemPrice;
                     }
                 });
             }
@@ -254,7 +258,11 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                 const entry = ingredientEntries.find(e => e.id === entryId);
                 const item = entry?.groupItems.find((i: any) => i.id === replacerItemId);
                 if (item) {
-                    ingredientReplacersTotal += Number(item.price_adjustment || 0);
+                    let itemPrice = Number(item.price_adjustment || 0);
+                    if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                        itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                    }
+                    ingredientReplacersTotal += itemPrice;
                 }
             }
         });
@@ -682,6 +690,10 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                                         <div className="grid grid-cols-2 gap-2">
                                             {group.items.map((item: any) => {
                                                 const isSelected = !!(selectedReplacers[group.id] || {})[item.id];
+                                                let itemPrice = Number(item.price_adjustment || 0);
+                                                if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                                                    itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                                                }
                                                 return (
                                                     <button
                                                         key={item.id}
@@ -695,9 +707,9 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                                                         style={isSelected ? { borderColor: 'var(--theme-color)', color: 'white' } : {}}
                                                     >
                                                         <div className="text-xs font-bold">{item.name}</div>
-                                                        {item.price_adjustment !== 0 && (
+                                                        {itemPrice !== 0 && (
                                                             <div className="text-[10px] mt-1 opacity-70">
-                                                                {item.price_adjustment > 0 ? `+${currency}${item.price_adjustment.toFixed(2)}` : `-${currency}${Math.abs(item.price_adjustment).toFixed(2)}`}
+                                                                {itemPrice > 0 ? `+${currency}${itemPrice.toFixed(2)}` : `-${currency}${Math.abs(itemPrice).toFixed(2)}`}
                                                             </div>
                                                         )}
                                                         {isSelected && (
@@ -921,28 +933,33 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                         <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
                             {replacerPopupEntry.groupItems.map((item: any) => {
                                 const isSelected = ingredientExclusions[replacerPopupEntry.id] === item.id;
-                                return (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => {
-                                            setIngredientExclusions(prev => ({
-                                                ...prev,
-                                                [replacerPopupEntry.id]: isSelected ? undefined : item.id
-                                            }));
-                                        }}
-                                        className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center ${isSelected
-                                            ? 'bg-white text-gray-900 border-white shadow-lg'
-                                            : 'bg-gray-700 border-transparent text-gray-200 hover:bg-gray-600'
-                                            }`}
-                                    >
-                                        {item.name}
-                                        {item.price_adjustment > 0 && (
-                                            <div className="text-[10px] mt-0.5 opacity-70">
-                                                +{currency}{Number(item.price_adjustment).toFixed(2)}
-                                            </div>
-                                        )}
-                                    </button>
-                                );
+                                    let itemPrice = Number(item.price_adjustment || 0);
+                                    if (selectedVariant && item.price_matrix?.[selectedVariant.name] !== undefined) {
+                                        itemPrice = Number(item.price_matrix[selectedVariant.name]);
+                                    }
+
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                setIngredientExclusions(prev => ({
+                                                    ...prev,
+                                                    [replacerPopupEntry.id]: isSelected ? undefined : item.id
+                                                }));
+                                            }}
+                                            className={`p-3 rounded-xl border-2 text-sm font-bold transition-all text-center ${isSelected
+                                                ? 'bg-white text-gray-900 border-white shadow-lg'
+                                                : 'bg-gray-700 border-transparent text-gray-200 hover:bg-gray-600'
+                                                }`}
+                                        >
+                                            {item.name}
+                                            {itemPrice > 0 && (
+                                                <div className="text-[10px] mt-0.5 opacity-70">
+                                                    +{currency}{Number(itemPrice).toFixed(2)}
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
                             })}
                         </div>
                         <div className="p-4 border-t border-gray-700">

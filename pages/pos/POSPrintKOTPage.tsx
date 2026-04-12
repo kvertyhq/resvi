@@ -186,19 +186,30 @@ const POSPrintKOTPage: React.FC = () => {
                                     {/* Modifiers Container */}
                                     <div className="mt-2 pl-2 space-y-1">
                                         {/* Modifiers / Addons */}
-                                        {Array.isArray(modifiers) && modifiers.map((mod: any, idx: number) => {
-                                            const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
-                                            return (
-                                                <div key={idx} className="text-2xl font-bold text-gray-800 uppercase flex items-center gap-2">
+                                        {(() => {
+                                            const mods = item.selected_modifiers || item.selected_addons || [];
+                                            if (mods.length === 0) return null;
+                                            const grouped = mods.reduce((acc: any, mod: any) => {
+                                                const gn = mod.modifier_group_name || mod.group_name || 'Extras';
+                                                if (!acc[gn]) acc[gn] = [];
+                                                acc[gn].push(mod);
+                                                return acc;
+                                            }, {});
+                                            
+                                            return Object.entries(grouped).map(([gn, ms]: [string, any[]], gIdx) => (
+                                                <div key={gIdx} className="text-2xl font-bold text-gray-800 uppercase flex items-start gap-2">
                                                     <span className="text-gray-400">+</span>
                                                     <span>
-                                                        {modName}
-                                                        {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
-                                                        {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
+                                                        <span className="text-gray-500 text-[0.8em]">{gn}:</span> {ms.map(m => {
+                                                            let s = m.name || m.modifier_item_name || m.modifier_name;
+                                                            if (m.location && m.location !== 'whole') s += ` (${m.location})`;
+                                                            if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
+                                                            return s;
+                                                        }).join(', ')}
                                                     </span>
                                                 </div>
-                                            );
-                                        })}
+                                            ));
+                                        })()}
                                         
                                         {/* Exclusions */}
                                         {Array.isArray(exclusions) && exclusions.map((excl: any, idx: number) => (

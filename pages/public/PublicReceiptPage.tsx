@@ -160,16 +160,35 @@ const PublicReceiptPage: React.FC = () => {
                                     <span>{item.quantity}x {item.name_snapshot}</span>
                                     <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                                 </div>
-                                {item.selected_modifiers?.map((mod: any, j: number) => (
-                                    <div key={`mod-${j}`} className="flex justify-between text-xs text-gray-500 pl-4 italic">
-                                        <span>
-                                            + {mod.name} {mod.modifier_group_name ? `(${mod.modifier_group_name})` : ''}
-                                            {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
-                                            {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
-                                        </span>
-                                        <span>{stationId || !mod.price ? '' : mod.price.toFixed(2)}</span>
+                                {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                    <div className="text-xs text-gray-500 pl-4 italic">
+                                        {(() => {
+                                            const grouped = item.selected_modifiers.reduce((acc: any, mod: any) => {
+                                                const gn = mod.modifier_group_name || 'Extras';
+                                                if (!acc[gn]) acc[gn] = [];
+                                                acc[gn].push(mod);
+                                                return acc;
+                                            }, {});
+
+                                            return Object.entries(grouped).map(([gn, ms]: [string, any[]], j) => {
+                                                const totalPrice = ms.reduce((sum, m) => sum + Number(m.price || 0), 0);
+                                                return (
+                                                    <div key={j} className="flex justify-between">
+                                                        <span>
+                                                            + {gn}: {ms.map(m => {
+                                                                let s = m.name;
+                                                                if (m.location && m.location !== 'whole') s += ` (${m.location})`;
+                                                                if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
+                                                                return s;
+                                                            }).join(', ')}
+                                                        </span>
+                                                        <span>{stationId || totalPrice <= 0 ? '' : totalPrice.toFixed(2)}</span>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
                                     </div>
-                                ))}
+                                )}
                                 {item.excluded_toppings?.map((excl: any, j: number) => (
                                     <div key={`excl-${j}`} className="flex justify-between text-xs text-red-500 pl-4 italic">
                                         <span>

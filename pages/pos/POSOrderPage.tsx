@@ -1384,24 +1384,38 @@ const POSOrderPage: React.FC = () => {
 
                                         {item.modifiers && item.modifiers.length > 0 && (
                                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1 border-t border-gray-300 dark:border-gray-600 pt-1">
-                                                {item.modifiers.map((mod, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center">
-                                                        <div className="flex gap-1 flex-wrap">
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">+ {mod.name} {mod.modifier_group_name ? `(${mod.modifier_group_name})` : ''}</span>
-                                                            {mod.location && mod.location !== 'whole' && (
-                                                                <span className="text-[9px] bg-gray-200 dark:bg-gray-600 px-1 rounded uppercase font-bold">({mod.location})</span>
-                                                            )}
-                                                            {mod.intensity && mod.intensity !== 'normal' && (
-                                                                <span className="text-[9px] bg-gray-200 dark:bg-gray-600 px-1 rounded uppercase font-bold">({mod.intensity})</span>
-                                                            )}
-                                                        </div>
-                                                        {Number(mod.price) > 0 && (
-                                                            <span className="font-mono text-gray-400">
-                                                                {settings?.currency || '$'}{Number(mod.price).toFixed(2)}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                {(() => {
+                                                    const grouped = item.modifiers.reduce((acc: any, mod) => {
+                                                        const groupName = mod.modifier_group_name || 'Extras';
+                                                        if (!acc[groupName]) acc[groupName] = [];
+                                                        acc[groupName].push(mod);
+                                                        return acc;
+                                                    }, {});
+
+                                                    return Object.entries(grouped).map(([groupName, mods]: [string, any[]], gIdx) => {
+                                                        const totalPrice = mods.reduce((sum, m) => sum + Number(m.price || 0), 0);
+                                                        return (
+                                                            <div key={gIdx} className="flex justify-between items-start gap-2">
+                                                                <div className="flex-1">
+                                                                    <span className="font-bold text-gray-700 dark:text-gray-300 uppercase text-[10px] tracking-wider">{groupName}: </span>
+                                                                    <span className="text-gray-600 dark:text-gray-400 font-medium">
+                                                                        {mods.map(m => {
+                                                                            let s = m.name;
+                                                                            if (m.location && m.location !== 'whole') s += ` (${m.location})`;
+                                                                            if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
+                                                                            return s;
+                                                                        }).join(', ')}
+                                                                    </span>
+                                                                </div>
+                                                                {totalPrice > 0 && (
+                                                                    <span className="font-mono text-gray-400 whitespace-nowrap">
+                                                                        +{settings?.currency || '$'}{totalPrice.toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()}
                                             </div>
                                         )}
                                         {item.selected_replacers && item.selected_replacers.length > 0 && (

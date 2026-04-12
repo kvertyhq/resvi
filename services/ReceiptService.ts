@@ -506,26 +506,29 @@ class ReceiptService {
                 // Modifiers / Addons
                 const modifiers = item.selected_modifiers || item.selected_addons || [];
                 if (Array.isArray(modifiers) && modifiers.length > 0) {
-                    modifiers.forEach((mod: any) => {
-                        const modName = mod.name || mod.modifier_item_name || mod.modifier_name;
-                        const modPrice = mod.price || 0;
-                        if (modName) {
-                            // Indent(4) + Name(X) + Sym(1) + Price(9)
-                            const modGroupName = mod.modifier_group_name || mod.group_name;
-                            const fullModName = `+ ${modName}${modGroupName ? ` (${modGroupName})` : ""}`;
-                            const modQtyStr = "    ";
-                            const nameWidth = lineWidth - 4 - 1 - 9;
-                            const modNameStr = fullModName.slice(0, nameWidth).padEnd(nameWidth);
-                            const modPriceValStr = modPrice > 0 ? modPrice.toFixed(2).padStart(9) : "".padStart(9);
+                    const grouped = modifiers.reduce((acc: any, mod: any) => {
+                        const gName = mod.modifier_group_name || mod.group_name || "Extras";
+                        if (!acc[gName]) acc[gName] = [];
+                        acc[gName].push(mod);
+                        return acc;
+                    }, {});
 
-                            data.push(...encoder.encode(modQtyStr));
-                            data.push(...encoder.encode(modNameStr));
-                            if (modPrice > 0 && !isKOT) {
-                                data.push(...encoder.encode(" ")); // Spacer
-                                data.push(...encoder.encode(`${modPriceValStr}\n`));
-                            } else {
-                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
-                            }
+                    Object.entries(grouped).forEach(([groupName, mods]: [string, any[]]) => {
+                        const totalGroupPrice = mods.reduce((sum, m) => sum + (m.price || 0), 0);
+                        const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
+                        const fullLine = `+ ${groupName}: ${names}`;
+                        
+                        const nameWidth = lineWidth - 4 - 1 - 9;
+                        const lineStr = fullLine.slice(0, nameWidth).padEnd(nameWidth);
+                        const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
+
+                        data.push(...encoder.encode("    "));
+                        data.push(...encoder.encode(lineStr));
+                        if (totalGroupPrice > 0 && !isKOT) {
+                            data.push(...encoder.encode(" "));
+                            data.push(...encoder.encode(`${priceStr}\n`));
+                        } else {
+                            data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
                         }
                     });
                 }
@@ -779,12 +782,25 @@ class ReceiptService {
                             <span>${item.quantity}x ${item.name_snapshot}</span>
                             <span>${(stationName || isKOT) ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                         </div>
-                        ${item.selected_modifiers?.map((mod: any) => `
-                            <div class="flex small" style="padding-left: 10px; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
-                                <span>+ ${mod.name}</span>
-                                <span>${(stationName || isKOT) || !mod.price ? '' : mod.price.toFixed(2)}</span>
-                            </div>
-                        `).join('') || ''}
+                        ${(() => {
+                            const mods = item.selected_modifiers || item.selected_addons || [];
+                            if (mods.length === 0) return '';
+                            const grouped = mods.reduce((acc: any, mod: any) => {
+                                const gn = mod.modifier_group_name || mod.group_name || 'Extras';
+                                if (!acc[gn]) acc[gn] = [];
+                                acc[gn].push(mod);
+                                return acc;
+                            }, {});
+                            return Object.entries(grouped).map(([gn, ms]: [string, any[]]) => {
+                                const price = ms.reduce((s, m) => s + (m.price || 0), 0);
+                                return `
+                                    <div class="flex small" style="padding-left: 10px; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                        <span>+ ${gn}: ${ms.map(m => m.name || m.modifier_item_name || m.modifier_name).join(', ')}</span>
+                                        <span>${(stationName || isKOT) || price <= 0 ? '' : price.toFixed(2)}</span>
+                                    </div>
+                                `;
+                            }).join('');
+                        })()}
                         ${item.excluded_toppings?.map((excl: any) => `
                             <div class="small" style="padding-left: 10px; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
                                 - NO ${excl.name}

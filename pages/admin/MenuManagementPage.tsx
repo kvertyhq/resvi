@@ -87,6 +87,7 @@ interface ReplacerItem {
     name: string;
     target_modifier_item_id?: string;
     price_adjustment: number;
+    price_matrix?: Record<string, number>;
     is_available: boolean;
 }
 
@@ -158,7 +159,8 @@ const MenuManagementPage: React.FC = () => {
     const [isReplacerItemModalOpen, setIsReplacerItemModalOpen] = useState(false);
     const [editingReplacerItem, setEditingReplacerItem] = useState<ReplacerItem | null>(null);
     const [replacerItemForm, setReplacerItemForm] = useState<Partial<ReplacerItem>>({
-        name: '', price_adjustment: 0, is_available: true, target_modifier_item_id: ''
+        name: '', price_adjustment: 0, is_available: true, target_modifier_item_id: '',
+        price_matrix: {}
     });
     const [replacerItemGroupId, setReplacerItemGroupId] = useState<string>('');
 
@@ -565,12 +567,18 @@ const MenuManagementPage: React.FC = () => {
 
     const openReplacerItemModal = (groupId: string, item?: ReplacerItem) => {
         setReplacerItemGroupId(groupId);
+        setPriceMatrixVariants(allUniqueVariantNames);
         if (item) {
             setEditingReplacerItem(item);
-            setReplacerItemForm(item);
+            setReplacerItemForm({
+                ...item,
+                price_matrix: item.price_matrix || {}
+            } as any);
         } else {
             setEditingReplacerItem(null);
-            setReplacerItemForm({ name: '', price_adjustment: 0, is_available: true, target_modifier_item_id: null as any });
+            const emptyMatrix: Record<string, number> = {};
+            (allUniqueVariantNames || []).forEach(v => { emptyMatrix[v] = 0; });
+            setReplacerItemForm({ name: '', price_adjustment: 0, is_available: true, price_matrix: emptyMatrix, target_modifier_item_id: null as any });
         }
         setIsReplacerItemModalOpen(true);
     };
@@ -1814,38 +1822,50 @@ const MenuManagementPage: React.FC = () => {
                                                                             <tr>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Adj.</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Matrix (Sizes)</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody className="divide-y divide-gray-200">
-                                                                            {group.items.map(item => {
-                                                                                return (
-                                                                                    <tr key={item.id} className="hover:bg-gray-50">
-                                                                                        <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
-                                                                                        <td className="px-4 py-2 text-sm text-gray-600">£{(item.price_adjustment || 0).toFixed(2)}</td>
-                                                                                        <td className="px-4 py-2 whitespace-nowrap">
-                                                                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                                                                {item.is_available ? 'Available' : 'Unavailable'}
-                                                                                            </span>
-                                                                                        </td>
-                                                                                        <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                                                                            <button
-                                                                                                onClick={() => openReplacerItemModal(group.id, item)}
-                                                                                                className="text-indigo-600 hover:text-indigo-900 mr-3"
-                                                                                            >
-                                                                                                <Edit className="h-4 w-4" />
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={() => handleDeleteReplacerItem(item.id)}
-                                                                                                className="text-red-600 hover:text-red-900"
-                                                                                            >
-                                                                                                <Trash2 className="h-4 w-4" />
-                                                                                            </button>
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                );
-                                                                            })}
+                                                                            {group.items.map(item => (
+                                                                                <tr key={item.id} className="hover:bg-gray-50">
+                                                                                    <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
+                                                                                    <td className="px-4 py-2 text-sm text-gray-600">£{(item.price_adjustment || 0).toFixed(2)}</td>
+                                                                                    <td className="px-4 py-2 text-xs text-gray-500">
+                                                                                        {item.price_matrix && Object.keys(item.price_matrix).length > 0 ? (
+                                                                                            <div className="flex flex-wrap gap-1">
+                                                                                                {Object.entries(item.price_matrix).map(([size, price]) => (
+                                                                                                    <span key={size} className="bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                                                        {size}: £{Number(price).toFixed(2)}
+                                                                                                    </span>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <span className="text-gray-400 italic">None</span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 whitespace-nowrap">
+                                                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                                            {item.is_available ? 'Available' : 'Unavailable'}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                                                                        <button
+                                                                                            onClick={() => openReplacerItemModal(group.id, item)}
+                                                                                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                                                                                        >
+                                                                                            <Edit className="h-4 w-4" />
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={() => handleDeleteReplacerItem(item.id)}
+                                                                                            className="text-red-600 hover:text-red-900"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        </button>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
                                                                         </tbody>
                                                                     </table>
                                                                 ) : (
@@ -2591,6 +2611,33 @@ const MenuManagementPage: React.FC = () => {
                                     <p className="text-xs text-gray-500 mb-3">If this modifier costs different amounts for different item sizes (e.g. Small vs Large pizza), add sizes below.</p>
 
                                     <div className="space-y-3">
+                                        {/* Suggestions for matrix */}
+                                        {priceMatrixVariants.length > 0 && (
+                                            <div className="mb-4">
+                                                <p className="text-xs font-semibold text-gray-600 mb-2">Suggestions from Menu Items:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {priceMatrixVariants.map(v => (
+                                                        <button
+                                                            key={v}
+                                                            type="button"
+                                                            disabled={!!modifierItemForm.price_matrix?.[v]}
+                                                            onClick={() => {
+                                                                setModifierItemForm({
+                                                                    ...modifierItemForm,
+                                                                    price_matrix: {
+                                                                        ...(modifierItemForm.price_matrix || {}),
+                                                                        [v]: 0
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className={`px-2 py-1 text-xs rounded border ${modifierItemForm.price_matrix?.[v] ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
+                                                        >
+                                                            + {v}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         {Object.entries(modifierItemForm.price_matrix || {}).map(([sizeName, price]) => (
                                             <div key={sizeName} className="flex items-center space-x-3">
                                                 <div className="flex-1 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 text-sm">

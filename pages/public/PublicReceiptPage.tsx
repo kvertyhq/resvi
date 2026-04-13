@@ -145,8 +145,11 @@ const PublicReceiptPage: React.FC = () => {
                             <div className="mt-3 text-xs pt-2 border-t border-gray-100 italic">
                                 <p className="font-bold">{order.customer?.full_name || order.customer_name || 'Guest'}</p>
                                 { (order.customer?.phone || order.customer_phone) && <p>{order.customer?.phone || order.customer_phone}</p> }
-                                { order.order_type === 'delivery' && (order.customer?.address || order.customer_address) && (
-                                    <p className="mt-1">{order.customer?.address || order.customer_address}{ (order.customer?.postcode || order.customer_postcode) ? `, ${order.customer?.postcode || order.customer_postcode}` : '' }</p>
+                                { order.order_type?.toLowerCase() === 'delivery' && (order.customer?.address || order.customer_address) && (
+                                    <div className="mt-1 border-t border-gray-50 pt-1">
+                                        <p className="font-semibold text-gray-700">Delivery Address:</p>
+                                        <p>{order.customer?.address || order.customer_address}{ (order.customer?.postcode || order.customer_postcode) ? `, ${order.customer?.postcode || order.customer_postcode}` : '' }</p>
+                                    </div>
                                 )}
                             </div>
                         )}

@@ -445,13 +445,20 @@ class ReceiptService {
             const cAddress = order.customer?.address || order.customer_address || '';
             const cPostcode = order.customer?.postcode || order.customer_postcode || '';
 
-            if (cName || cPhone) {
-                const customerLine = `${cName}${cName && cPhone ? ' - ' : ''}${cPhone}`.slice(0, lineWidth);
-                data.push(...encoder.encode(`${customerLine}\n`));
+            if (cName) {
+                data.push(...encoder.encode(`${cName.slice(0, lineWidth)}\n`));
             }
+            if (cPhone) {
+                data.push(...encoder.encode(`${cPhone.slice(0, lineWidth)}\n`));
+            }
+            
             if (orderTypeLabel === 'DELIVERY' && (cAddress || cPostcode)) {
-                const addrLine = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`.slice(0, lineWidth);
-                data.push(...encoder.encode(`${addrLine}\n`));
+                const fullAddress = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`;
+                // Simple wrapping logic for addresses
+                for (let i = 0; i < fullAddress.length; i += lineWidth) {
+                    const chunk = fullAddress.slice(i, i + lineWidth);
+                    data.push(...encoder.encode(`${chunk}\n`));
+                }
             }
 
             data = [
@@ -768,10 +775,16 @@ class ReceiptService {
                     <div class="bold" style="font-size: 16px;">ORDER #${order.daily_order_number || order.id.slice(0, 8)}</div>
                     <div class="small">${new Date(order.created_at).toLocaleString()}</div>
                     
-                    ${(order.customer || order.customer_name) ? `
+                    ${(order.customer || order.customer_name || order.customer_phone) ? `
                         <div class="mt-2 small" style="font-style: italic;">
                             <div class="bold">${order.customer?.full_name || order.customer_name || 'Guest'}</div>
-                            ${order.customer?.phone || order.customer_phone || ''}
+                            ${(order.customer?.phone || order.customer_phone) ? `<div>${order.customer?.phone || order.customer_phone}</div>` : ''}
+                            ${(order.order_type === 'delivery' && (order.customer?.address || order.customer_address)) ? `
+                                <div class="mt-1">
+                                    ${order.customer?.address || order.customer_address}
+                                    ${(order.customer?.postcode || order.customer_postcode) ? `, ${order.customer?.postcode || order.customer_postcode}` : ''}
+                                </div>
+                            ` : ''}
                         </div>
                     ` : ''}
                 </div>

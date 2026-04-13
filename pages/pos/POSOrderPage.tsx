@@ -75,6 +75,7 @@ const POSOrderPage: React.FC = () => {
     // Additional Customer fields for Phone Orders
     const [customerAddress, setCustomerAddress] = useState('');
     const [customerPostcode, setCustomerPostcode] = useState('');
+    const [customerName, setCustomerName] = useState('');
     const [isPhoneOrder, setIsPhoneOrder] = useState(false);
     const [callLogId, setCallLogId] = useState<string | null>(null);
     const [phoneOrderType, setPhoneOrderType] = useState<'delivery' | 'collection' | null>(null);
@@ -221,6 +222,7 @@ const POSOrderPage: React.FC = () => {
             setSelectedCustomer(state.customer);
             if (state.customer.address) setCustomerAddress(state.customer.address);
             if (state.customer.postcode) setCustomerPostcode(state.customer.postcode);
+            if (state.customer.full_name || state.customer.name) setCustomerName(state.customer.full_name || state.customer.name);
 
             if (state.isPhoneOrder) {
                 setIsPhoneOrder(true);
@@ -277,6 +279,7 @@ const POSOrderPage: React.FC = () => {
                 setCustomerSearch('');
                 setCustomerAddress('');
                 setCustomerPostcode('');
+                setCustomerName('');
                 setPhoneOrderType(null);
                 setPhoneOrderTimeslot(null);
             }
@@ -697,8 +700,9 @@ const POSOrderPage: React.FC = () => {
                 const phone = isPhone ? customerSearch : (selectedCustomer?.phone || callerPhone || null);
 
                 if (finalCustomerId) {
-                    // Update existing profile with address/phone if needed
+                    // Update existing profile with address/phone/name if needed
                     await supabase.from('profiles').update({
+                        full_name: customerName || null,
                         address: customerAddress || null,
                         postcode: customerPostcode || null,
                         ...(phone && !selectedCustomer?.phone ? { phone } : {})
@@ -728,7 +732,7 @@ const POSOrderPage: React.FC = () => {
                         const { data: newProfile } = await supabase
                             .from('profiles')
                             .insert({
-                                full_name: name || 'Guest',
+                                full_name: customerName || name || 'Guest',
                                 phone: phone,
                                 restaurant_id: settings?.id,
                                 created_at: new Date().toISOString(),
@@ -1133,25 +1137,32 @@ const POSOrderPage: React.FC = () => {
                                             </button>
                                         ))}
                                     </div>
-                                )}
-
-                                {/* Only show address and postcode fields for Phone Delivery orders */}
+                                )}                                 {/* Only show name, address and postcode fields for Phone Delivery orders */}
                                 {(isPhoneOrder && phoneOrderType === 'delivery') && (
-                                    <div className="flex gap-2 mt-2">
+                                    <div className="flex flex-col gap-2 mt-2">
                                         <input
                                             type="text"
-                                            placeholder="Address..."
-                                            value={customerAddress}
-                                            onChange={(e) => setCustomerAddress(e.target.value)}
-                                            className="w-2/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Customer Name..."
+                                            value={customerName}
+                                            onChange={(e) => setCustomerName(e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 font-bold"
                                         />
-                                        <input
-                                            type="text"
-                                            placeholder="Postcode"
-                                            value={customerPostcode}
-                                            onChange={(e) => setCustomerPostcode(e.target.value)}
-                                            className="w-1/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                                        />
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Address..."
+                                                value={customerAddress}
+                                                onChange={(e) => setCustomerAddress(e.target.value)}
+                                                className="w-2/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Postcode"
+                                                value={customerPostcode}
+                                                onChange={(e) => setCustomerPostcode(e.target.value)}
+                                                className="w-1/3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>

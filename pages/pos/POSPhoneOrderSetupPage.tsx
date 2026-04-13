@@ -41,6 +41,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
     const [deliveryTime, setDeliveryTime] = useState('');
     const [postcode, setPostcode] = useState(customer?.postcode || '');
     const [address, setAddress] = useState(customer?.address || '');
+    const [customerName, setCustomerName] = useState(customer?.full_name || customer?.name || '');
 
     // Postcode address lookup
     const [addressOptions, setAddressOptions] = useState<string[]>([]);
@@ -145,9 +146,9 @@ const POSPhoneOrderSetupPage: React.FC = () => {
         setCapacityError(null);
     }, [orderType]);
 
-    // Validation - Date/Time hidden, so only postcode/address required for delivery
-    const isDeliveryReady = orderType === 'delivery' && postcode && address;
-    const isCollectionReady = orderType === 'collection';
+    // Validation - Name required for all, postcode/address required for delivery
+    const isDeliveryReady = orderType === 'delivery' && postcode && address && customerName.trim();
+    const isCollectionReady = orderType === 'collection' && customerName.trim();
     const canContinue = isDeliveryReady || isCollectionReady;
 
     const handleContinue = async () => {
@@ -168,6 +169,7 @@ const POSPhoneOrderSetupPage: React.FC = () => {
         const timeslot = { date, time };
         const updatedCustomer = {
             ...customer,
+            full_name: customerName.trim(),
             postcode: orderType === 'delivery' ? postcode : customer?.postcode,
             address: orderType === 'delivery' ? address : customer?.address,
         };
@@ -226,6 +228,18 @@ const POSPhoneOrderSetupPage: React.FC = () => {
 
                 {/* Scrollable Body */}
                 <div className="overflow-y-auto flex-1 p-6">
+                    {/* Customer Name Section */}
+                    <div className="mb-6 animate-fade-in">
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Customer Name <span className="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="Enter guest name..."
+                            className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-[var(--theme-color)] outline-none text-base font-semibold"
+                        />
+                    </div>
+
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">Select Order Type</h2>
 
                     <div className="grid grid-cols-2 gap-4 mb-6">

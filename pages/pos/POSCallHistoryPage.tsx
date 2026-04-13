@@ -485,28 +485,26 @@ const POSCallHistoryPage: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        {order.profiles ? (
-                                                            <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                                                                <div className="font-semibold flex items-center gap-1">
-                                                                    <User size={13} /> {order.profiles.full_name || 'Guest'}
-                                                                </div>
-                                                                {order.profiles.phone && (
-                                                                    <div className="flex items-center gap-1 mt-1 text-gray-500">
-                                                                        <Phone size={13} /> {order.profiles.phone}
-                                                                    </div>
-                                                                )}
-                                                                {order.order_type === 'delivery' && (order.customer_address || order.customer_postcode) && (
-                                                                    <div className="flex items-start gap-1 mt-1.5 text-gray-500">
-                                                                        <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[var(--theme-color)]" />
-                                                                        <span className="text-xs leading-snug">
-                                                                            {order.customer_address}{order.customer_address && order.customer_postcode ? ', ' : ''}{order.customer_postcode}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
+                                                        <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                                                            <div className="font-semibold flex items-center gap-1">
+                                                                <User size={13} /> {order.profiles?.full_name || order.customer_name || 'Guest Customer'}
                                                             </div>
-                                                        ) : (
-                                                            <div className="text-sm text-gray-500 italic mb-3">Guest Customer</div>
-                                                        )}
+                                                            {(order.profiles?.phone || order.customer_phone) && (
+                                                                <div className="flex items-center gap-1 mt-1 text-gray-500">
+                                                                    <Phone size={13} /> {order.customer_phone || order.profiles?.phone}
+                                                                </div>
+                                                            )}
+                                                            {order.order_type === 'delivery' && (order.customer_address || order.customer_postcode || order.profiles?.address) && (
+                                                                <div className="flex items-start gap-1 mt-1.5 text-gray-500">
+                                                                    <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[var(--theme-color)]" />
+                                                                    <span className="text-xs leading-snug">
+                                                                        {order.customer_address || order.profiles?.address}
+                                                                        {(order.customer_address || order.profiles?.address) && (order.customer_postcode || order.profiles?.postcode) ? ', ' : ''}
+                                                                        {order.customer_postcode || order.profiles?.postcode}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
 
                                                         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
                                                             <div className="font-bold text-gray-900 dark:text-white">
@@ -662,9 +660,14 @@ const POSCallHistoryPage: React.FC = () => {
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50 mt-auto">
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                                {order.profiles?.full_name || 'Guest'}
-                                                            </span>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                                                                    {order.profiles?.full_name || order.customer_name || 'Guest'}
+                                                                </span>
+                                                                {(order.profiles?.phone || order.customer_phone) && (
+                                                                    <span className="text-[10px] text-gray-400">{order.customer_phone || order.profiles?.phone}</span>
+                                                                )}
+                                                            </div>
                                                             <div className="text-right">
                                                                 <span className="text-sm font-bold text-gray-900 dark:text-white block">
                                                                     £{(order.total_amount || 0).toFixed(2)}
@@ -890,16 +893,16 @@ const POSCallHistoryPage: React.FC = () => {
                                 {/* Scrollable body */}
                                 <div className="overflow-y-auto flex-1 p-5 space-y-5">
                                     {/* Customer info */}
-                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-1.5">
-                                        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Customer</p>
+                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-2">
+                                        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Customer</p>
                                         <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
                                             <User size={14} className="text-[var(--theme-color)]" />
-                                            {selectedOrder.profiles?.full_name || 'Guest Customer'}
+                                            {selectedOrder.profiles?.full_name || selectedOrder.customer_name || 'Guest Customer'}
                                         </div>
-                                        {selectedOrder.profiles?.phone && (
+                                        {(selectedOrder.profiles?.phone || selectedOrder.customer_phone) && (
                                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                                 <Phone size={14} />
-                                                {selectedOrder.profiles.phone}
+                                                {selectedOrder.customer_phone || selectedOrder.profiles?.phone}
                                             </div>
                                         )}
                                         {selectedOrder.order_type && (
@@ -908,11 +911,13 @@ const POSCallHistoryPage: React.FC = () => {
                                                 {selectedOrder.order_type}
                                             </div>
                                         )}
-                                        {selectedOrder.order_type === 'delivery' && (selectedOrder.customer_address || selectedOrder.customer_postcode) && (
+                                        {selectedOrder.order_type === 'delivery' && (selectedOrder.customer_address || selectedOrder.customer_postcode || selectedOrder.profiles?.address) && (
                                             <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                 <MapPin size={14} className="mt-0.5 flex-shrink-0 text-[var(--theme-color)]" />
                                                 <span>
-                                                    {selectedOrder.customer_address}{selectedOrder.customer_address && selectedOrder.customer_postcode ? ', ' : ''}{selectedOrder.customer_postcode}
+                                                    {selectedOrder.customer_address || selectedOrder.profiles?.address}
+                                                    {(selectedOrder.customer_address || selectedOrder.profiles?.address) && (selectedOrder.customer_postcode || selectedOrder.profiles?.postcode) ? ', ' : ''}
+                                                    {selectedOrder.customer_postcode || selectedOrder.profiles?.postcode}
                                                 </span>
                                             </div>
                                         )}

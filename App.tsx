@@ -64,6 +64,7 @@ import { SipProvider } from './context/SipContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthCallbackHandler from './components/AuthCallbackHandler';
+import UpdateHandler from './components/UpdateHandler';
 import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 import { useAlert } from './context/AlertContext';
 
@@ -142,6 +143,7 @@ function App() {
   return (
     <HashRouter>
       <AuthCallbackHandler />
+      <UpdateHandler />
       <AdminProvider>
         <MenuProvider>
           <OrderProvider>

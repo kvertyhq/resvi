@@ -29,7 +29,7 @@
       "active": true,
       "pubkey": "SET_YOUR_PUBLIC_KEY_HERE",
       "endpoints": [
-        "https://your-domain.com/updates/{{target}}-{{arch}}.json"
+        "https://raw.githubusercontent.com/kvertyhq/resvi-packages/main/latest.json"
       ]
     },
     "process": {}

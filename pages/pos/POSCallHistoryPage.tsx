@@ -123,7 +123,7 @@ const POSCallHistoryPage: React.FC = () => {
                 profiles ( id, full_name, phone ),
                 orders!call_logs_order_id_fkey (
                     id, readable_id, daily_order_number, status, total_amount, payment_status,
-                    order_items ( id, quantity, price_snapshot, name_snapshot ),
+                    order_items ( id, quantity, price_snapshot, name_snapshot, selected_modifiers, selected_addons, selected_replacers, excluded_toppings ),
                     profiles!orders_user_id_fkey ( full_name, phone )
                 )
             `, { count: 'exact' })
@@ -198,7 +198,7 @@ const POSCallHistoryPage: React.FC = () => {
             .select(`
                 *,
                 profiles!orders_user_id_fkey ( full_name, phone ),
-                order_items ( id, quantity, price_snapshot, name_snapshot )
+                order_items ( id, quantity, price_snapshot, name_snapshot, selected_modifiers, selected_addons, selected_replacers, excluded_toppings )
             `)
             .eq('restaurant_id', settings.id)
             .eq('source', 'phone')
@@ -230,7 +230,7 @@ const POSCallHistoryPage: React.FC = () => {
             .select(`
                 *,
                 profiles!orders_user_id_fkey ( full_name, phone ),
-                order_items ( id, quantity, price_snapshot, name_snapshot )
+                order_items ( id, quantity, price_snapshot, name_snapshot, selected_modifiers, selected_addons, selected_replacers, excluded_toppings )
             `, { count: 'exact' })
             .eq('restaurant_id', settings.id)
             .eq('source', 'phone')
@@ -937,13 +937,47 @@ const POSCallHistoryPage: React.FC = () => {
                                         <div className="space-y-2">
                                             {(selectedOrder.order_items || []).map((item: any, idx: number) => (
                                                 <div key={idx} className="flex items-center justify-between py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="w-6 h-6 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="w-6 h-6 rounded-full bg-[var(--theme-color)]/10 text-[var(--theme-color)] flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                                                             {item.quantity}
                                                         </span>
-                                                        <span className="text-sm text-gray-800 dark:text-gray-200 font-medium">
-                                                            {item.name_snapshot || 'Item'}
-                                                        </span>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm text-gray-800 dark:text-gray-200 font-medium">
+                                                                {item.name_snapshot || 'Item'}
+                                                            </span>
+                                                            
+                                                            {/* Modifiers & Addons */}
+                                                            {((item.selected_modifiers || []).length > 0 || (item.selected_addons || []).length > 0) && (
+                                                                <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">
+                                                                    {[...(item.selected_modifiers || []), ...(item.selected_addons || [])].map((m: any, i: number) => (
+                                                                        <div key={i}>
+                                                                            + {m.name || m.modifier_item_name} {m.modifier_group_name ? `(${m.modifier_group_name})` : ''}
+                                                                            {m.location && m.location !== 'whole' && <span className="ml-1 opacity-70">({m.location})</span>}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Replacers & Ingredients */}
+                                                            {item.selected_replacers && item.selected_replacers.length > 0 && (
+                                                                <div className="text-[11px] text-orange-600 dark:text-orange-400 mt-0.5 leading-tight">
+                                                                    {item.selected_replacers.map((r: any, i: number) => (
+                                                                        <div key={i}>
+                                                                            {r.is_exclusion_only ? `✕ NO ${r.ingredient_name || r.name}` : `↔ ${r.ingredient_name || 'Item'} → ${r.name}`}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Exclusions */}
+                                                            {item.excluded_toppings && item.excluded_toppings.length > 0 && (
+                                                                <div className="text-[11px] text-red-500 mt-0.5 leading-tight italic">
+                                                                    {item.excluded_toppings.map((ex: any, i: number) => (
+                                                                        <div key={i}>✕ NO {ex.name}</div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                                         £{((item.price_snapshot || 0) * item.quantity).toFixed(2)}

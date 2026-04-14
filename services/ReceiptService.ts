@@ -497,17 +497,34 @@ class ReceiptService {
                     });
                     data.push(...[27, 33, 0]); // Normal size
                 } else {
-                    const nameWidth = lineWidth - 4 - 1 - 9;
-                    const nameStr = itemName.slice(0, nameWidth).padEnd(nameWidth);
+                    // Wrapping item name: first line has qty + name + price, continuation lines indent
+                    const nameWidth = lineWidth - 4 - 1 - 9; // available chars for name on first line
                     const priceValStr = itemPrice.toFixed(2).padStart(9);
 
-                    data = [
-                        ...data,
-                        ...encoder.encode(qtyStr),
-                        ...encoder.encode(nameStr),
-                        ...encoder.encode(" "), // Spacer in place of currency byte
-                        ...encoder.encode(`${priceValStr}\n`)
-                    ];
+                    if (itemName.length <= nameWidth) {
+                        // Name fits in one line
+                        const nameStr = itemName.padEnd(nameWidth);
+                        data.push(...encoder.encode(qtyStr));
+                        data.push(...encoder.encode(nameStr));
+                        data.push(...encoder.encode(" "));
+                        data.push(...encoder.encode(`${priceValStr}\n`));
+                    } else {
+                        // Name needs wrapping — print first line with price, then continuation lines
+                        const firstLine = itemName.slice(0, nameWidth).padEnd(nameWidth);
+                        data.push(...encoder.encode(qtyStr));
+                        data.push(...encoder.encode(firstLine));
+                        data.push(...encoder.encode(" "));
+                        data.push(...encoder.encode(`${priceValStr}\n`));
+
+                        // Wrap remaining text with 4-char indent (matching qty column)
+                        let remaining = itemName.slice(nameWidth);
+                        const wrapWidth = lineWidth - 4; // full width minus indent
+                        while (remaining.length > 0) {
+                            const chunk = remaining.slice(0, wrapWidth);
+                            data.push(...encoder.encode("    " + chunk + "\n"));
+                            remaining = remaining.slice(wrapWidth);
+                        }
+                    }
                 }
 
                 // Modifiers / Addons
@@ -525,17 +542,40 @@ class ReceiptService {
                         const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
                         const fullLine = `+ ${groupName}: ${names}`;
                         
-                        const nameWidth = lineWidth - 4 - 1 - 9;
-                        const lineStr = fullLine.slice(0, nameWidth).padEnd(nameWidth);
+                        const nameWidth = lineWidth - 4 - 1 - 9; // available for modifier text on first line
                         const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
 
-                        data.push(...encoder.encode("    "));
-                        data.push(...encoder.encode(lineStr));
-                        if (totalGroupPrice > 0 && !isKOT) {
-                            data.push(...encoder.encode(" "));
-                            data.push(...encoder.encode(`${priceStr}\n`));
+                        if (fullLine.length <= nameWidth) {
+                            // Fits in one line
+                            const lineStr = fullLine.padEnd(nameWidth);
+                            data.push(...encoder.encode("    "));
+                            data.push(...encoder.encode(lineStr));
+                            if (totalGroupPrice > 0 && !isKOT) {
+                                data.push(...encoder.encode(" "));
+                                data.push(...encoder.encode(`${priceStr}\n`));
+                            } else {
+                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
+                            }
                         } else {
-                            data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
+                            // Wrapping modifier text
+                            const firstLine = fullLine.slice(0, nameWidth).padEnd(nameWidth);
+                            data.push(...encoder.encode("    "));
+                            data.push(...encoder.encode(firstLine));
+                            if (totalGroupPrice > 0 && !isKOT) {
+                                data.push(...encoder.encode(" "));
+                                data.push(...encoder.encode(`${priceStr}\n`));
+                            } else {
+                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
+                            }
+
+                            // Continuation lines for modifier text
+                            let remaining = fullLine.slice(nameWidth);
+                            const wrapWidth = lineWidth - 4; // full width minus indent
+                            while (remaining.length > 0) {
+                                const chunk = remaining.slice(0, wrapWidth);
+                                data.push(...encoder.encode("    " + chunk + "\n"));
+                                remaining = remaining.slice(wrapWidth);
+                            }
                         }
                     });
                 }

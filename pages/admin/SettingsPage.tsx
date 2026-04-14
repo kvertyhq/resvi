@@ -214,7 +214,8 @@ const SettingsPage: React.FC = () => {
                             show_tables: true,
                             show_kds: true,
                             show_reports: true,
-                            show_calls: true
+                            show_calls: true,
+                            auto_complete_minutes: 0
                         },
                         caller_id_config: settings.caller_id_config || {
                             did: '',

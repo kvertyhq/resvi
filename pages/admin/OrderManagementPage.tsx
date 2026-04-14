@@ -108,6 +108,7 @@ const OrderManagementPage: React.FC = () => {
                     )
                 `)
                 .eq('restaurant_id', restaurantId)
+                .eq('source', 'online')
                 .in('order_type', ['delivery', 'collection'])
                 .order('created_at', { ascending: false });
 
@@ -152,8 +153,10 @@ const OrderManagementPage: React.FC = () => {
             .channel('public:orders')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
                 const newOrder = payload.new as any;
-                if (newOrder.restaurant_id === selectedRestaurantId && ['delivery', 'collection'].includes(newOrder.order_type)) {
-                    console.log('New order received:', payload);
+                if (newOrder.restaurant_id === selectedRestaurantId && 
+                    newOrder.source === 'online' && 
+                    ['delivery', 'collection'].includes(newOrder.order_type)) {
+                    console.log('New online order received:', payload);
                     playNotificationSound();
                     
                     // Trigger auto-print if enabled
@@ -167,8 +170,10 @@ const OrderManagementPage: React.FC = () => {
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
                 const updatedOrder = payload.new as any;
-                if (updatedOrder.restaurant_id === selectedRestaurantId && ['delivery', 'collection'].includes(updatedOrder.order_type)) {
-                    console.log('Order updated:', payload);
+                if (updatedOrder.restaurant_id === selectedRestaurantId && 
+                    updatedOrder.source === 'online' && 
+                    ['delivery', 'collection'].includes(updatedOrder.order_type)) {
+                    console.log('Online order updated:', payload);
                     fetchOrders();
                 }
             })
@@ -344,11 +349,11 @@ const OrderManagementPage: React.FC = () => {
                                     onClick={() => setAutoPrint(!autoPrint)}
                                     className="flex items-center gap-3 group transition-all"
                                 >
-                                    <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${autoPrint ? 'text-green-600' : 'text-gray-400'}`}>
+                                    <span className={`text-[10px] md:text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${autoPrint ? 'text-green-600' : 'text-gray-400'}`}>
                                         Auto Print
                                     </span>
-                                    <div className={`w-10 h-5 rounded-full relative transition-all duration-300 ${autoPrint ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-gray-300'}`}>
-                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${autoPrint ? 'left-6' : 'left-1'}`} />
+                                    <div className={`w-11 h-6 rounded-full relative transition-all duration-300 flex-shrink-0 ${autoPrint ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-md transform ${autoPrint ? 'translate-x-5' : 'translate-x-0'}`} />
                                     </div>
                                 </button>
                                 <div className="h-6 w-px bg-gray-200 mx-1"></div>

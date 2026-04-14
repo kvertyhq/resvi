@@ -6,6 +6,7 @@ interface POSSettings {
     show_kds: boolean;
     show_reports: boolean;
     show_calls: boolean;
+    auto_complete_minutes?: number;
 }
 
 interface SettingsPOSProps {
@@ -121,6 +122,45 @@ const SettingsPOS: React.FC<SettingsPOSProps> = ({ formData, setFormData }) => {
                         >
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${posSettings.show_calls ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Automation Section */}
+            <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-brand-gold" />
+                    Automation
+                </h4>
+                <p className="text-sm text-gray-500 mb-6 font-medium">
+                    Automate order management workflows to keep the dashboard clean.
+                </p>
+
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <p className="text-sm font-bold dark:text-white">Auto-complete Orders</p>
+                            <p className="text-xs text-gray-500">Mark orders as completed after a chosen duration (minutes). 0 to disable.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={posSettings.auto_complete_minutes || 0}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    setFormData((prev: any) => ({
+                                        ...prev,
+                                        pos_settings: {
+                                            ...posSettings,
+                                            auto_complete_minutes: val
+                                        }
+                                    }));
+                                }}
+                                className="w-24 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-bold focus:ring-2 focus:ring-brand-gold outline-none"
+                                min="0"
+                            />
+                            <span className="text-xs font-medium text-gray-500">minutes</span>
+                        </div>
                     </div>
                 </div>
             </div>

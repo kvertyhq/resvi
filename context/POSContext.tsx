@@ -42,6 +42,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [staff, setStaff] = useState<any>(null);
     const [activeShift, setActiveShift] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const isAuthenticated = !!staff;
     const [uiFontScale, setUIFontScaleState] = useState<number>(() => {
         const saved = localStorage.getItem('pos-font-scale');
         return saved ? parseFloat(saved) : 1;
@@ -83,6 +84,44 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             showAlert('Access Restricted', 'Your workspace has been locked. Please contact support.', 'error');
         }
     }, [settings?.is_disabled, staff]);
+
+    // Heartbeat for Auto-Complete Orders
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        const runAutoComplete = async () => {
+            if (!settings?.id || !staff) return;
+            
+            // Only run if the setting is enabled (saves unnecessary RPC calls)
+            if (!(settings.pos_settings?.auto_complete_minutes > 0)) return;
+
+            try {
+                const { data, error } = await supabase.rpc('auto_complete_stale_orders', {
+                    p_restaurant_id: settings.id
+                });
+                
+                if (error) {
+                    console.error('Auto-complete heartbeat error:', error);
+                } else if (data?.updated_count > 0) {
+                    console.log(`Auto-completed ${data.updated_count} stagnant orders.`);
+                }
+            } catch (err) {
+                console.error('Failed to run auto-complete heartbeat:', err);
+            }
+        };
+
+        if (isAuthenticated && settings?.id) {
+            // Run immediately on login/load
+            runAutoComplete();
+            
+            // Then every 5 minutes
+            interval = setInterval(runAutoComplete, 5 * 60 * 1000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isAuthenticated, settings?.id, settings?.pos_settings?.auto_complete_minutes, staff]);
 
     const login = async (pin: string) => {
         if (!settings?.id) {

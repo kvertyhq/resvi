@@ -19,7 +19,7 @@ BEGIN
   -- 2. If setting is > 0, proceed
   IF v_auto_complete_minutes IS NOT NULL AND v_auto_complete_minutes > 0 THEN
     -- 3. Update active orders older than the threshold
-    -- Logic: status IN ('confirmed', 'preparing', 'ready')
+    -- Logic: status IN ('pending', 'confirmed', 'preparing', 'ready')
     -- AND source IN ('phone', 'pos') -- Restricted to Phone and POS/Walk-in as requested
     -- AND (now() - interval 'X minutes') > updated_at (fallback to created_at if updated_at null)
     WITH updated_rows AS (
@@ -27,7 +27,7 @@ BEGIN
       SET status = 'completed',
           updated_at = NOW()
       WHERE restaurant_id = p_restaurant_id
-        AND status IN ('confirmed', 'preparing', 'ready')
+        AND status IN ('pending', 'confirmed', 'preparing', 'ready')
         AND source IN ('phone', 'pos')
         AND (
           COALESCE(updated_at, created_at) < (NOW() - (v_auto_complete_minutes * interval '1 minute'))

@@ -35,6 +35,8 @@ interface Order {
     scheduled_time: string | null;
     payment_method: string | null; // Added
     notes: string | null;
+    customer_name: string | null;
+    customer_phone: string | null;
     metadata: {
         subtotal: number;
         tax: number;
@@ -446,8 +448,10 @@ const OrderManagementPage: React.FC = () => {
                                     </div>
                                     <div className="text-gray-600 text-sm space-y-1">
                                         <div>
-                                            <span className="font-semibold">{order.profiles?.full_name || 'Guest'}</span>
-                                            {order.profiles?.phone && <span className="ml-2 text-gray-500">• {order.profiles.phone}</span>}
+                                            <span className="font-semibold">{order.profiles?.full_name || order.customer_name || 'Guest'}</span>
+                                            {(order.profiles?.phone || order.customer_phone) && (
+                                                <span className="ml-2 text-gray-500">• {order.profiles?.phone || order.customer_phone}</span>
+                                            )}
                                         </div>
                                         <div>
                                             <span className="font-semibold">Total: {settings?.currency || '£'}{order.total_amount.toFixed(2)}</span>

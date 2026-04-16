@@ -30,6 +30,36 @@ class ReceiptService {
     }
 
     /**
+     * Helper to wrap text into multiple lines based on word boundaries.
+     */
+    private wrapText(text: string, width: number): string[] {
+        if (!text) return [];
+        const words = text.split(/\s+/);
+        const lines: string[] = [];
+        let currentLine = '';
+
+        words.forEach(word => {
+            if (!word) return;
+            // Check if adding this word (and a space) exceeds the width
+            if ((currentLine + (currentLine ? ' ' : '') + word).length <= width) {
+                currentLine += (currentLine ? ' ' : '') + word;
+            } else {
+                if (currentLine) lines.push(currentLine);
+                
+                // Handle single words longer than width by splitting them
+                let remainingWord = word;
+                while (remainingWord.length > width) {
+                    lines.push(remainingWord.slice(0, width));
+                    remainingWord = remainingWord.slice(width);
+                }
+                currentLine = remainingWord;
+            }
+        });
+        if (currentLine) lines.push(currentLine);
+        return lines;
+    }
+
+    /**
      * Fetch print mode from database for a restaurant
      */
     async getPrintMode(restaurantId: string): Promise<PrintMode> {
@@ -445,19 +475,20 @@ class ReceiptService {
             const cAddress = order.customer?.address || order.customer_address || '';
             const cPostcode = order.customer?.postcode || order.customer_postcode || '';
 
-            if (cName) {
-                data.push(...encoder.encode(`${cName.slice(0, lineWidth)}\n`));
-            }
-            if (cPhone) {
-                data.push(...encoder.encode(`${cPhone.slice(0, lineWidth)}\n`));
-            }
-            
-            if (orderTypeLabel === 'DELIVERY' && (cAddress || cPostcode)) {
-                const fullAddress = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`;
-                // Simple wrapping logic for addresses
-                for (let i = 0; i < fullAddress.length; i += lineWidth) {
-                    const chunk = fullAddress.slice(i, i + lineWidth);
-                    data.push(...encoder.encode(`${chunk}\n`));
+            if (cName || cPhone || cAddress || cPostcode) {
+                if (cName) {
+                    data.push(...encoder.encode(`${cName.slice(0, lineWidth)}\n`));
+                }
+                if (cPhone) {
+                    data.push(...encoder.encode(`${cPhone.slice(0, lineWidth)}\n`));
+                }
+                
+                if ((order.order_type === 'delivery' || orderTypeLabel === 'DELIVERY') && (cAddress || cPostcode)) {
+                    const fullAddress = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`;
+                    const addressLines = this.wrapText(fullAddress, lineWidth);
+                    addressLines.forEach(line => {
+                        data.push(...encoder.encode(`${line}\n`));
+                    });
                 }
             }
 
@@ -477,54 +508,38 @@ class ReceiptService {
 
                 if (isKOT) {
                     // Double width and double height for Kitchen Items
-                    const rowLimit = Math.floor(lineWidth / 2);
-                    const linesStr = [];
-                    let remaining = itemName;
-
-                    const firstChunk = remaining.slice(0, rowLimit - qtyStr.length);
-                    linesStr.push(qtyStr + firstChunk);
-                    remaining = remaining.slice(rowLimit - qtyStr.length);
-
-                    while (remaining.length > 0) {
-                        const chunk = remaining.slice(0, rowLimit - 4); // 4 spaces indent
-                        linesStr.push("    " + chunk);
-                        remaining = remaining.slice(rowLimit - 4);
-                    }
-
+                    const rowLimit = Math.floor(lineWidth / 2); // printer width is halved in double-size mode
+                    const wrappedNames = this.wrapText(itemName, rowLimit - qtyStr.length);
+                    
                     data.push(...[27, 33, 48]); // Double width & height
-                    linesStr.forEach((l: string) => {
-                        data.push(...encoder.encode(`${l}\n`));
+                    wrappedNames.forEach((line, index) => {
+                        if (index === 0) {
+                            data.push(...encoder.encode(`${qtyStr}${line}\n`));
+                        } else {
+                            data.push(...encoder.encode(`    ${line}\n`)); // 4-char indent (matching qty column)
+                        }
                     });
                     data.push(...[27, 33, 0]); // Normal size
                 } else {
                     // Wrapping item name: first line has qty + name + price, continuation lines indent
                     const nameWidth = lineWidth - 4 - 1 - 9; // available chars for name on first line
                     const priceValStr = itemPrice.toFixed(2).padStart(9);
+                    const wrappedNames = this.wrapText(itemName, nameWidth);
 
-                    if (itemName.length <= nameWidth) {
-                        // Name fits in one line
-                        const nameStr = itemName.padEnd(nameWidth);
-                        data.push(...encoder.encode(qtyStr));
-                        data.push(...encoder.encode(nameStr));
-                        data.push(...encoder.encode(" "));
-                        data.push(...encoder.encode(`${priceValStr}\n`));
-                    } else {
-                        // Name needs wrapping — print first line with price, then continuation lines
-                        const firstLine = itemName.slice(0, nameWidth).padEnd(nameWidth);
-                        data.push(...encoder.encode(qtyStr));
-                        data.push(...encoder.encode(firstLine));
-                        data.push(...encoder.encode(" "));
-                        data.push(...encoder.encode(`${priceValStr}\n`));
-
-                        // Wrap remaining text with 4-char indent (matching qty column)
-                        let remaining = itemName.slice(nameWidth);
-                        const wrapWidth = lineWidth - 4; // full width minus indent
-                        while (remaining.length > 0) {
-                            const chunk = remaining.slice(0, wrapWidth);
-                            data.push(...encoder.encode("    " + chunk + "\n"));
-                            remaining = remaining.slice(wrapWidth);
+                    wrappedNames.forEach((line, index) => {
+                        if (index === 0) {
+                            data.push(...encoder.encode(qtyStr));
+                            data.push(...encoder.encode(line.padEnd(nameWidth)));
+                            data.push(...encoder.encode(" "));
+                            data.push(...encoder.encode(`${priceValStr}\n`));
+                        } else {
+                            // Wrap remaining text with 4-char indent
+                            const continuationLines = this.wrapText(line, lineWidth - 4);
+                            continuationLines.forEach(cl => {
+                                data.push(...encoder.encode("    " + cl + "\n"));
+                            });
                         }
-                    }
+                    });
                 }
 
                 // Modifiers / Addons
@@ -540,43 +555,30 @@ class ReceiptService {
                     Object.entries(grouped).forEach(([groupName, mods]: [string, any[]]) => {
                         const totalGroupPrice = mods.reduce((sum, m) => sum + (m.price || 0), 0);
                         const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
-                        const fullLine = `+ ${groupName}: ${names}`;
+                        const fullText = `+ ${groupName}: ${names}`;
                         
                         const nameWidth = lineWidth - 4 - 1 - 9; // available for modifier text on first line
                         const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
+                        const wrappedLines = this.wrapText(fullText, nameWidth);
 
-                        if (fullLine.length <= nameWidth) {
-                            // Fits in one line
-                            const lineStr = fullLine.padEnd(nameWidth);
-                            data.push(...encoder.encode("    "));
-                            data.push(...encoder.encode(lineStr));
-                            if (totalGroupPrice > 0 && !isKOT) {
-                                data.push(...encoder.encode(" "));
-                                data.push(...encoder.encode(`${priceStr}\n`));
+                        wrappedLines.forEach((line, index) => {
+                            if (index === 0) {
+                                data.push(...encoder.encode("    "));
+                                data.push(...encoder.encode(line.padEnd(nameWidth)));
+                                if (totalGroupPrice > 0 && !isKOT) {
+                                    data.push(...encoder.encode(" "));
+                                    data.push(...encoder.encode(`${priceStr}\n`));
+                                } else {
+                                    data.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n"))); // 1 space + 9 price
+                                }
                             } else {
-                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
+                                // Continuation lines for modifier text use full available width
+                                const continuationLines = this.wrapText(line, lineWidth - 4);
+                                continuationLines.forEach(cl => {
+                                    data.push(...encoder.encode("    " + cl + "\n"));
+                                });
                             }
-                        } else {
-                            // Wrapping modifier text
-                            const firstLine = fullLine.slice(0, nameWidth).padEnd(nameWidth);
-                            data.push(...encoder.encode("    "));
-                            data.push(...encoder.encode(firstLine));
-                            if (totalGroupPrice > 0 && !isKOT) {
-                                data.push(...encoder.encode(" "));
-                                data.push(...encoder.encode(`${priceStr}\n`));
-                            } else {
-                                data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
-                            }
-
-                            // Continuation lines for modifier text
-                            let remaining = fullLine.slice(nameWidth);
-                            const wrapWidth = lineWidth - 4; // full width minus indent
-                            while (remaining.length > 0) {
-                                const chunk = remaining.slice(0, wrapWidth);
-                                data.push(...encoder.encode("    " + chunk + "\n"));
-                                remaining = remaining.slice(wrapWidth);
-                            }
-                        }
+                        });
                     });
                 }
 
@@ -584,12 +586,20 @@ class ReceiptService {
                 const exclusions = item.excluded_toppings || [];
                 if (Array.isArray(exclusions) && exclusions.length > 0) {
                     exclusions.forEach((excl: any) => {
-                        const nameWidth = lineWidth - 4;
-                        let exclStr = `  - NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
+                        const icon = "  - ";
+                        const nameWidth = lineWidth - icon.length;
+                        let exclStr = `NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
                         if (excl.replacement) {
                             exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
                         }
-                        data.push(...encoder.encode(exclStr.slice(0, nameWidth).padEnd(nameWidth) + "\n"));
+                        const wrappedExcl = this.wrapText(exclStr, nameWidth);
+                        wrappedExcl.forEach((line, index) => {
+                            if (index === 0) {
+                                data.push(...encoder.encode(icon + line + "\n"));
+                            } else {
+                                data.push(...encoder.encode("    " + line + "\n"));
+                            }
+                        });
                     });
                 }
 
@@ -598,29 +608,41 @@ class ReceiptService {
                 if (Array.isArray(replacers) && replacers.length > 0) {
                     replacers.forEach((repl: any) => {
                         const nameWidth = lineWidth - 4 - 1 - 9;
-                        let replStr: string;
+                        let replContent: string;
+                        let icon: string;
+                        
                         if (repl.is_exclusion_only) {
-                            replStr = `  x ${repl.name}`;
+                            icon = "  x ";
+                            replContent = `${repl.name}`;
                         } else if (repl.ingredient_name) {
+                            icon = "  x ";
                             const ingName = repl.ingredient_name.toLowerCase().startsWith('no') 
                                 ? repl.ingredient_name 
                                 : `No ${repl.ingredient_name}`;
-                            replStr = `  x ${ingName} -> ${repl.name}`;
+                            replContent = `${ingName} -> ${repl.name}`;
                         } else {
-                            replStr = `  ~ ${repl.name}`;
+                            icon = "  ~ ";
+                            replContent = `${repl.name}`;
                         }
-                        const replNameStr = replStr.slice(0, nameWidth).padEnd(nameWidth);
+
+                        const wrappedRepl = this.wrapText(replContent, nameWidth);
                         const replPrice = Number(repl.price_adjustment || 0);
                         const replPriceStr = replPrice > 0 ? replPrice.toFixed(2).padStart(9) : "".padStart(9);
 
-                        data.push(...encoder.encode("    "));
-                        data.push(...encoder.encode(replNameStr));
-                        if (replPrice > 0 && !isKOT) {
-                            data.push(...encoder.encode(" "));
-                            data.push(...encoder.encode(`${replPriceStr}\n`));
-                        } else {
-                            data.push(...encoder.encode(isKOT ? "\n" : (" ".repeat(10) + "\n")));
-                        }
+                        wrappedRepl.forEach((line, index) => {
+                            if (index === 0) {
+                                data.push(...encoder.encode(icon));
+                                data.push(...encoder.encode(line.padEnd(nameWidth)));
+                                if (replPrice > 0 && !isKOT) {
+                                    data.push(...encoder.encode(" "));
+                                    data.push(...encoder.encode(`${replPriceStr}\n`));
+                                } else {
+                                    data.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n")));
+                                }
+                            } else {
+                                data.push(...encoder.encode("    " + line + "\n"));
+                            }
+                        });
                     });
                 }
             });
@@ -815,7 +837,7 @@ class ReceiptService {
                     <div class="bold" style="font-size: 16px;">ORDER #${order.daily_order_number || order.id.slice(0, 8)}</div>
                     <div class="small">${new Date(order.created_at).toLocaleString()}</div>
                     
-                    ${(order.customer || order.customer_name || order.customer_phone) ? `
+                    ${(order.customer || order.customer_name || order.customer_phone || order.customer_address || order.customer_postcode) ? `
                         <div class="mt-2 small" style="font-style: italic;">
                             <div class="bold">${order.customer?.full_name || order.customer_name || 'Guest'}</div>
                             ${(order.customer?.phone || order.customer_phone) ? `<div>${order.customer?.phone || order.customer_phone}</div>` : ''}

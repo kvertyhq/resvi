@@ -141,7 +141,7 @@ const PublicReceiptPage: React.FC = () => {
                         <p className="font-bold text-lg">Order #{order.daily_order_number || order.readable_id || order.id?.slice(0, 8)}</p>
                         <p className="text-gray-500 text-xs">{new Date(order.created_at).toLocaleString()}</p>
                         
-                        {(order.customer || order.customer_name || order.customer_phone) && (
+                        {(order.customer || order.customer_name || order.customer_phone || order.customer_address || order.customer_postcode) && (
                             <div className="mt-3 text-xs pt-2 border-t border-gray-100 italic">
                                 <p className="font-bold">{order.customer?.full_name || order.customer_name || 'Guest'}</p>
                                 { (order.customer?.phone || order.customer_phone) && <p>{order.customer?.phone || order.customer_phone}</p> }

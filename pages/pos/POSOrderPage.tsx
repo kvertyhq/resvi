@@ -693,24 +693,23 @@ const POSOrderPage: React.FC = () => {
 
             // For phone orders: the customer details are stored in selectedCustomer
             const callerPhone = isPhoneOrder ? (selectedCustomer?.phone || null) : null;
+            const isPhoneSearch = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
+            const extractedPhone = isPhoneSearch ? customerSearch : (selectedCustomer?.phone || callerPhone || null);
+            const extractedName = !isPhoneSearch && customerSearch ? customerSearch : (selectedCustomer?.full_name || selectedCustomer?.name || null);
 
             if (isWalkIn && (customerSearch || customerAddress || customerPostcode || callerPhone)) {
-                const isPhone = /^[+\d\s-]+$/.test(customerSearch) && customerSearch.length > 5;
-                const name = !isPhone && customerSearch ? customerSearch : (selectedCustomer?.full_name || selectedCustomer?.name || null);
-                const phone = isPhone ? customerSearch : (selectedCustomer?.phone || callerPhone || null);
-
                 if (finalCustomerId) {
                     // Update existing profile with address/phone/name if needed
                     await supabase.from('profiles').update({
-                        full_name: customerName || null,
+                        full_name: customerName || extractedName || null,
                         address: customerAddress || null,
                         postcode: customerPostcode || null,
-                        ...(phone && !selectedCustomer?.phone ? { phone } : {})
+                        ...(extractedPhone && !selectedCustomer?.phone ? { phone: extractedPhone } : {})
                     }).eq('id', finalCustomerId)
                         .eq('restaurant_id', settings?.id);
-                } else if (phone) {
+                } else if (extractedPhone) {
                     // Try to find an existing profile by phone number first
-                    const normalizedPhone = phone.replace(/\D/g, '');
+                    const normalizedPhone = extractedPhone.replace(/\D/g, '');
                     const { data: existingProfiles } = await supabase
                         .from('profiles')
                         .select('id, full_name, phone')
@@ -721,9 +720,9 @@ const POSOrderPage: React.FC = () => {
                     if (existingProfiles && existingProfiles.length > 0) {
                         finalCustomerId = existingProfiles[0].id;
                         // Update name if we now have one and they didn't before
-                        if (name && !existingProfiles[0].full_name) {
+                        if (extractedName && !existingProfiles[0].full_name) {
                             await supabase.from('profiles')
-                                .update({ full_name: name })
+                                .update({ full_name: extractedName })
                                 .eq('id', finalCustomerId)
                                 .eq('restaurant_id', settings?.id);
                         }
@@ -732,8 +731,8 @@ const POSOrderPage: React.FC = () => {
                         const { data: newProfile } = await supabase
                             .from('profiles')
                             .insert({
-                                full_name: customerName || name || 'Guest',
-                                phone: phone,
+                                full_name: customerName || extractedName || 'Guest',
+                                phone: extractedPhone,
                                 restaurant_id: settings?.id,
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
@@ -755,7 +754,8 @@ const POSOrderPage: React.FC = () => {
                 p_discount_amount: discountAmount || 0,
                 p_payment_method: method === 'unpaid' ? null : method,
                 p_payment_transaction_id: transactionId || null,
-                p_customer_name: (customerSearch && !/^[+\d\s-]+$/.test(customerSearch)) ? customerSearch : null,
+                p_customer_name: customerName || extractedName || null,
+                p_customer_phone: extractedPhone || null,
                 p_customer_address: customerAddress || null,
                 p_customer_postcode: customerPostcode || null,
                 p_order_type: isPhoneOrder ? (phoneOrderType || 'takeaway') : 'takeaway',

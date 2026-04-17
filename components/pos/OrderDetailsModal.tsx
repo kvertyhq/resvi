@@ -16,6 +16,8 @@ interface OrderItem {
     excluded_toppings?: any[];
     notes?: string;
     round_number?: number;
+    is_deal?: boolean;
+    parent_item_id?: string;
 }
 
 interface OrderDetailsModalProps {
@@ -105,7 +107,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                                     <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
                                 </div>
                                 <div className="space-y-3">
-                                    {rounds[roundNum].map((item) => (
+                                    {rounds[roundNum]
+                                        .filter(item => !item.parent_item_id) // Only show top-level items (deals or individuals)
+                                        .map((item) => (
                                         <div
                                             key={item.id}
                                             className="flex justify-between items-start p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 transition-colors"
@@ -145,6 +149,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, onClose, 
                                                         "{item.notes}"
                                                     </div>
                                                 )}
+                                                {/* Render deal selections if this is a deal parent */}
+                                                {item.is_deal && order.order_items?.filter(child => child.parent_item_id === item.id).map(child => (
+                                                    <div key={child.id} className="text-sm text-blue-600 dark:text-blue-400 mt-1 pl-6 flex justify-between">
+                                                        <span>• {child.name_snapshot || child.menu_item?.name}</span>
+                                                        {child.price_snapshot > 0 && (
+                                                            <span className="text-xs opacity-70">+{currency}{child.price_snapshot.toFixed(2)}</span>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                             <div className="font-semibold text-gray-900 dark:text-white ml-4">
                                                 {currency}{(item.price_snapshot * item.quantity).toFixed(2)}

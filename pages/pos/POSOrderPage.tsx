@@ -12,6 +12,7 @@ import { useOffline } from '../../context/OfflineContext';
 import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
+import DealFlowModal from '../../components/pos/DealFlowModal';
 import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
 import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
@@ -38,6 +39,9 @@ interface CartItem {
     isMiscellaneous?: boolean; // Flag for custom items
     station_id?: string; // Target station for this item
     category_id?: string; // Add this for tax calculation
+    isDeal?: boolean;
+    deal_id?: string;
+    selections?: any[];
 }
 
 
@@ -59,7 +63,15 @@ const POSOrderPage: React.FC = () => {
     // Check if this is a walk-in order
     const isWalkIn = tableId === 'walk-in';
 
-    const { categories, menuItems, itemModifiersMap, loading: menuLoading, isSyncing } = useMenu();
+    const { categories: rawCategories, menuItems, deals, itemModifiersMap, loading: menuLoading, isSyncing } = useMenu();
+    
+    const categories = useMemo(() => {
+        if (deals && deals.length > 0) {
+            return [{ id: 'deals-cat', name: 'Deals', color: 'var(--theme-color)' }, ...rawCategories];
+        }
+        return rawCategories;
+    }, [rawCategories, deals]);
+
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(false); // Action loading state
     const [tableName, setTableName] = useState('');
@@ -99,6 +111,9 @@ const POSOrderPage: React.FC = () => {
         exclusions?: any;
         replacers?: any;
     }>({});
+
+    const [isDealModalOpen, setIsDealModalOpen] = useState(false);
+    const [selectedDeal, setSelectedDeal] = useState<any>(null);
 
     // Discount State
     const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('percentage');
@@ -364,6 +379,12 @@ const POSOrderPage: React.FC = () => {
     };
 
     const handleItemClick = (item: any) => {
+        if (item.is_deal) {
+            setSelectedDeal(item);
+            setIsDealModalOpen(true);
+            return;
+        }
+
         // Revert back to original flow: open modal if item has options
         const hasOptions = itemModifiersMap.has(item.id) || (item.price_variants && item.price_variants.length > 1) || item.flags?.includes('half_half');
         
@@ -446,8 +467,28 @@ const POSOrderPage: React.FC = () => {
             return;
         }
 
+        // Correctly handle deals
+        if (item.isDeal) {
+            const newDeal: CartItem = {
+                tempId: crypto.randomUUID(),
+                id: null,
+                name: item.name,
+                basePrice: item.price,
+                price: finalPrice, // Includes price adjustments from selections
+                quantity: 1,
+                modifiers: [],
+                selections: item.selections,
+                isDeal: true,
+                deal_id: item.id,
+                course: 'Main',
+            };
+            setCartItems(prev => [...prev, newDeal]);
+            return;
+        }
+
         // Check if item with same ID, price, and modifiers already exists
         const existingItemIndex = cartItems.findIndex(cartItem => {
+            if (cartItem.isDeal) return false;
             if (cartItem.id !== item.id || cartItem.price !== finalPrice) return false;
             if (cartItem.modifiers.length !== modifiers.length) return false;
             
@@ -680,6 +721,9 @@ const POSOrderPage: React.FC = () => {
                 modifiers: item.modifiers,
                 excluded_toppings: item.excluded_toppings || [],
                 selected_replacers: item.selected_replacers || [],
+                is_deal: item.isDeal || false,
+                deal_id: item.deal_id || null,
+                deal_selections: item.selections || null,
                 notes: item.notes || null,
                 course: item.course,
                 is_miscellaneous: item.isMiscellaneous || false,
@@ -907,26 +951,32 @@ const POSOrderPage: React.FC = () => {
             }
 
             // 3. Create Order Items (New Items Only) - Only for table orders
-            const orderItems = cartItems.map(item => ({
-                order_id: orderId,
+            const orderItemsRaw = cartItems.map(item => ({
                 menu_item_id: item.isMiscellaneous ? null : item.id,
                 quantity: item.quantity,
-                price_snapshot: item.price,
-                selected_modifiers: item.modifiers,
+                price: item.price,
+                modifiers: item.modifiers,
                 excluded_toppings: item.excluded_toppings || [],
                 selected_replacers: item.selected_replacers || [],
+                is_deal: item.isDeal || false,
+                deal_id: item.deal_id || null,
+                deal_selections: item.selections || null,
                 notes: item.notes,
                 course_name: item.course,
-                round_number: currentRound,
                 is_miscellaneous: item.isMiscellaneous || false,
                 custom_item_name: item.isMiscellaneous ? item.name : null,
-                name_snapshot: item.name, // Always store the name
+                name_snapshot: item.name,
                 station_id: item.station_id
             }));
 
-            const { error: itemsError } = await supabase
-                .from('order_items')
-                .insert(orderItems);
+            const { data: addItemsResult, error: itemsError } = await supabase.rpc('add_items_to_order', {
+                p_order_id: orderId,
+                p_items: orderItemsRaw,
+                p_round_number: currentRound
+            });
+
+            if (itemsError) throw itemsError;
+            if (!(addItemsResult as any).success) throw new Error((addItemsResult as any).error || 'Failed to add items');
 
             if (itemsError) throw itemsError;
 
@@ -1017,7 +1067,12 @@ const POSOrderPage: React.FC = () => {
 
 
 
-    const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
+    const filteredItems = useMemo(() => {
+        if (selectedCategory === 'deals-cat') {
+            return deals.map(d => ({ ...d, is_deal: true }));
+        }
+        return menuItems.filter(item => item.category_id === selectedCategory);
+    }, [selectedCategory, menuItems, deals]);
 
     return (
         <div className="flex h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden relative transition-colors duration-300">
@@ -1037,6 +1092,13 @@ const POSOrderPage: React.FC = () => {
                 initialExclusions={initialModalData?.exclusions}
                 initialReplacers={initialModalData?.replacers}
                 initialReplacersArray={initialModalData?.replacersArray}
+            />
+
+            <DealFlowModal
+                isOpen={isDealModalOpen}
+                deal={selectedDeal}
+                onClose={() => setIsDealModalOpen(false)}
+                onComplete={addToCart}
             />
 
             <OrderUpdatedModal
@@ -1322,6 +1384,27 @@ const POSOrderPage: React.FC = () => {
                                             </div>
                                         )}
                                         {item.notes && <div className="text-xs text-orange-500 mt-1 italic">"{item.notes}"</div>}
+                                        {item.selections && item.selections.length > 0 && (
+                                            <div className="text-xs text-blue-500 mt-1 pl-2 border-l-2 border-blue-300 space-y-0.5">
+                                                {item.selections.map((sel: any, sIdx: number) => (
+                                                    <div key={sIdx}>
+                                                        <div className="flex justify-between font-medium">
+                                                            <span>{sel.group_name}: {sel.name} {sel.selected_variant ? `(${sel.selected_variant.name})` : ''}</span>
+                                                            {Number(sel.price_adjustment || 0) > 0 && (
+                                                                <span>+{settings?.currency || '$'}{Number(sel.price_adjustment).toFixed(2)}</span>
+                                                            )}
+                                                        </div>
+                                                        {sel.modifiers && sel.modifiers.length > 0 && (
+                                                            <div className="pl-2 text-[10px] text-blue-400 opacity-80">
+                                                                {sel.modifiers.map((m: any, mIdx: number) => (
+                                                                    <div key={mIdx}>+ {m.name}</div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1393,6 +1476,28 @@ const POSOrderPage: React.FC = () => {
                                             </div>
                                         </div>
 
+                                        {item.isDeal && item.selections && item.selections.length > 0 && (
+                                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 space-y-1 border-t border-blue-200 dark:border-blue-900/50 pt-1">
+                                                {item.selections.map((sel: any, sIdx: number) => (
+                                                    <div key={sIdx} className="flex justify-between items-start gap-2">
+                                                        <div className="flex-1">
+                                                            <span className="font-bold uppercase text-[10px] tracking-wider">{sel.group_name}: </span>
+                                                            <span className="font-medium">{sel.name}</span>
+                                                            {sel.modifiers && sel.modifiers.length > 0 && (
+                                                                <span className="text-[10px] text-gray-500 ml-1">
+                                                                    ({sel.modifiers.map((m: any) => m.name).join(', ')})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {Number(sel.price_adjustment || 0) > 0 && (
+                                                            <span className="font-mono text-gray-400 whitespace-nowrap">
+                                                                +{settings?.currency || '$'}{Number(sel.price_adjustment).toFixed(2)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         {item.modifiers && item.modifiers.length > 0 && (
                                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1 border-t border-gray-300 dark:border-gray-600 pt-1">
                                                 {(() => {

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronUp, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronUp, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw, Package, Tag } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -91,29 +91,74 @@ interface ReplacerItem {
     is_available: boolean;
 }
 
+interface MenuDeal {
+    id: string;
+    restaurant_id: string;
+    name: string;
+    description: string;
+    image_url: string;
+    pricing_type: 'fixed' | 'percentage_discount' | 'amount_discount';
+    price: number | null;
+    discount_value: number | null;
+    is_available: boolean;
+    order_index: number;
+    groups?: MenuDealGroup[];
+}
+
+interface MenuDealGroup {
+    id: string;
+    deal_id: string;
+    name: string;
+    min_selection: number;
+    max_selection: number;
+    order_index: number;
+    options?: MenuDealGroupOption[];
+}
+
+interface MenuDealGroupOption {
+    id: string;
+    deal_group_id: string;
+    menu_item_id: string | null;
+    category_id: string | null;
+    price_adjustment: number;
+}
+
 const MenuManagementPage: React.FC = () => {
     const { selectedRestaurantId } = useAdmin();
     const { showAlert, showConfirm } = useAlert();
-    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers' | 'replacers'>('items');
+    const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers' | 'replacers' | 'deals'>('items');
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [categorySearchQuery, setCategorySearchQuery] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
+    const [categorySearchQuery, setCategorySearchQuery] = useState('');
+    // Data State
+    const [categories, setCategories] = useState<MenuCategory[]>([]);
+    const [allCategories, setAllCategories] = useState<MenuCategory[]>([]);
+    const [items, setItems] = useState<MenuItem[]>([]);
+    const [itemsTotalCount, setItemsTotalCount] = useState(0);
+    const [allDealsItems, setAllDealsItems] = useState<MenuItem[]>([]);
 
     // Pagination State
-    const itemsPerPage = 10;
+    const itemsPerPage = 20;
     const [itemsPage, setItemsPage] = useState(1);
-    const [itemsTotalCount, setItemsTotalCount] = useState(0);
+    const [isFetchingMoreItems, setIsFetchingMoreItems] = useState(false);
+    const itemsObserverRef = useRef<IntersectionObserver | null>(null);
+    const lastItemRef = useCallback((node: HTMLTableRowElement | null) => {
+        if (loading || isFetchingMoreItems) return;
+        if (itemsObserverRef.current) itemsObserverRef.current.disconnect();
+        itemsObserverRef.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && items.length < itemsTotalCount) {
+                setItemsPage(prev => prev + 1);
+            }
+        });
+        if (node) itemsObserverRef.current.observe(node);
+    }, [loading, isFetchingMoreItems, items.length, itemsTotalCount]);
+
     const [categoriesPage, setCategoriesPage] = useState(1);
     const [categoriesTotalCount, setCategoriesTotalCount] = useState(0);
     const [addonsPage, setAddonsPage] = useState(1);
     const [addonsTotalCount, setAddonsTotalCount] = useState(0);
 
-    // Data State
-    const [categories, setCategories] = useState<MenuCategory[]>([]);
-    const [allCategories, setAllCategories] = useState<MenuCategory[]>([]);
-    const [items, setItems] = useState<MenuItem[]>([]);
-    
     // Suggestion logic for modifier price matrix
     const allUniqueVariantNames = useMemo(() => {
         const names = new Set<string>();
@@ -130,6 +175,7 @@ const MenuManagementPage: React.FC = () => {
     const [stations, setStations] = useState<Station[]>([]);
     const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
     const [replacerGroups, setReplacerGroups] = useState<ReplacerGroup[]>([]);
+    const [deals, setDeals] = useState<MenuDeal[]>([]);
     const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
     const [expandedReplacerGroupId, setExpandedReplacerGroupId] = useState<string | null>(null);
 
@@ -164,6 +210,14 @@ const MenuManagementPage: React.FC = () => {
     });
     const [replacerItemGroupId, setReplacerItemGroupId] = useState<string>('');
 
+    // Deal Modal State
+    const [isDealModalOpen, setIsDealModalOpen] = useState(false);
+    const [editingDeal, setEditingDeal] = useState<MenuDeal | null>(null);
+    const [dealForm, setDealForm] = useState<Partial<MenuDeal>>({
+        name: '', description: '', pricing_type: 'fixed', price: 0, discount_value: 0, is_available: true
+    });
+    const [dealGroups, setDealGroups] = useState<Partial<MenuDealGroup & { options: Partial<MenuDealGroupOption>[] }>[]>([]);
+
     // For size-based price matrix input (variant names derived from item being edited)
     const [priceMatrixVariants, setPriceMatrixVariants] = useState<string[]>([]);
 
@@ -196,6 +250,9 @@ const MenuManagementPage: React.FC = () => {
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
     const [editingAddon, setEditingAddon] = useState<Addon | null>(null);
     const [selectedAddonIds, setSelectedAddonIds] = useState<Set<string>>(new Set());
+    const [dealOptionSearchResults, setDealOptionSearchResults] = useState<{items: MenuItem[], loading: boolean}>({ items: [], loading: false });
+    const [activeDealOptionSearch, setActiveDealOptionSearch] = useState<{ gIdx: number, oIdx: number } | null>(null);
+    const [searchCoords, setSearchCoords] = useState<{ top: number, left: number, width: number } | null>(null);
 
     // Form State
     const [categoryForm, setCategoryForm] = useState<Partial<MenuCategory>>({
@@ -257,8 +314,10 @@ const MenuManagementPage: React.FC = () => {
     }, [activeTab]);
 
     useEffect(() => {
-        if (selectedRestaurantId) fetchItems();
-    }, [itemsPage, selectedCategoryId]);
+        if (selectedRestaurantId && activeTab === 'items') {
+            fetchItems();
+        }
+    }, [itemsPage]);
 
     useEffect(() => {
         if (selectedRestaurantId) fetchCategories();
@@ -271,7 +330,16 @@ const MenuManagementPage: React.FC = () => {
     const fetchData = async () => {
         if (!selectedRestaurantId) return;
         setLoading(true);
-        await Promise.all([fetchCategories(), fetchAllCategories(), fetchItems(), fetchAddons(), fetchStations(), fetchModifierGroups(), fetchReplacerGroups()]);
+        await Promise.all([
+            fetchCategories(), 
+            fetchAllCategories(), 
+            fetchItems(), 
+            fetchAddons(), 
+            fetchStations(), 
+            fetchModifierGroups(), 
+            fetchReplacerGroups(),
+            fetchDeals()
+        ]);
         setLoading(false);
     };
 
@@ -309,7 +377,7 @@ const MenuManagementPage: React.FC = () => {
                 .eq('restaurant_id', selectedRestaurantId)
                 .order('name');
 
-            if (groups) {
+            if (groups && groups.length > 0) {
                 // Load items for each group
                 const { data: allItems } = await supabase
                     .from('menu_modifier_items')
@@ -324,6 +392,29 @@ const MenuManagementPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Error fetching modifier groups:', error);
+        }
+    };
+
+    const searchItemsForDeal = async (query: string) => {
+        if (!selectedRestaurantId || !query || query.length < 2) {
+            setDealOptionSearchResults({ items: [], loading: false });
+            return;
+        }
+
+        setDealOptionSearchResults(prev => ({ ...prev, loading: true }));
+        try {
+            const { data, error } = await supabase
+                .from('menu_items')
+                .select('*')
+                .eq('restaurant_id', selectedRestaurantId)
+                .ilike('name', `%${query}%`)
+                .limit(10);
+
+            if (error) throw error;
+            setDealOptionSearchResults({ items: data || [], loading: false });
+        } catch (error) {
+            console.error('Error searching items:', error);
+            setDealOptionSearchResults({ items: [], loading: false });
         }
     };
 
@@ -351,6 +442,56 @@ const MenuManagementPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Error fetching replacer groups:', error);
+        }
+    };
+
+    const fetchDeals = async () => {
+        if (!selectedRestaurantId) return;
+        try {
+            const { data: dealsData } = await supabase
+                .from('menu_deals')
+                .select('*')
+                .eq('restaurant_id', selectedRestaurantId)
+                .order('order_index');
+
+            if (dealsData) {
+                // Load groups and options for each deal
+                const { data: allGroups } = await supabase
+                    .from('menu_deal_groups')
+                    .select('*')
+                    .in('deal_id', dealsData.map(d => d.id))
+                    .order('order_index');
+
+                if (allGroups && allGroups.length > 0) {
+                    const { data: allOptions } = await supabase
+                        .from('menu_deal_group_options')
+                        .select('*')
+                        .in('deal_group_id', allGroups.map(g => g.id));
+
+                    const dealsWithRelations = dealsData.map(deal => ({
+                        ...deal,
+                        groups: allGroups
+                            .filter(g => g.deal_id === deal.id)
+                            .map(group => ({
+                                ...group,
+                                options: (allOptions || []).filter(o => o.deal_group_id === group.id)
+                            }))
+                    }));
+                    setDeals(dealsWithRelations);
+
+                    // Fetch some items for initial dropdown values if needed
+                    const { data: initialItems } = await supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('restaurant_id', selectedRestaurantId)
+                        .limit(50);
+                    if (initialItems) setAllDealsItems(initialItems);
+                } else {
+                    setDeals(dealsData.map(d => ({ ...d, groups: [] })));
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching deals:', error);
         }
     };
 
@@ -665,9 +806,17 @@ const MenuManagementPage: React.FC = () => {
         if (error) console.error('Error fetching categories:', error);
     };
 
-    const fetchItems = async () => {
+    const fetchItems = async (isManualRefresh = false) => {
         if (!selectedRestaurantId) return;
-        setIsRefreshingItems(true);
+        
+        const isInitialLoad = !isFetchingMoreItems && itemsPage === 1;
+        
+        if (isInitialLoad) {
+            setIsRefreshingItems(true);
+        } else {
+            setIsFetchingMoreItems(true);
+        }
+
         const from = (itemsPage - 1) * itemsPerPage;
         const to = from + itemsPerPage - 1;
 
@@ -687,21 +836,33 @@ const MenuManagementPage: React.FC = () => {
 
         const { data, error, count } = await query.range(from, to);
 
-        if (data) setItems(data);
+        if (data) {
+            if (itemsPage === 1) {
+                setItems(data);
+            } else {
+                setItems(prev => [...prev, ...data]);
+            }
+        }
+        
         if (count !== null) setItemsTotalCount(count);
         if (error) console.error('Error fetching items:', error);
+        
         setIsRefreshingItems(false);
+        setIsFetchingMoreItems(false);
     };
 
     useEffect(() => {
         const timer = setTimeout(() => {
             if (selectedRestaurantId && activeTab === 'items') {
-                setItemsPage(1);
-                fetchItems();
+                if (itemsPage !== 1) {
+                    setItemsPage(1);
+                } else {
+                    fetchItems();
+                }
             }
         }, 400);
         return () => clearTimeout(timer);
-    }, [searchQuery, selectedCategoryId]);
+    }, [searchQuery, selectedCategoryId, activeTab]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -1179,6 +1340,106 @@ const MenuManagementPage: React.FC = () => {
         }
     };
 
+    const openDealModal = (deal?: MenuDeal) => {
+        if (deal) {
+            setEditingDeal(deal);
+            setDealForm(deal);
+            setDealGroups(deal.groups || []);
+        } else {
+            setEditingDeal(null);
+            setDealForm({
+                name: '',
+                description: '',
+                pricing_type: 'fixed',
+                price: 0,
+                discount_value: 0,
+                is_available: true,
+                order_index: deals.length
+            });
+            setDealGroups([{ name: 'Group 1', min_selection: 1, max_selection: 1, order_index: 0, options: [] }]);
+        }
+        setIsDealModalOpen(true);
+    };
+
+    const handleDealSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedRestaurantId) return;
+
+        const payload = {
+            restaurant_id: selectedRestaurantId,
+            name: dealForm.name,
+            description: dealForm.description,
+            pricing_type: dealForm.pricing_type,
+            price: dealForm.price,
+            discount_value: dealForm.discount_value,
+            is_available: dealForm.is_available,
+            order_index: dealForm.order_index,
+            image_url: dealForm.image_url || ''
+        };
+
+        try {
+            let dealId = editingDeal?.id;
+
+            if (editingDeal) {
+                await supabase.from('menu_deals').update(payload).eq('id', editingDeal.id);
+            } else {
+                const { data, error } = await supabase.from('menu_deals').insert([payload]).select().single();
+                if (error) throw error;
+                dealId = data.id;
+            }
+
+            if (dealId) {
+                // Delete existing groups (cascade will delete options)
+                await supabase.from('menu_deal_groups').delete().eq('deal_id', dealId);
+
+                // Insert groups and options
+                for (let i = 0; i < dealGroups.length; i++) {
+                    const group = dealGroups[i];
+                    const { data: grpData, error: grpError } = await supabase.from('menu_deal_groups').insert([{
+                        deal_id: dealId,
+                        name: group.name,
+                        min_selection: group.min_selection,
+                        max_selection: group.max_selection,
+                        order_index: i
+                    }]).select().single();
+
+                    if (grpError) throw grpError;
+
+                    if (group.options && group.options.length > 0) {
+                        const optionsToInsert = group.options.map(opt => ({
+                            deal_group_id: grpData.id,
+                            menu_item_id: opt.menu_item_id || null,
+                            category_id: opt.category_id || null,
+                            price_adjustment: opt.price_adjustment || 0,
+                            min_selection: opt.min_selection || 0,
+                            max_selection: opt.max_selection || null
+                        }));
+                        await supabase.from('menu_deal_group_options').insert(optionsToInsert);
+                    }
+                }
+            }
+
+            setIsDealModalOpen(false);
+            fetchDeals();
+            showAlert('Success', 'Deal saved successfully.', 'success');
+        } catch (error: any) {
+            console.error('Error saving deal:', error);
+            showAlert('Error', error.message || 'Failed to save deal.', 'error');
+        }
+    };
+
+    const handleDeleteDeal = async (id: string) => {
+        const confirmed = await showConfirm(
+            'Confirm Delete',
+            'Delete this deal? This will also delete all associated groups and rules.',
+            'warning'
+        );
+        if (confirmed) {
+            await supabase.from('menu_deals').delete().eq('id', id);
+            fetchDeals();
+        }
+    };
+
     if (!selectedRestaurantId) return <div className="text-center py-10 text-gray-500">Select a restaurant context</div>;
 
     return (
@@ -1236,11 +1497,18 @@ const MenuManagementPage: React.FC = () => {
                         </div>
                     )}
                     <button
-                        onClick={() => activeTab === 'categories' ? openCategoryModal() : activeTab === 'addons' ? openAddonModal() : activeTab === 'modifiers' ? openModifierGroupModal() : activeTab === 'replacers' ? openReplacerGroupModal() : openItemModal()}
+                        onClick={() => {
+                            if (activeTab === 'categories') openCategoryModal();
+                            else if (activeTab === 'addons') openAddonModal();
+                            else if (activeTab === 'modifiers') openModifierGroupModal();
+                            else if (activeTab === 'replacers') openReplacerGroupModal();
+                            else if (activeTab === 'deals') openDealModal();
+                            else openItemModal();
+                        }}
                         className="bg-brand-gold text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-600 transition-colors"
                     >
                         <Plus className="h-5 w-5 mr-2" />
-                        Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : activeTab === 'replacers' ? 'Replacer Group' : 'Item'}
+                        Add {activeTab === 'categories' ? 'Category' : activeTab === 'addons' ? 'Add-on' : activeTab === 'modifiers' ? 'Modifier Group' : activeTab === 'replacers' ? 'Replacer Group' : activeTab === 'deals' ? 'Deal' : 'Item'}
                     </button>
                 </div>
             </div>
@@ -1277,12 +1545,81 @@ const MenuManagementPage: React.FC = () => {
                 >
                     <Settings2 className="h-4 w-4 mr-2" /> Replacers
                 </button>
+                <button
+                    onClick={() => setActiveTab('deals')}
+                    className={`pb-2 px-4 font-medium text-sm flex items-center ${activeTab === 'deals' ? 'border-b-2 border-brand-gold text-brand-gold' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    <Package className="h-4 w-4 mr-2" /> Deals
+                </button>
             </div>
 
             {loading ? (
                 <div className="text-center py-10">Loading...</div>
             ) : (
                 <>
+                    {activeTab === 'deals' && (
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pricing</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Groups</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {deals.map((deal) => (
+                                            <tr key={deal.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <div className="flex items-center gap-3">
+                                                        {deal.image_url ? (
+                                                            <img src={deal.image_url} alt={deal.name} className="h-8 w-8 rounded-md object-cover" />
+                                                        ) : (
+                                                            <div className="h-8 w-8 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
+                                                                <Package className="h-4 w-4" />
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <div className="font-medium">{deal.name}</div>
+                                                            <div className="text-xs text-gray-500">{deal.description}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                                                    {deal.pricing_type.replace('_', ' ')}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                                                    {deal.pricing_type === 'fixed' 
+                                                        ? `£${deal.price?.toFixed(2)}` 
+                                                        : deal.pricing_type === 'percentage_discount'
+                                                            ? `${deal.discount_value}% Off`
+                                                            : `£${deal.discount_value?.toFixed(2)} Off`
+                                                    }
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {deal.groups?.length || 0} Groups
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${deal.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {deal.is_available ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button onClick={() => openDealModal(deal)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
+                                                    <button onClick={() => handleDeleteDeal(deal.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {deals.length === 0 && <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">No deals configured.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'categories' && (
                         <div className="bg-white rounded-lg shadow overflow-hidden">
                             <div className="overflow-x-auto">
@@ -1411,11 +1748,12 @@ const MenuManagementPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {items.map((item) => {
+                                        {items.map((item, index) => {
                                             const category = allCategories.find(c => c.id === item.category_id);
                                             const catName = category?.name || 'Unknown';
+                                            const isLastItem = index === items.length - 1;
                                             return (
-                                                <tr key={item.id}>
+                                                <tr key={item.id} ref={isLastItem ? lastItemRef : null}>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         {item.image_url ? (
                                                             <img src={item.image_url} alt={item.name} className="h-10 w-10 rounded-full object-cover" />
@@ -1464,69 +1802,18 @@ const MenuManagementPage: React.FC = () => {
                                 </table>
                             </div>
 
-                            {/* Pagination Controls for Items */}
-                            {itemsTotalCount > 0 && (
-                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-                                    <div className="flex flex-1 justify-between sm:hidden">
-                                        <button
-                                            onClick={() => setItemsPage(page => Math.max(page - 1, 1))}
-                                            disabled={itemsPage === 1}
-                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                                        >
-                                            Previous
-                                        </button>
-                                        <button
-                                            onClick={() => setItemsPage(page => Math.min(page + 1, Math.ceil(itemsTotalCount / itemsPerPage)))}
-                                            disabled={itemsPage === Math.ceil(itemsTotalCount / itemsPerPage)}
-                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                                        >
-                                            Next
-                                        </button>
-                                    </div>
-                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                                        <div>
-                                            <p className="text-sm text-gray-700">
-                                                Showing <span className="font-medium">{(itemsPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(itemsPage * itemsPerPage, itemsTotalCount)}</span> of{' '}
-                                                <span className="font-medium">{itemsTotalCount}</span> results
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                                                <button
-                                                    onClick={() => setItemsPage(page => Math.max(page - 1, 1))}
-                                                    disabled={itemsPage === 1}
-                                                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                                                >
-                                                    <span className="sr-only">Previous</span>
-                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                                                    </svg>
-                                                </button>
-                                                {Array.from({ length: Math.ceil(itemsTotalCount / itemsPerPage) }, (_, i) => i + 1).map((page) => (
-                                                    <button
-                                                        key={page}
-                                                        onClick={() => setItemsPage(page)}
-                                                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${itemsPage === page
-                                                            ? 'bg-brand-gold text-white focus:z-20'
-                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
-                                                            }`}
-                                                    >
-                                                        {page}
-                                                    </button>
-                                                ))}
-                                                <button
-                                                    onClick={() => setItemsPage(page => Math.min(page + 1, Math.ceil(itemsTotalCount / itemsPerPage)))}
-                                                    disabled={itemsPage === Math.ceil(itemsTotalCount / itemsPerPage)}
-                                                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                                                >
-                                                    <span className="sr-only">Next</span>
-                                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                                                    </svg>
-                                                </button>
-                                            </nav>
-                                        </div>
-                                    </div>
+                            {/* Infinite Scroll Loader */}
+                            {(isFetchingMoreItems) && (
+                                <div className="flex justify-center items-center py-6 bg-gray-50 border-t border-gray-100">
+                                    <Loader2 className="h-6 w-6 text-brand-gold animate-spin mr-2" />
+                                    <span className="text-sm font-medium text-gray-500">Loading more items...</span>
+                                </div>
+                            )}
+
+                            {/* End of list indicator */}
+                            {!isFetchingMoreItems && items.length > 0 && items.length >= itemsTotalCount && (
+                                <div className="text-center py-6 text-xs text-gray-400 border-t border-gray-50 italic">
+                                    Showing all {itemsTotalCount} items
                                 </div>
                             )}
                         </div>
@@ -2881,6 +3168,429 @@ const MenuManagementPage: React.FC = () => {
                                 </div>
                             </form>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Deal Modal */}
+            {isDealModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div 
+                        onScroll={() => {
+                            if (activeDealOptionSearch) setActiveDealOptionSearch(null);
+                        }}
+                        className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                    >
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-20">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {editingDeal ? 'Edit Deal' : 'Add New Deal'}
+                            </h3>
+                            <button onClick={() => setIsDealModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleDealSubmit} className="p-6 space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Deal Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={dealForm.name || ''} 
+                                            onChange={e => setDealForm({...dealForm, name: e.target.value})} 
+                                            required 
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                        <textarea 
+                                            value={dealForm.description || ''} 
+                                            onChange={e => setDealForm({...dealForm, description: e.target.value})} 
+                                            rows={2} 
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Pricing Type</label>
+                                            <select 
+                                                value={dealForm.pricing_type} 
+                                                onChange={e => setDealForm({...dealForm, pricing_type: e.target.value as any})} 
+                                                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                                            >
+                                                <option value="fixed">Fixed Price</option>
+                                                <option value="percentage_discount">Percentage Off</option>
+                                                <option value="amount_discount">Amount Off</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            {dealForm.pricing_type === 'fixed' ? (
+                                                <>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Deal Price (£)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        value={dealForm.price || 0} 
+                                                        onChange={e => setDealForm({...dealForm, price: parseFloat(e.target.value) || 0})} 
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-2" 
+                                                    />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Discount Value</label>
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        value={dealForm.discount_value || 0} 
+                                                        onChange={e => setDealForm({...dealForm, discount_value: parseFloat(e.target.value) || 0})} 
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-2" 
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                         <div className="flex items-center">
+                                            <input 
+                                                type="checkbox" 
+                                                id="deal_available" 
+                                                checked={dealForm.is_available} 
+                                                onChange={e => setDealForm({...dealForm, is_available: e.target.checked})} 
+                                                className="h-4 w-4 text-brand-gold border-gray-300 rounded" 
+                                            />
+                                            <label htmlFor="deal_available" className="ml-2 text-sm text-gray-900">Available</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <Tag className="h-5 w-5 text-brand-gold" />
+                                        Deal Selections (Groups)
+                                    </h4>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setDealGroups([...dealGroups, { name: `Group ${dealGroups.length + 1}`, min_selection: 1, max_selection: 1, options: [] }])} 
+                                        className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md flex items-center gap-1 hover:bg-indigo-100 transition-colors"
+                                    >
+                                        <Plus size={16} /> Add Group
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {dealGroups.map((group, gIdx) => (
+                                        <div key={gIdx} className="border border-gray-200 rounded-lg p-5 bg-gray-50 relative shadow-sm">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setDealGroups(dealGroups.filter((_, i) => i !== gIdx))} 
+                                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Group Name</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={group.name || ''} 
+                                                        onChange={e => {
+                                                            const updated = [...dealGroups];
+                                                            updated[gIdx].name = e.target.value;
+                                                            setDealGroups(updated);
+                                                        }} 
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm shadow-sm focus:ring-brand-gold focus:border-brand-gold" 
+                                                        placeholder="e.g. Choose 1 Main" 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Min Selection</label>
+                                                    <input 
+                                                        type="number" 
+                                                        min={0} 
+                                                        value={group.min_selection || 0} 
+                                                        onChange={e => {
+                                                            const updated = [...dealGroups];
+                                                            updated[gIdx].min_selection = parseInt(e.target.value) || 0;
+                                                            setDealGroups(updated);
+                                                        }} 
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm shadow-sm" 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Max Selection</label>
+                                                    <input 
+                                                        type="number" 
+                                                        min={1} 
+                                                        value={group.max_selection || 0} 
+                                                        onChange={e => {
+                                                            const updated = [...dealGroups];
+                                                            updated[gIdx].max_selection = parseInt(e.target.value) || 0;
+                                                            setDealGroups(updated);
+                                                        }} 
+                                                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm shadow-sm" 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-inner">
+                                                <table className="min-w-full divide-y divide-gray-100">
+                                                    <thead className="bg-gray-50">
+                                                        <tr>
+                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase">Choice (Item or Category)</th>
+                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase w-20 text-center">Min</th>
+                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase w-20 text-center">Max</th>
+                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase w-32">Price Adj.</th>
+                                                            <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-400 uppercase w-16"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100">
+                                                        {group.options?.map((opt, oIdx) => (
+                                                            <tr key={oIdx}>
+                                                                <td className="px-4 py-2 relative">
+                                                                    <div className="relative">
+                                                                        <div className={`flex items-center gap-2 border rounded-md px-3 py-2 text-sm bg-white transition-all shadow-sm ${activeDealOptionSearch?.gIdx === gIdx && activeDealOptionSearch?.oIdx === oIdx ? 'ring-2 ring-brand-gold/20 border-brand-gold bg-indigo-50/5' : 'border-gray-200 hover:border-gray-300'}`}>
+                                                                            <Search size={14} className={`${activeDealOptionSearch?.gIdx === gIdx && activeDealOptionSearch?.oIdx === oIdx ? 'text-brand-gold' : 'text-gray-400'}`} />
+                                                                            <input 
+                                                                                key={`${gIdx}-${oIdx}-${opt.menu_item_id || opt.category_id || 'none'}`}
+                                                                                type="text"
+                                                                                placeholder="Search item or pick category..."
+                                                                                defaultValue={(() => {
+                                                                                    if (opt.menu_item_id) {
+                                                                                        const found = items.find(i => i.id === opt.menu_item_id) || allDealsItems.find(i => i.id === opt.menu_item_id);
+                                                                                        return found?.name || 'Unknown Item';
+                                                                                    }
+                                                                                    if (opt.category_id) {
+                                                                                        const found = allCategories.find(c => c.id === opt.category_id);
+                                                                                        return found ? `Any from ${found.name}` : 'Unknown Category';
+                                                                                    }
+                                                                                    return '';
+                                                                                })()}
+                                                                                onFocus={(e) => {
+                                                                                    e.currentTarget.select();
+                                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                                    setSearchCoords({ top: rect.bottom, left: rect.left, width: rect.width });
+                                                                                    setActiveDealOptionSearch({ gIdx, oIdx });
+                                                                                }}
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value;
+                                                                                    // Recalculate position in case input size changes (rare but good practice)
+                                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                                    setSearchCoords({ top: rect.bottom, left: rect.left, width: rect.width });
+                                                                                    
+                                                                                    const timer = setTimeout(() => searchItemsForDeal(val), 300);
+                                                                                    return () => clearTimeout(timer);
+                                                                                }}
+                                                                                className="flex-1 outline-none bg-transparent font-medium text-gray-700"
+                                                                            />
+                                                                            <div className="flex items-center gap-1">
+                                                                                { (opt.menu_item_id || opt.category_id) && (
+                                                                                    <button 
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            const updated = [...dealGroups];
+                                                                                            updated[gIdx].options![oIdx] = { ...opt, menu_item_id: null, category_id: null };
+                                                                                            setDealGroups(updated);
+                                                                                        }}
+                                                                                        className="text-gray-300 hover:text-red-500 transition-colors p-0.5"
+                                                                                    >
+                                                                                        <XCircle size={14} />
+                                                                                    </button>
+                                                                                )}
+                                                                                <ChevronDown size={14} className={`text-gray-300 transition-transform ${activeDealOptionSearch?.gIdx === gIdx && activeDealOptionSearch?.oIdx === oIdx ? 'rotate-180 text-brand-gold' : ''}`} />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {activeDealOptionSearch?.gIdx === gIdx && activeDealOptionSearch?.oIdx === oIdx && searchCoords && (
+                                                                            <div 
+                                                                                style={{ 
+                                                                                    position: 'fixed', 
+                                                                                    top: `${searchCoords.top + 4}px`, 
+                                                                                    left: `${searchCoords.left}px`, 
+                                                                                    width: `${searchCoords.width}px` 
+                                                                                }}
+                                                                                className="bg-white border border-gray-100 rounded-lg shadow-2xl z-[9999] max-h-72 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                            >
+                                                                                <div className="sticky top-0 bg-gray-50/95 backdrop-blur-sm p-2 border-b border-gray-100 text-[10px] font-bold text-brand-gold uppercase tracking-widest px-4 py-1.5 flex items-center justify-between">
+                                                                                    Categories
+                                                                                    <Layers size={12} />
+                                                                                </div>
+                                                                                <div className="p-1">
+                                                                                    {allCategories.map(c => (
+                                                                                        <button
+                                                                                            key={c.id}
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                const updated = [...dealGroups];
+                                                                                                updated[gIdx].options![oIdx] = { ...opt, menu_item_id: null, category_id: c.id };
+                                                                                                setDealGroups(updated);
+                                                                                                setActiveDealOptionSearch(null);
+                                                                                            }}
+                                                                                            className={`w-full text-left px-4 py-2.5 text-sm rounded-md transition-colors flex items-center gap-3 ${opt.category_id === c.id ? 'bg-brand-gold/10 text-brand-gold font-bold' : 'hover:bg-gray-50 text-gray-600'}`}
+                                                                                        >
+                                                                                            <span className={`w-2 h-2 rounded-full ${c.color ? `bg-[${c.color}]` : 'bg-gray-200'}`} />
+                                                                                            Any from <b>{c.name}</b>
+                                                                                        </button>
+                                                                                    ))}
+                                                                                </div>
+
+                                                                                <div className="sticky top-[32px] bg-gray-50/95 backdrop-blur-sm p-2 border-b border-gray-100 text-[10px] font-bold text-brand-gold uppercase tracking-widest px-4 py-1.5 flex items-center justify-between mt-1">
+                                                                                    Menu Items
+                                                                                    <Utensils size={12} />
+                                                                                </div>
+                                                                                <div className="p-1">
+                                                                                    {dealOptionSearchResults.loading ? (
+                                                                                        <div className="p-6 text-center text-xs text-gray-400 flex flex-col items-center justify-center gap-2">
+                                                                                            <Loader2 size={20} className="animate-spin text-brand-gold opacity-50" /> 
+                                                                                            Searching menu...
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            {(dealOptionSearchResults.items.length > 0 ? dealOptionSearchResults.items : allDealsItems).map(i => (
+                                                                                                <button
+                                                                                                    key={i.id}
+                                                                                                    type="button"
+                                                                                                    onClick={() => {
+                                                                                                        const updated = [...dealGroups];
+                                                                                                        updated[gIdx].options![oIdx] = { ...opt, menu_item_id: i.id, category_id: null };
+                                                                                                        setDealGroups(updated);
+                                                                                                        setActiveDealOptionSearch(null);
+                                                                                                    }}
+                                                                                                    className={`w-full text-left px-4 py-2.5 text-sm rounded-md transition-colors flex items-center justify-between group ${opt.menu_item_id === i.id ? 'bg-brand-gold/10 text-brand-gold font-bold' : 'hover:bg-gray-50 text-gray-600'}`}
+                                                                                                >
+                                                                                                    <div className="flex flex-col">
+                                                                                                        <span>{i.name}</span>
+                                                                                                        {i.description && <span className="text-[10px] text-gray-400 font-normal line-clamp-1">{i.description}</span>}
+                                                                                                    </div>
+                                                                                                    <span className={`text-xs font-mono transition-opacity ${opt.menu_item_id === i.id ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`}>£{i.price.toFixed(2)}</span>
+                                                                                                </button>
+                                                                                            ))}
+                                                                                            {dealOptionSearchResults.items.length === 0 && allDealsItems.length === 0 && (
+                                                                                                <div className="p-8 text-center text-xs text-gray-400 italic flex flex-col items-center gap-2">
+                                                                                                    <Search size={24} className="opacity-20" />
+                                                                                                    Type to search menu items...
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        
+                                                                        {activeDealOptionSearch?.gIdx === gIdx && activeDealOptionSearch?.oIdx === oIdx && (
+                                                                            <div 
+                                                                                className="fixed inset-0 z-[90] bg-black/5" 
+                                                                                onClick={() => setActiveDealOptionSearch(null)}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-2">
+                                                                    <input 
+                                                                        type="number" 
+                                                                        min={0}
+                                                                        value={opt.min_selection || 0} 
+                                                                        onChange={e => {
+                                                                            const updated = [...dealGroups];
+                                                                            updated[gIdx].options![oIdx].min_selection = parseInt(e.target.value) || 0;
+                                                                            setDealGroups(updated);
+                                                                        }} 
+                                                                        placeholder="0"
+                                                                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs text-center font-medium shadow-sm focus:ring-1 focus:ring-brand-gold" 
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-2">
+                                                                    <input 
+                                                                        type="number" 
+                                                                        min={1}
+                                                                        value={opt.max_selection || ''} 
+                                                                        onChange={e => {
+                                                                            const updated = [...dealGroups];
+                                                                            updated[gIdx].options![oIdx].max_selection = e.target.value ? parseInt(e.target.value) : null;
+                                                                            setDealGroups(updated);
+                                                                        }} 
+                                                                        placeholder="None"
+                                                                        className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs text-center font-medium shadow-sm focus:ring-1 focus:ring-brand-gold" 
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-2">
+                                                                    <div className="relative rounded-md shadow-sm">
+                                                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
+                                                                            <span className="text-gray-400 text-xs text font-mono">£</span>
+                                                                        </div>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            step="0.01" 
+                                                                            value={opt.price_adjustment || 0} 
+                                                                            onChange={e => {
+                                                                                const updated = [...dealGroups];
+                                                                                updated[gIdx].options![oIdx].price_adjustment = parseFloat(e.target.value) || 0;
+                                                                                setDealGroups(updated);
+                                                                            }} 
+                                                                            className="w-full border border-gray-200 rounded-md pl-5 pr-2 py-1.5 text-xs font-mono" 
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-2 text-right">
+                                                                    <button 
+                                                                        type="button" 
+                                                                        onClick={() => {
+                                                                            const updated = [...dealGroups];
+                                                                            updated[gIdx].options = (updated[gIdx].options || []).filter((_, i) => i !== oIdx);
+                                                                            setDealGroups(updated);
+                                                                        }} 
+                                                                        className="text-gray-400 hover:text-red-500"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        <tr>
+                                                            <td colSpan={5} className="px-4 py-3 bg-gray-50/30">
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => {
+                                                                        const updated = [...dealGroups];
+                                                                        updated[gIdx].options = [...(updated[gIdx].options || []), { 
+                                                                            menu_item_id: null, 
+                                                                            category_id: null, 
+                                                                            price_adjustment: 0,
+                                                                            min_selection: 0,
+                                                                            max_selection: null
+                                                                        }];
+                                                                        setDealGroups(updated);
+                                                                    }} 
+                                                                    className="text-xs text-brand-gold font-bold flex items-center gap-1 hover:text-yellow-600"
+                                                                >
+                                                                    <Plus size={12} /> Add Choice
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {dealGroups.length === 0 && (
+                                        <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-lg text-gray-500">
+                                            No selections added. Click "Add Group" to start building this deal.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-3 pt-8 border-t border-gray-100">
+                                <button type="button" onClick={() => setIsDealModalOpen(false)} className="px-6 py-2.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button type="submit" className="px-10 py-2.5 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800 transition-colors font-bold shadow-sm">Save Deal</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

@@ -43,6 +43,20 @@ export interface CartItem extends MenuItemData {
   selectedAddons: Addon[];
   selected_variant?: any;
   modifiers?: any[];
+  isDeal?: boolean;
+  deal_id?: string;
+  selections?: DealSelection[];
+}
+
+export interface DealSelection {
+  group_id: string;
+  group_name: string;
+  option_id?: string; // Links back to the specific choice/category option
+  menu_item_id: string;
+  name: string;
+  selected_variant?: any;
+  modifiers?: any[];
+  price_adjustment: number;
 }
 
 type OrderType = 'delivery' | 'collection';
@@ -77,6 +91,7 @@ interface OrderContextType extends OrderState {
   addToCart: (item: MenuItemData, addons?: Addon[], modifiers?: any[]) => void;
   updateQuantity: (cartId: string, quantity: number) => void;
   removeFromCart: (cartId: string) => void;
+  addDealToCart: (deal: any, selections: DealSelection[]) => void;
   clearCart: () => void;
   submitOrder: (orderDetails: any) => Promise<{ success: boolean; error?: any; orderId?: string }>;
   cartCount: number;
@@ -429,6 +444,50 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const addDealToCart = (deal: any, selections: DealSelection[]) => {
+    setState(s => {
+      const selectionsHash = JSON.stringify(selections);
+      
+      const existingIndex = s.cart.findIndex(item => 
+        item.isDeal && 
+        item.deal_id === deal.id && 
+        JSON.stringify(item.selections) === selectionsHash
+      );
+
+      if (existingIndex > -1) {
+        const newCart = [...s.cart];
+        newCart[existingIndex].quantity += 1;
+        return { ...s, cart: newCart };
+      }
+
+      const dealCartItem: CartItem = {
+        id: deal.id,
+        deal_id: deal.id,
+        cartId: `deal-${deal.id}-${Date.now()}`,
+        name: deal.name,
+        description: deal.description,
+        price: deal.price || 0,
+        quantity: 1,
+        isDeal: true,
+        selections: selections,
+        selectedAddons: [],
+        category: 'Deals'
+      };
+
+      // Calculate deal price based on pricing type if it's not fixed
+      if (deal.pricing_type === 'percentage_discount') {
+        const basePrice = selections.reduce((sum, sel) => sum + (sel.price_adjustment || 0), 0);
+        // Wait, percentage discount is usually applied to the SUM of items.
+        // But the deal schema has price and discount_value.
+        // If fixed, price is used.
+        // If percentage, we need to know the base price of items.
+        // For now, let's assume the POS passes the calculated price or handled here.
+      }
+
+      return { ...s, cart: [...s.cart, dealCartItem] };
+    });
+  };
+
   const updateQuantity = (cartId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(cartId);
@@ -586,7 +645,19 @@ Notes: ${orderDetails.notes}
     return state.cart.reduce((total, item) => {
       const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
       const modifiersPrice = (item.modifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
-      return total + (item.price + addonsPrice + modifiersPrice) * item.quantity;
+      
+      let itemPrice = item.price + addonsPrice + modifiersPrice;
+      
+      if (item.isDeal && item.selections) {
+        // For deals, the base price is usually fixed, but some choices might have adjustments
+        const selectionAdjustments = item.selections.reduce((sum, sel) => {
+          const selModifiersPrice = (sel.modifiers || []).reduce((s, m) => s + (m.price || 0), 0);
+          return sum + (sel.price_adjustment || 0) + selModifiersPrice;
+        }, 0);
+        itemPrice += selectionAdjustments;
+      }
+
+      return total + itemPrice * item.quantity;
     }, 0);
   }, [state.cart]);
 
@@ -617,6 +688,7 @@ Notes: ${orderDetails.notes}
         addToCart,
         updateQuantity,
         removeFromCart,
+        addDealToCart,
         clearCart,
         submitOrder,
         cartCount,

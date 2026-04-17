@@ -27,7 +27,7 @@ const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick, onModifie
                 <button
                     key={item.id}
                     onClick={() => onItemClick(item)}
-                    className="bg-white dark:bg-gray-800 border-2 border-transparent hover:border-orange-500 rounded-xl p-4 flex flex-col items-start gap-2 h-40 shadow-sm hover:shadow-xl transition-all relative overflow-hidden group text-left"
+                    className="bg-white dark:bg-gray-800 border-2 border-transparent hover:border-[var(--theme-color)] rounded-xl p-4 flex flex-col items-start gap-2 h-40 shadow-sm hover:shadow-xl transition-all relative overflow-hidden group text-left"
                 >
                     {/* Background Image Overlay if available */}
                     {item.image_url && (
@@ -57,7 +57,7 @@ const POSMenuGrid: React.FC<POSMenuGridProps> = ({ items, onItemClick, onModifie
                         {item.description && (
                             <p className="text-gray-500 dark:text-gray-400 text-xs mt-1 line-clamp-2">{item.description}</p>
                         )}
-                        <div className="mt-auto pt-2 font-mono text-orange-400 text-xl font-bold">
+                        <div className="mt-auto pt-2 font-mono text-[var(--theme-color)] text-xl font-bold">
                             {settings?.currency || '$'}{Number(item.price).toFixed(2)}
                         </div>
                     </div>

@@ -13,6 +13,7 @@ interface MenuContextType {
     replacerGroups: any[];
     replacerItems: any[];
     menuItemReplacers: any[];
+    deals: any[];
     loading: boolean;
 
     isSyncing: boolean;
@@ -30,6 +31,7 @@ const MenuContext = createContext<MenuContextType>({
     replacerGroups: [],
     replacerItems: [],
     menuItemReplacers: [],
+    deals: [],
     loading: true,
 
     isSyncing: false,
@@ -48,6 +50,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [replacerGroups, setReplacerGroups] = useState<any[]>([]);
     const [replacerItems, setReplacerItems] = useState<any[]>([]);
     const [menuItemReplacers, setMenuItemReplacers] = useState<any[]>([]);
+    const [deals, setDeals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isSyncing, setIsSyncing] = useState(false);
@@ -82,6 +85,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setReplacerGroups(JSON.parse(cachedData).replacerGroups || []);
                 setReplacerItems(JSON.parse(cachedData).replacerItems || []);
                 setMenuItemReplacers(JSON.parse(cachedData).menuItemReplacers || []);
+                setDeals(JSON.parse(cachedData).deals || []);
                 setLoading(false);
             } catch (e) {
 
@@ -99,16 +103,19 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSyncing(true);
         try {
             // 1. Categories & Items (Parallel)
-            const [catRes, itemRes] = await Promise.all([
+            const [catRes, itemRes, dealRes] = await Promise.all([
                 supabase.from('menu_categories').select('id, name, description, order_index, tax_rate, color').eq('restaurant_id', restaurantId).order('order_index'),
-                supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).eq('is_available', true)
+                supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).eq('is_available', true),
+                supabase.from('menu_deals').select('*, groups:menu_deal_groups(*, options:menu_deal_group_options(*))').eq('restaurant_id', restaurantId).eq('is_available', true)
             ]);
 
             if (catRes.error) throw catRes.error;
             if (itemRes.error) throw itemRes.error;
+            if (dealRes && (dealRes as any).error) throw (dealRes as any).error;
 
             const catData = catRes.data || [];
             const itemData = itemRes.data || [];
+            const dealData = (dealRes as any)?.data || [];
 
             // 2. Modifiers & Links & Items (Parallel)
             let modSet = new Set<string>();
@@ -189,6 +196,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setReplacerGroups(replGroupsData);
             setReplacerItems(replItemsData);
             setMenuItemReplacers(replLinksData);
+            setDeals(dealData);
             setLoading(false);
 
             // Save to Cache
@@ -204,6 +212,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 replacerGroups: replGroupsData,
                 replacerItems: replItemsData,
                 menuItemReplacers: replLinksData,
+                deals: dealData,
                 timestamp: Date.now()
             }));
 
@@ -227,6 +236,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
             replacerGroups,
             replacerItems,
             menuItemReplacers,
+            deals,
             loading, 
             isSyncing,
             refreshMenu 

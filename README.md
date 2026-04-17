@@ -23,27 +23,74 @@ Important
 alter publication supabase_realtime add table call_logs;
 
 
-# Tauri Auto Updater
+# Releasing and Signing (Windows)
 
-`npx tauri signer generate -w src-tauri/signer.key`
+To build a production-ready Windows application that is signed (to avoid "Unknown Publisher" warnings) and supports the auto-updater, follow these steps.
 
-Save the **Public Key** it outputs and paste it into `src-tauri/tauri.conf.json` where I wrote `"SET_YOUR_PUBLIC_KEY_HERE"`.
+## 1. Prerequisites
 
-You need a simple JSON file hosted at the `endpoints` URL
+- **OpenSSL/Keytool**: For certificate management.
+- **Windows SDK**: Specifically `signtool.exe` (installed with "Desktop development with C++" in Visual Studio).
+- **Node.js**: v22+.
 
+## 2. Setup Signing Keys
+
+### A. Windows Authenticode (The .exe/.msi signature)
+1. Place your `.pfx` or `.p12` certificate file in the project root (e.g., `codesigning.pfx`).
+2. Add the following to your `.env.local`:
+   ```env
+   SIG_CERTIFICATE=codesigning.pfx
+   SIG_PASSWORD=your_certificate_password
+   ```
+
+### B. Tauri Updater (The update payload signature)
+1. Generate a signing key if you haven't already:
+   `npx tauri signer generate -w src-tauri/signer.key`
+2. Save the **Public Key** it outputs and paste it into `src-tauri/tauri.conf.json`:
+   ```json
+   "plugins": {
+     "updater": {
+       "pubkey": "YOUR_PUBLIC_KEY_HERE",
+       ...
+     }
+   }
+   ```
+3. Copy the content of `src-tauri/signer.key` and add it to your `.env.local`:
+   ```env
+   TAURI_SIGNING_PRIVATE_KEY="untrusted comment: minisign private key: ..."
+   TAURI_SIGNING_PRIVATE_KEY_PASSWORD=your_optional_password
+   ```
+
+## 3. Build the Application
+
+Run the customized build script which loads your `.env.local` and validates the signing configuration:
+
+```bash
+npm run tauri:build
+```
+
+The script will:
+1. Sync the version from `package.json` to `tauri.conf.json`.
+2. Load environment variables.
+3. Run `tauri build`.
+4. Use `scripts/sign.js` to automatically sign the resulting bundles using `signtool.exe`.
+
+## 4. Distributing Updates
+
+You need a simple JSON file hosted at the `endpoints` URL defined in `tauri.conf.json`:
+
+```json
 {
-  "version": "1.0.1",
-  "notes": "Bug fixes and font scaling updates!",
+  "version": "1.0.2",
+  "notes": "Feature updates and bug fixes!",
   "pub_date": "2024-03-23T00:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "...",
-      "url": "https://your-domain.com/updates/app-1.0.1.msi.zip"
+      "url": "https://your-domain.com/updates/app-1.0.2.msi.zip"
     }
   }
 }
-
-**Build with Signing** : When you run `npm run tauri build`, you must set these environment variables so Tauri can sign the bundle:
-
-* `TAURI_SIGNING_PRIVATE_KEY` (The content of your `.key` file)
-* `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (If you used one)
+```
+> [!TIP]
+> The `signature` for the updater JSON is found in the console output after a successful `npm run tauri:build`.

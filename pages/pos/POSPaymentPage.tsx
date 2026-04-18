@@ -82,9 +82,15 @@ const POSPaymentPage: React.FC = () => {
                     *, 
                     table_info(table_name),
                     order_items (
+                        id,
+                        parent_item_id,
+                        is_deal,
                         quantity,
-                        menu_items ( name, price ),
-                        selected_modifiers
+                        name_snapshot,
+                        price_snapshot,
+                        selected_modifiers,
+                        excluded_toppings,
+                        selected_replacers
                     )
                 `)
                 .eq('id', orderId)
@@ -209,6 +215,64 @@ const POSPaymentPage: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
+                    {/* Itemized Bill */}
+                    <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Order Items</h3>
+                    <div className="mb-6">
+                        {(() => {
+                            const rootItems = order.order_items.filter((i: any) => !i.parent_item_id);
+                            const allChildren = order.order_items.filter((i: any) => i.parent_item_id);
+
+                            const renderPaymentItem = (item: any, isChild: boolean = false) => (
+                                <div key={item.id} className={`bg-white dark:bg-gray-800 p-3 rounded mb-2 text-sm shadow-sm border border-gray-100 dark:border-gray-700 ${isChild ? 'ml-6 border-l-4 border-l-blue-400 opacity-90' : ''}`}>
+                                    <div className="flex justify-between">
+                                        <div className="flex-1">
+                                            <div className="font-bold text-gray-900 dark:text-white capitalize">
+                                                {item.quantity}x {item.name_snapshot}
+                                            </div>
+                                            {/* Meta Data */}
+                                            <div className="text-[10px] text-gray-500 mt-0.5 space-y-0.5">
+                                                {item.selected_modifiers?.map((m: any, i: number) => (
+                                                    <div key={i}>+ {m.name}</div>
+                                                ))}
+                                                {item.excluded_toppings?.map((excl: any, i: number) => (
+                                                    <div key={i} className="text-red-400">- NO {excl.name}</div>
+                                                ))}
+                                                {item.selected_replacers?.map((repl: any, i: number) => (
+                                                    <div key={i} className="text-red-600">✕ {repl.name}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <span className="font-bold text-gray-600 dark:text-gray-400">
+                                        {(() => {
+                                            const q = Number(item.quantity || 1);
+                                            const p = Number(item.price_snapshot || 0);
+                                            const lineTotal = q * p;
+                                            return (isChild && lineTotal <= 0) ? '' : currency + lineTotal.toFixed(2);
+                                        })()}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+
+                            const result: React.ReactNode[] = [];
+                            rootItems.forEach(item => {
+                                result.push(renderPaymentItem(item));
+                                allChildren.filter(c => c.parent_item_id === item.id).forEach(c => {
+                                    result.push(renderPaymentItem(c, true));
+                                });
+                            });
+
+                            // Orphans
+                            const rootIds = new Set(rootItems.map(i => i.id));
+                            allChildren.filter(c => !rootIds.has(c.parent_item_id)).forEach(c => {
+                                result.push(<div key={`orphan-label-${c.id}`} className="text-[9px] text-gray-400 uppercase font-black ml-6 mb-1">(PART OF DEAL)</div>);
+                                result.push(renderPaymentItem(c, true));
+                            });
+
+                            return result;
+                        })()}
+                    </div>
+
                     <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Payment History</h3>
                     {payments.length === 0 ? (
                         <p className="text-gray-500 dark:text-gray-600 text-sm">No payments yet.</p>

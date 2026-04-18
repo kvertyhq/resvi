@@ -10,9 +10,10 @@ interface DealFlowModalProps {
     isOpen: boolean;
     onClose: () => void;
     onComplete: (deal: any, selections: DealSelection[], totalPrice: number) => void;
+    initialSelections?: DealSelection[];
 }
 
-const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, onComplete }) => {
+const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, onComplete, initialSelections }) => {
     const { menuItems, categories, itemModifiersMap } = useMenu();
     const { showAlert } = useAlert();
 
@@ -32,10 +33,21 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
     useEffect(() => {
         if (isOpen) {
             setCurrentGroupIdx(0);
-            setSelections({});
             setActiveOptionId(null);
+            
+            if (initialSelections && initialSelections.length > 0) {
+                // Map flat array back to Record<groupId, DealSelection[]>
+                const grouped: Record<string, DealSelection[]> = {};
+                initialSelections.forEach(sel => {
+                    if (!grouped[sel.group_id]) grouped[sel.group_id] = [];
+                    grouped[sel.group_id].push(sel);
+                });
+                setSelections(grouped);
+            } else {
+                setSelections({});
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialSelections]);
 
     const handleItemClick = (item: any, option: any) => {
         const groupSelections = selections[currentGroup.id] || [];

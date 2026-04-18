@@ -126,25 +126,89 @@ const POSPrintLocalPage: React.FC = () => {
 
                 {/* Items */}
                 <div className="space-y-2 mb-6 border-b border-dashed border-black pb-4">
-                    {items.map((item: any, i: number) => (
-                        <div key={i}>
-                            <div className="flex justify-between font-bold">
-                                <span>{item.quantity}x {item.name}</span>
-                                <span>{(item.price * item.quantity).toFixed(2)}</span>
-                            </div>
-                            {item.modifiers?.map((mod: any, j: number) => (
-                                <div key={j} className="flex justify-between text-xs pl-4 italic">
-                                    <span>
-                                        + {mod.name} 
-                                        {mod.location && mod.location !== 'whole' && ` (${mod.location})`}
-                                        {mod.intensity && mod.intensity !== 'normal' && ` (${mod.intensity})`}
-                                    </span>
-                                    {mod.price > 0 && <span>{mod.price.toFixed(2)}</span>}
+                    {(() => {
+                        const renderLocalItem = (item: any, isChild: boolean = false) => {
+                            const uniqueKey = item.id || item.tempId || Math.random().toString();
+                            return (
+                                <div key={uniqueKey} className="mb-2">
+                                    <div className={`flex justify-between font-bold ${isChild ? 'pl-4 text-[13px] text-gray-700' : ''}`}>
+                                        <span>{item.quantity || 1}x {item.name || item.name_snapshot}</span>
+                                        <span>{(() => {
+                                            const q = Number(item.quantity || 1);
+                                            const p = Number(item.price || item.price_snapshot || 0);
+                                            const lineTotal = q * p;
+                                            return (isChild && lineTotal <= 0) ? '' : lineTotal.toFixed(2);
+                                        })()}</span>
+                                    </div>
+                                    
+                                    {/* Unified Meta Details Rendering */}
+                                    <div className="space-y-0.5">
+                                        {/* Modifiers */}
+                                        {(item.selected_modifiers || item.modifiers)?.map((mod: any, j: number) => (
+                                            <div key={j} className={`flex justify-between text-[11px] italic text-gray-600 ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                <span>
+                                                    + {mod.modifier_group_name || mod.group_name ? `${mod.modifier_group_name || mod.group_name}: ` : ''}{mod.name} 
+                                                </span>
+                                                {mod.price > 0 && <span>{mod.price.toFixed(2)}</span>}
+                                            </div>
+                                        ))}
+                                        
+                                        {/* Exclusions */}
+                                        {item.excluded_toppings?.map((excl: any, j: number) => (
+                                            <div key={`excl-${j}`} className={`flex justify-between text-[11px] text-red-500 italic ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                <span>- NO {excl.name}</span>
+                                            </div>
+                                        ))}
+
+                                        {/* Replacers */}
+                                        {item.selected_replacers?.map((repl: any, j: number) => (
+                                            <div key={`repl-${j}`} className={`flex justify-between text-[11px] text-red-600 italic ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                <span>✕ {repl.name}</span>
+                                                {Number(repl.price_adjustment) > 0 && (
+                                                    <span className="text-gray-400">{Number(repl.price_adjustment).toFixed(2)}</span>
+                                                )}
+                                            </div>
+                                        ))}
+
+                                        {item.notes && <p className={`text-[11px] text-blue-600 mt-0.5 italic ${isChild ? 'pl-8' : 'pl-4'}`}>"{item.notes}"</p>}
+                                    </div>
                                 </div>
-                            ))}
-                            {item.notes && <p className="text-xs pl-4 text-gray-600 mt-1 italic">"{item.notes}"</p>}
-                        </div>
-                    ))}
+                            );
+                        };
+
+                        // 1. Identify Saved Components (Hierarchy from parent_item_id)
+                        const rootItems = items.filter((i: any) => !i.parent_item_id);
+                        const allChildren = items.filter((i: any) => i.parent_item_id);
+                        const rootIds = new Set(rootItems.map(i => i.id));
+
+                        const components: React.ReactNode[] = [];
+
+                        rootItems.forEach(item => {
+                            components.push(renderLocalItem(item));
+                            
+                            // A: Check for children in basic items (Saved Deal components)
+                            if (item.id) {
+                                allChildren.filter(c => c.parent_item_id === item.id).forEach(c => {
+                                    components.push(renderLocalItem(c, true));
+                                });
+                            }
+
+                            // B: Check for in-memory selections (Unsaved Deal components)
+                            if (item.isDeal && item.selections && Array.isArray(item.selections)) {
+                                item.selections.forEach((sel: any) => {
+                                    components.push(renderLocalItem(sel, true));
+                                });
+                            }
+                        });
+
+                        // 2. Orphans (Children whose parent is missing)
+                        allChildren.filter(c => !rootIds.has(c.parent_item_id)).forEach(c => {
+                            components.push(<div key={`orphan-label-${c.id}`} className="text-[10px] text-gray-400 pl-4 font-bold uppercase">(PART OF DEAL)</div>);
+                            components.push(renderLocalItem(c));
+                        });
+
+                        return components;
+                    })()}
                 </div>
 
                 {/* Totals */}

@@ -499,7 +499,11 @@ class ReceiptService {
             ];
 
             // 3. Items
-            items.forEach((item: any) => {
+            const rootItems = items.filter(i => !i.parent_item_id);
+            const allChildren = items.filter(i => i.parent_item_id);
+
+            const renderRawItem = (item: any, isChild: boolean = false) => {
+                const innerData: number[] = [];
                 const itemName = item.name_snapshot || item.name || 'Unknown Item';
                 const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
 
@@ -511,35 +515,44 @@ class ReceiptService {
                     const rowLimit = Math.floor(lineWidth / 2); // printer width is halved in double-size mode
                     const wrappedNames = this.wrapText(itemName, rowLimit - qtyStr.length);
                     
-                    data.push(...[27, 33, 48]); // Double width & height
+                    innerData.push(...[27, 33, 48]); // Double width & height
                     wrappedNames.forEach((line, index) => {
                         if (index === 0) {
-                            data.push(...encoder.encode(`${qtyStr}${line}\n`));
+                            innerData.push(...encoder.encode(`${qtyStr.slice(0, 4)}${line}\n`));
                         } else {
-                            data.push(...encoder.encode(`    ${line}\n`)); // 4-char indent (matching qty column)
+                            innerData.push(...encoder.encode(`    ${line}\n`)); // 4-char indent (matching qty column)
                         }
                     });
-                    data.push(...[27, 33, 0]); // Normal size
+                    innerData.push(...[27, 33, 0]); // Normal size
                 } else {
                     // Wrapping item name: first line has qty + name + price, continuation lines indent
-                    const nameWidth = lineWidth - 4 - 1 - 9; // available chars for name on first line
+                    const indentStr = isChild ? "    " : "";
+                    const prefixWidth = (isChild ? 4 : 4); // Both use 4 chars for qty
+                    const nameWidth = lineWidth - prefixWidth - (isChild ? 4 : 0) - 1 - 9; // Indent child name extra
+                    
                     const priceValStr = itemPrice.toFixed(2).padStart(9);
                     const wrappedNames = this.wrapText(itemName, nameWidth);
 
                     wrappedNames.forEach((line, index) => {
                         if (index === 0) {
-                            data.push(...encoder.encode(qtyStr));
-                            data.push(...encoder.encode(line.padEnd(nameWidth)));
-                            data.push(...encoder.encode(" "));
-                            data.push(...encoder.encode(`${priceValStr}\n`));
+                            if (isChild) innerData.push(...encoder.encode("  ")); // extra indent for child
+                            innerData.push(...encoder.encode(qtyStr.slice(0, 4)));
+                            innerData.push(...encoder.encode(line.padEnd(nameWidth)));
+                            innerData.push(...encoder.encode(" "));
+                            innerData.push(...encoder.encode(`${priceValStr}\n`));
                         } else {
-                            // Wrap remaining text with 4-char indent
-                            const continuationLines = this.wrapText(line, lineWidth - 4);
+                            // Wrap remaining text with indent
+                            const extraIndent = isChild ? 6 : 4;
+                            const continuationLines = this.wrapText(line, lineWidth - extraIndent);
                             continuationLines.forEach(cl => {
-                                data.push(...encoder.encode("    " + cl + "\n"));
+                                innerData.push(...encoder.encode(" ".repeat(extraIndent) + cl + "\n"));
                             });
                         }
                     });
+                }
+
+                if (isChild && !isKOT) {
+                    // Optional label for clarity if needed, but indentation is usually enough
                 }
 
                 // Modifiers / Addons
@@ -557,36 +570,36 @@ class ReceiptService {
                         const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
                         const fullText = `+ ${groupName}: ${names}`;
                         
-                        const nameWidth = lineWidth - 4 - 1 - 9; // available for modifier text on first line
+                        const metaIndent = isChild ? 6 : 4;
+                        const nameWidth = lineWidth - metaIndent - 1 - 9; // available for modifier text on first line
                         const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
                         const wrappedLines = this.wrapText(fullText, nameWidth);
 
                         wrappedLines.forEach((line, index) => {
                             if (index === 0) {
-                                data.push(...encoder.encode("    "));
-                                data.push(...encoder.encode(line.padEnd(nameWidth)));
+                                innerData.push(...encoder.encode(" ".repeat(metaIndent)));
+                                innerData.push(...encoder.encode(line.padEnd(nameWidth)));
                                 if (totalGroupPrice > 0 && !isKOT) {
-                                    data.push(...encoder.encode(" "));
-                                    data.push(...encoder.encode(`${priceStr}\n`));
+                                    innerData.push(...encoder.encode(" "));
+                                    innerData.push(...encoder.encode(`${priceStr}\n`));
                                 } else {
-                                    data.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n"))); // 1 space + 9 price
+                                    innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n"))); // 1 space + 9 price
                                 }
                             } else {
-                                // Continuation lines for modifier text use full available width
-                                const continuationLines = this.wrapText(line, lineWidth - 4);
+                                const continuationLines = this.wrapText(line, lineWidth - metaIndent);
                                 continuationLines.forEach(cl => {
-                                    data.push(...encoder.encode("    " + cl + "\n"));
+                                    innerData.push(...encoder.encode(" ".repeat(metaIndent) + cl + "\n"));
                                 });
                             }
                         });
                     });
                 }
 
-                // Excluded Toppings (New)
+                // Excluded Toppings
                 const exclusions = item.excluded_toppings || [];
                 if (Array.isArray(exclusions) && exclusions.length > 0) {
                     exclusions.forEach((excl: any) => {
-                        const icon = "  - ";
+                        const icon = isChild ? "    - " : "  - ";
                         const nameWidth = lineWidth - icon.length;
                         let exclStr = `NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
                         if (excl.replacement) {
@@ -595,9 +608,9 @@ class ReceiptService {
                         const wrappedExcl = this.wrapText(exclStr, nameWidth);
                         wrappedExcl.forEach((line, index) => {
                             if (index === 0) {
-                                data.push(...encoder.encode(icon + line + "\n"));
+                                innerData.push(...encoder.encode(icon + line + "\n"));
                             } else {
-                                data.push(...encoder.encode("    " + line + "\n"));
+                                innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
                             }
                         });
                     });
@@ -607,21 +620,22 @@ class ReceiptService {
                 const replacers = item.selected_replacers || [];
                 if (Array.isArray(replacers) && replacers.length > 0) {
                     replacers.forEach((repl: any) => {
-                        const nameWidth = lineWidth - 4 - 1 - 9;
+                        const replIndent = isChild ? 6 : 4;
+                        const nameWidth = lineWidth - replIndent - 1 - 9;
                         let replContent: string;
                         let icon: string;
                         
                         if (repl.is_exclusion_only) {
-                            icon = "  x ";
+                            icon = isChild ? "    x " : "  x ";
                             replContent = `${repl.name}`;
                         } else if (repl.ingredient_name) {
-                            icon = "  x ";
+                            icon = isChild ? "    x " : "  x ";
                             const ingName = repl.ingredient_name.toLowerCase().startsWith('no') 
                                 ? repl.ingredient_name 
                                 : `No ${repl.ingredient_name}`;
                             replContent = `${ingName} -> ${repl.name}`;
                         } else {
-                            icon = "  ~ ";
+                            icon = isChild ? "    ~ " : "  ~ ";
                             replContent = `${repl.name}`;
                         }
 
@@ -631,20 +645,37 @@ class ReceiptService {
 
                         wrappedRepl.forEach((line, index) => {
                             if (index === 0) {
-                                data.push(...encoder.encode(icon));
-                                data.push(...encoder.encode(line.padEnd(nameWidth)));
+                                innerData.push(...encoder.encode(icon));
+                                innerData.push(...encoder.encode(line.padEnd(nameWidth)));
                                 if (replPrice > 0 && !isKOT) {
-                                    data.push(...encoder.encode(" "));
-                                    data.push(...encoder.encode(`${replPriceStr}\n`));
+                                    innerData.push(...encoder.encode(" "));
+                                    innerData.push(...encoder.encode(`${replPriceStr}\n`));
                                 } else {
-                                    data.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n")));
+                                    innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n")));
                                 }
                             } else {
-                                data.push(...encoder.encode("    " + line + "\n"));
+                                innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
                             }
                         });
                     });
                 }
+
+                return innerData;
+            };
+
+            rootItems.forEach(item => {
+                data.push(...renderRawItem(item));
+                const children = allChildren.filter(c => c.parent_item_id === item.id);
+                children.forEach(c => {
+                    data.push(...renderRawItem(c, true));
+                });
+            });
+
+            // Handle orphans
+            const rootIds = new Set(rootItems.map(i => i.id));
+            allChildren.filter(c => !rootIds.has(c.parent_item_id)).forEach(c => {
+                data.push(...encoder.encode(" (PART OF DEAL)\n"));
+                data.push(...renderRawItem(c));
             });
 
             // 4. Totals Breakdown (Skip for KOT)
@@ -852,47 +883,131 @@ class ReceiptService {
                 </div>
 
                 <div class="mb-4">
-                    ${items.map(item => `
-                        <div class="flex bold ${isKOT ? "mt-2" : ""}" style="${isKOT ? "font-size: 20px;" : ""}">
-                            <span>${item.quantity}x ${item.name_snapshot}</span>
-                            <span>${(stationName || isKOT) ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
-                        </div>
-                        ${(() => {
+                    ${(() => {
+                        const rootItems = items.filter(i => !i.parent_item_id);
+                        const allChildren = items.filter(i => i.parent_item_id);
+
+                        const renderItemMeta = (item: any, isChild: boolean = false) => {
                             const mods = item.selected_modifiers || item.selected_addons || [];
-                            if (mods.length === 0) return '';
-                            const grouped = mods.reduce((acc: any, mod: any) => {
-                                const gn = mod.modifier_group_name || mod.group_name || 'Extras';
-                                if (!acc[gn]) acc[gn] = [];
-                                acc[gn].push(mod);
-                                return acc;
-                            }, {});
-                            return Object.entries(grouped).map(([gn, ms]: [string, any[]]) => {
-                                const price = ms.reduce((s, m) => s + (m.price || 0), 0);
-                                return `
-                                    <div class="flex small" style="padding-left: 10px; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
-                                        <span>+ ${gn}: ${ms.map(m => m.name || m.modifier_item_name || m.modifier_name).join(', ')}</span>
-                                        <span>${(stationName || isKOT) || price <= 0 ? '' : price.toFixed(2)}</span>
+                            const modHtml = mods.length > 0 ? (() => {
+                                const grouped = mods.reduce((acc: any, mod: any) => {
+                                    const gn = mod.modifier_group_name || mod.group_name || 'Extras';
+                                    if (!acc[gn]) acc[gn] = [];
+                                    acc[gn].push(mod);
+                                    return acc;
+                                }, {});
+                                return Object.entries(grouped).map(([gn, ms]: [string, any[]]) => {
+                                    const price = ms.reduce((s, m) => s + (m.price || 0), 0);
+                                    return `
+                                        <div class="flex small" style="padding-left: ${isChild ? '20px' : '10px'}; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                            <span>+ ${gn}: ${ms.map(m => m.name || m.modifier_item_name || m.modifier_name).join(', ')}</span>
+                                            <span>${(stationName || isKOT) || price <= 0 ? '' : price.toFixed(2)}</span>
+                                        </div>
+                                    `;
+                                }).join('');
+                            })() : '';
+
+                            const exclHtml = item.excluded_toppings?.map((excl: any) => `
+                                <div class="small" style="padding-left: ${isChild ? '20px' : '10px'}; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                    - NO ${excl.name}
+                                </div>
+                            `).join('') || '';
+
+                            const replHtml = item.selected_replacers?.map((repl: any) => `
+                                <div class="small" style="padding-left: ${isChild ? '20px' : '10px'}; color: #c00; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                    <span>${repl.is_exclusion_only
+                                        ? `x ${repl.name}`
+                                        : repl.ingredient_name
+                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
+                                            : `~ ${repl.name}`
+                                    }</span>
+                                    ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}
+                                </div>
+                            `).join('') || '';
+
+                            return modHtml + exclHtml + replHtml;
+                        };
+
+                        return rootItems.map(item => {
+                            const children = allChildren.filter(c => c.parent_item_id === item.id);
+                            
+                            let html = `
+                                <div class="flex bold ${isKOT ? "mt-2" : ""}" style="${isKOT ? "font-size: 20px;" : ""}">
+                                    <span>${item.quantity}x ${item.name_snapshot}</span>
+                                    <span>${(stationName || isKOT) ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
+                                </div>
+                                ${renderItemMeta(item)}
+                            `;
+
+                            if (children.length > 0) {
+                                html += children.map(c => `
+                                    <div class="flex" style="padding-left: 10px; font-size: 13px; color: #444; ${isKOT ? "font-size: 18px; font-weight: bold;" : ""}">
+                                        <span>${c.quantity}x ${c.name_snapshot}</span>
+                                        <span>${(stationName || isKOT) || c.price_snapshot <= 0 ? '' : (c.price_snapshot * c.quantity).toFixed(2)}</span>
                                     </div>
-                                `;
-                            }).join('');
-                        })()}
-                        ${item.excluded_toppings?.map((excl: any) => `
-                            <div class="small" style="padding-left: 10px; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
-                                - NO ${excl.name}
+                                    ${renderItemMeta(c, true)}
+                                `).join('');
+                            }
+
+                            return html;
+                        }).join('');
+                    })()}
+                    ${(() => {
+                        // Handle cases where child items might exist but their parent is not in the list 
+                        // (e.g., station receipt where parent is not assigned to this station)
+                        const rootIds = new Set(items.filter(i => !i.parent_item_id).map(i => i.id));
+                        const orphanedChildren = items.filter(i => i.parent_item_id && !rootIds.has(i.parent_item_id));
+
+                        const renderItemMeta = (item: any, isChild: boolean = false) => {
+                            const mods = item.selected_modifiers || item.selected_addons || [];
+                            const modHtml = mods.length > 0 ? (() => {
+                                const grouped = mods.reduce((acc: any, mod: any) => {
+                                    const gn = mod.modifier_group_name || mod.group_name || 'Extras';
+                                    if (!acc[gn]) acc[gn] = [];
+                                    acc[gn].push(mod);
+                                    return acc;
+                                }, {});
+                                return Object.entries(grouped).map(([gn, ms]: [string, any[]]) => {
+                                    const price = ms.reduce((s, m) => s + (m.price || 0), 0);
+                                    return `
+                                        <div class="flex small" style="padding-left: 10px; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                            <span>+ ${gn}: ${ms.map(m => m.name || m.modifier_item_name || m.modifier_name).join(', ')}</span>
+                                            <span>${(stationName || isKOT) || price <= 0 ? '' : price.toFixed(2)}</span>
+                                        </div>
+                                    `;
+                                }).join('');
+                            })() : '';
+
+                            const exclHtml = item.excluded_toppings?.map((excl: any) => `
+                                <div class="small" style="padding-left: 10px; color: red; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                    - NO ${excl.name}
+                                </div>
+                            `).join('') || '';
+
+                            const replHtml = item.selected_replacers?.map((repl: any) => `
+                                <div class="small" style="padding-left: 10px; color: #c00; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
+                                    <span>${repl.is_exclusion_only
+                                        ? `x ${repl.name}`
+                                        : repl.ingredient_name
+                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
+                                            : `~ ${repl.name}`
+                                    }</span>
+                                    ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}
+                                </div>
+                            `).join('') || '';
+
+                            return modHtml + exclHtml + replHtml;
+                        };
+
+                        return orphanedChildren.map(c => `
+                            <div class="flex bold mt-2" style="${isKOT ? "font-size: 20px;" : ""}">
+                                <span>${c.quantity}x ${c.name_snapshot}</span>
+                                <span>${(stationName || isKOT) ? '' : (c.price_snapshot * c.quantity).toFixed(2)}</span>
                             </div>
-                        `).join('') || ''}
-                        ${item.selected_replacers?.map((repl: any) => `
-                            <div class="small" style="padding-left: 10px; color: #c00; font-style: italic; ${isKOT ? "font-size: 16px; font-weight: bold;" : ""}">
-                                <span>${repl.is_exclusion_only
-                                    ? `x ${repl.name}`
-                                    : repl.ingredient_name
-                                        ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
-                                        : `~ ${repl.name}`
-                                }</span>
-                                ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}
-                            </div>
-                        `).join('') || ''}
-                    `).join('')}
+                            <div class="small italic" style="padding-left: 10px; color: #666;">(PART OF DEAL)</div>
+                            ${renderItemMeta(c)}
+                        `).join('');
+                    })()}
                 </div>
 
                 ${!isKOT ? `

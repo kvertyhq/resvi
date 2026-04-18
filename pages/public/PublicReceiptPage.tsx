@@ -47,6 +47,9 @@ const PublicReceiptPage: React.FC = () => {
                     daily_order_number,
                     customer:user_id(full_name, phone, address, postcode),
                     order_items (
+                        id,
+                        parent_item_id,
+                        is_deal,
                         quantity,
                         name_snapshot,
                         price_snapshot,
@@ -157,70 +160,129 @@ const PublicReceiptPage: React.FC = () => {
 
                     {/* Items */}
                     <div className="space-y-2 mb-6">
-                        {displayedItems.map((item: any, i: number) => (
-                            <div key={i}>
-                                <div className="flex justify-between font-bold">
-                                    <span>{item.quantity}x {item.name_snapshot}</span>
-                                    <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
-                                </div>
-                                {item.selected_modifiers && item.selected_modifiers.length > 0 && (
-                                    <div className="text-xs text-gray-500 pl-4 italic">
-                                        {(() => {
-                                            const grouped = item.selected_modifiers.reduce((acc: any, mod: any) => {
-                                                const gn = mod.modifier_group_name || 'Extras';
-                                                if (!acc[gn]) acc[gn] = [];
-                                                acc[gn].push(mod);
-                                                return acc;
-                                            }, {});
+                        {(() => {
+                            const rootItems = displayedItems.filter((i: any) => !i.parent_item_id);
+                            const allChildren = displayedItems.filter((i: any) => i.parent_item_id);
 
-                                            return Object.entries(grouped).map(([gn, ms]: [string, any[]], j) => {
-                                                const totalPrice = ms.reduce((sum, m) => sum + Number(m.price || 0), 0);
-                                                return (
-                                                    <div key={j} className="flex justify-between">
-                                                        <span>
-                                                            + {gn}: {ms.map(m => {
-                                                                let s = m.name;
-                                                                if (m.location && m.location !== 'whole') s += ` (${m.location})`;
-                                                                if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
-                                                                return s;
-                                                            }).join(', ')}
+                            const renderItemMeta = (item: any, isChild: boolean = false) => {
+                                return (
+                                    <>
+                                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                            <div className={`text-xs text-gray-500 italic ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                {(() => {
+                                                    const grouped = item.selected_modifiers.reduce((acc: any, mod: any) => {
+                                                        const gn = mod.modifier_group_name || 'Extras';
+                                                        if (!acc[gn]) acc[gn] = [];
+                                                        acc[gn].push(mod);
+                                                        return acc;
+                                                    }, {});
+
+                                                    return Object.entries(grouped).map(([gn, ms]: [string, any[]], j) => {
+                                                        const totalPrice = ms.reduce((sum, m) => sum + Number(m.price || 0), 0);
+                                                        return (
+                                                            <div key={j} className="flex justify-between">
+                                                                <span>
+                                                                    + {gn}: {ms.map(m => {
+                                                                        let s = m.name;
+                                                                        if (m.location && m.location !== 'whole') s += ` (${m.location})`;
+                                                                        if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
+                                                                        return s;
+                                                                    }).join(', ')}
+                                                                </span>
+                                                                <span>{stationId || totalPrice <= 0 ? '' : totalPrice.toFixed(2)}</span>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        )}
+                                        {item.excluded_toppings?.map((excl: any, j: number) => (
+                                            <div key={`excl-${j}`} className={`flex justify-between text-xs text-red-500 italic ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                <span>
+                                                    - NO {excl.name} {excl.group_name ? `(${excl.group_name})` : ''}
+                                                    {excl.replacement && (
+                                                        <span className="text-green-600 ml-1">
+                                                            → {excl.replacement.name} {excl.replacement.group_name ? `(${excl.replacement.group_name})` : ''}
                                                         </span>
-                                                        <span>{stationId || totalPrice <= 0 ? '' : totalPrice.toFixed(2)}</span>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                )}
-                                {item.excluded_toppings?.map((excl: any, j: number) => (
-                                    <div key={`excl-${j}`} className="flex justify-between text-xs text-red-500 pl-4 italic">
-                                        <span>
-                                            - NO {excl.name} {excl.group_name ? `(${excl.group_name})` : ''}
-                                            {excl.replacement && (
-                                                <span className="text-green-600 ml-1">
-                                                    → {excl.replacement.name} {excl.replacement.group_name ? `(${excl.replacement.group_name})` : ''}
+                                                    )}
                                                 </span>
-                                            )}
-                                        </span>
+                                            </div>
+                                        ))}
+                                        {item.selected_replacers?.map((repl: any, j: number) => (
+                                            <div key={`repl-${j}`} className={`flex justify-between text-xs text-red-600 italic ${isChild ? 'pl-8' : 'pl-4'}`}>
+                                                <span>
+                                                    ✕ {repl.is_exclusion_only
+                                                        ? repl.name
+                                                        : (repl.ingredient_name?.toLowerCase().startsWith('no') 
+                                                            ? `${repl.ingredient_name} → ${repl.name}`
+                                                            : `No ${repl.ingredient_name} → ${repl.name}`)
+                                                    }
+                                                </span>
+                                                <span className="text-gray-400">
+                                                    {stationId || !repl.price_adjustment ? '' : Number(repl.price_adjustment).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </>
+                                );
+                            };
+
+                            return rootItems.map((item: any, i: number) => {
+                                const children = allChildren.filter((c: any) => c.parent_item_id === item.id);
+                                return (
+                                    <div key={item.id || i} className="mb-2">
+                                        <div className="flex justify-between font-bold">
+                                            <span>{item.quantity}x {item.name_snapshot}</span>
+                                            <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
+                                        </div>
+                                        {renderItemMeta(item)}
+                                        
+                                        {children.length > 0 && (
+                                            <div className="mt-1 space-y-1">
+                                                {children.map((child: any, j: number) => (
+                                                    <div key={child.id || j}>
+                                                        <div className="flex justify-between text-[13px] text-gray-700 font-medium pl-4">
+                                                            <span>{child.quantity}x {child.name_snapshot}</span>
+                                                            <span>{stationId || child.price_snapshot <= 0 ? '' : (child.price_snapshot * child.quantity).toFixed(2)}</span>
+                                                        </div>
+                                                        {renderItemMeta(child, true)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
-                                {item.selected_replacers?.map((repl: any, j: number) => (
-                                    <div key={`repl-${j}`} className="flex justify-between text-xs text-red-600 pl-4 italic">
-                                        <span>
-                                            ✕ {repl.is_exclusion_only
-                                                ? repl.name
-                                                : (repl.ingredient_name?.toLowerCase().startsWith('no') 
-                                                    ? `${repl.ingredient_name} → ${repl.name}`
-                                                    : `No ${repl.ingredient_name} → ${repl.name}`)
-                                            }
-                                        </span>
-                                        <span className="text-gray-400">
-                                            {stationId || !repl.price_adjustment ? '' : repl.price_adjustment.toFixed(2)}
-                                        </span>
+                                );
+                            });
+                        })()}
+
+                        {/* Orphans (Child items without their parent in the list - e.g. station receipts) */}
+                        {(() => {
+                            const rootIds = new Set(displayedItems.filter((i: any) => !i.parent_item_id).map((i: any) => i.id));
+                            const orphanedChildren = displayedItems.filter((i: any) => i.parent_item_id && !rootIds.has(i.parent_item_id));
+                            
+                            if (orphanedChildren.length === 0) return null;
+
+                            return orphanedChildren.map((item: any, i: number) => (
+                                <div key={`orphan-${i}`} className="mb-2">
+                                    <div className="flex justify-between font-bold">
+                                        <span>{item.quantity}x {item.name_snapshot}</span>
+                                        <span>{stationId ? '' : (item.price_snapshot * item.quantity).toFixed(2)}</span>
                                     </div>
-                                ))}
-                            </div>
-                        ))}
+                                    <div className="text-[10px] text-gray-400 uppercase tracking-tighter pl-4 font-bold">(PART OF DEAL)</div>
+                                    {/* Modifiers/Exclusions/Replacers for orphans */}
+                                    {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                                        <div className="text-xs text-gray-500 pl-4 italic">
+                                            {item.selected_modifiers.map((m: any, idx: number) => (
+                                                <div key={idx} className="flex justify-between">
+                                                    <span>+ {m.name}</span>
+                                                    <span>{stationId || !m.price ? '' : m.price.toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ));
+                        })()}
                     </div>
 
                     {/* Totals */}

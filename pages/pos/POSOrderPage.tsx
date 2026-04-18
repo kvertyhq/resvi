@@ -114,6 +114,7 @@ const POSOrderPage: React.FC = () => {
 
     const [isDealModalOpen, setIsDealModalOpen] = useState(false);
     const [selectedDeal, setSelectedDeal] = useState<any>(null);
+    const [dealInitialSelections, setDealInitialSelections] = useState<any[] | null>(null);
 
     // Discount State
     const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('percentage');
@@ -414,6 +415,7 @@ const POSOrderPage: React.FC = () => {
             
             setEditingTempId(tempId);
             setSelectedDeal(deal);
+            setDealInitialSelections(item.selections || []);
             setIsDealModalOpen(true);
             return;
         }
@@ -1116,8 +1118,13 @@ const POSOrderPage: React.FC = () => {
             <DealFlowModal
                 isOpen={isDealModalOpen}
                 deal={selectedDeal}
-                onClose={() => setIsDealModalOpen(false)}
+                onClose={() => {
+                    setIsDealModalOpen(false);
+                    setEditingTempId(null);
+                    setDealInitialSelections(null);
+                }}
                 onComplete={addToCart}
+                initialSelections={dealInitialSelections || undefined}
             />
 
             <OrderUpdatedModal

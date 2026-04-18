@@ -163,89 +163,115 @@ const POSPrintKOTPage: React.FC = () => {
 
             {/* Items Section (HUGE FONTS) */}
             <div className="space-y-6">
-                {order.order_items.map((item: any) => {
-                    const itemName = item.name_snapshot || item.menu_item?.name || 'Unknown Item';
-                    const modifiers = item.selected_modifiers || item.selected_addons || [];
-                    const exclusions = item.excluded_toppings || [];
+                {(() => {
+                    const rootItems = order.order_items.filter((i: any) => !i.parent_item_id);
+                    const allChildren = order.order_items.filter((i: any) => i.parent_item_id);
 
-                    return (
-                        <div key={item.id} className="border-b-2 border-dashed border-gray-400 pb-4">
-                            {/* Quantity and Item Name Container via Flex Box */}
-                            <div className="flex gap-4 items-start">
-                                {/* Large Quantity Box */}
-                                <div className="border-[3px] border-black rounded flex items-center justify-center p-2 min-w-[50px] font-black text-3xl shrink-0 leading-none">
-                                    {item.quantity}
-                                </div>
-                                
-                                {/* Item Data */}
-                                <div className="flex-1 pt-1">
-                                    <h3 className="text-3xl font-black uppercase leading-tight tracking-tight">
-                                        {itemName}
-                                    </h3>
+                    const renderKOTItem = (item: any, isChild: boolean = false) => {
+                        const itemName = item.name_snapshot || item.menu_item?.name || 'Unknown Item';
+                        const modifiers = item.selected_modifiers || item.selected_addons || [];
+                        const exclusions = item.excluded_toppings || [];
+
+                        return (
+                            <div key={item.id} className={`${isChild ? 'ml-12 mt-4' : 'border-b-2 border-dashed border-gray-400 pb-4'}`}>
+                                <div className="flex gap-4 items-start">
+                                    {/* Large Quantity Box */}
+                                    <div className={`border-[3px] border-black rounded flex items-center justify-center p-2 font-black leading-none shrink-0 ${isChild ? 'text-2xl min-w-[40px]' : 'text-3xl min-w-[50px]'}`}>
+                                        {item.quantity || 1}
+                                    </div>
                                     
-                                    {/* Modifiers Container */}
-                                    <div className="mt-2 pl-2 space-y-1">
-                                        {/* Modifiers / Addons */}
-                                        {(() => {
-                                            const mods = item.selected_modifiers || item.selected_addons || [];
-                                            if (mods.length === 0) return null;
-                                            const grouped = mods.reduce((acc: any, mod: any) => {
-                                                const gn = mod.modifier_group_name || mod.group_name || 'Extras';
-                                                if (!acc[gn]) acc[gn] = [];
-                                                acc[gn].push(mod);
-                                                return acc;
-                                            }, {});
+                                    {/* Item Data */}
+                                    <div className="flex-1 pt-1">
+                                        <h3 className={`${isChild ? 'text-2xl' : 'text-3xl'} font-black uppercase leading-tight tracking-tight`}>
+                                            {itemName}
+                                        </h3>
+                                        
+                                        {/* Meta Container */}
+                                        <div className="mt-2 pl-2 space-y-1">
+                                            {/* Modifiers */}
+                                            {(() => {
+                                                const mods = item.selected_modifiers || item.selected_addons || [];
+                                                if (mods.length === 0) return null;
+                                                const grouped = mods.reduce((acc: any, mod: any) => {
+                                                    const gn = mod.modifier_group_name || mod.group_name || 'Extras';
+                                                    if (!acc[gn]) acc[gn] = [];
+                                                    acc[gn].push(mod);
+                                                    return acc;
+                                                }, {});
+                                                
+                                                return Object.entries(grouped).map(([gn, ms]: [string, any[]], gIdx) => (
+                                                    <div key={gIdx} className={`${isChild ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 uppercase flex items-start gap-2`}>
+                                                        <span className="text-gray-400">+</span>
+                                                        <span>
+                                                            <span className="text-gray-500 text-[0.8em]">{gn}:</span> {ms.map(m => {
+                                                                let s = m.name || m.modifier_item_name || m.modifier_name;
+                                                                if (m.location && m.location !== 'whole') s += ` (${m.location})`;
+                                                                if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
+                                                                return s;
+                                                            }).join(', ')}
+                                                        </span>
+                                                    </div>
+                                                ));
+                                            })()}
                                             
-                                            return Object.entries(grouped).map(([gn, ms]: [string, any[]], gIdx) => (
-                                                <div key={gIdx} className="text-2xl font-bold text-gray-800 uppercase flex items-start gap-2">
-                                                    <span className="text-gray-400">+</span>
+                                            {/* Exclusions */}
+                                            {Array.isArray(exclusions) && exclusions.map((excl: any, idx: number) => (
+                                                <div key={`excl-${idx}`} className={`${isChild ? 'text-xl' : 'text-2xl'} font-black text-red-600 uppercase flex items-start gap-2`}>
+                                                    <span className="text-red-400">-</span>
+                                                    <span className="line-through decoration-[3px] opacity-80">NO {excl.name}</span>
+                                                </div>
+                                            ))}
+
+                                            {/* Notes */}
+                                            {item.notes && (
+                                                <div className="text-xl font-bold italic text-blue-800 mt-2 p-2 bg-blue-50 border-l-4 border-blue-600">
+                                                    " {item.notes} "
+                                                </div>
+                                            )}
+
+                                            {/* Replacers */}
+                                            {Array.isArray(item.selected_replacers) && item.selected_replacers.map((repl: any, idx: number) => (
+                                                <div key={`repl-${idx}`} className={`${isChild ? 'text-xl' : 'text-2xl'} font-black text-red-600 uppercase flex items-start gap-2`}>
+                                                    <span className="text-red-400">✕</span>
                                                     <span>
-                                                        <span className="text-gray-500 text-[0.8em]">{gn}:</span> {ms.map(m => {
-                                                            let s = m.name || m.modifier_item_name || m.modifier_name;
-                                                            if (m.location && m.location !== 'whole') s += ` (${m.location})`;
-                                                            if (m.intensity && m.intensity !== 'normal') s += ` (${m.intensity})`;
-                                                            return s;
-                                                        }).join(', ')}
+                                                        {repl.is_exclusion_only
+                                                            ? repl.name
+                                                            : (repl.ingredient_name?.toLowerCase().startsWith('no') 
+                                                                ? `${repl.ingredient_name} → ${repl.name}`
+                                                                : `No ${repl.ingredient_name} → ${repl.name}`)
+                                                        }
                                                     </span>
                                                 </div>
-                                            ));
-                                        })()}
-                                        
-                                        {/* Exclusions */}
-                                        {Array.isArray(exclusions) && exclusions.map((excl: any, idx: number) => (
-                                            <div key={`excl-${idx}`} className="text-2xl font-black text-red-600 uppercase flex items-start gap-2">
-                                                <span className="text-red-400">-</span>
-                                                <span className="line-through decoration-[3px] opacity-80">NO {excl.name}</span>
-                                            </div>
-                                        ))}
-
-                                        {/* Notes */}
-                                        {item.notes && (
-                                            <div className="text-xl font-bold italic text-blue-800 mt-2 p-2 bg-blue-50 border-l-4 border-blue-600">
-                                                " {item.notes} "
-                                            </div>
-                                        )}
-
-                                        {/* Ingredient Replacers */}
-                                        {Array.isArray(item.selected_replacers) && item.selected_replacers.map((repl: any, idx: number) => (
-                                            <div key={`repl-${idx}`} className="text-2xl font-black text-red-600 uppercase flex items-start gap-2">
-                                                <span className="text-red-400">✕</span>
-                                                <span>
-                                                    {repl.is_exclusion_only
-                                                        ? repl.name
-                                                        : (repl.ingredient_name?.toLowerCase().startsWith('no') 
-                                                            ? `${repl.ingredient_name} → ${repl.name}`
-                                                            : `No ${repl.ingredient_name} → ${repl.name}`)
-                                                    }
-                                                </span>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    };
+
+                    const result: React.ReactNode[] = [];
+                    rootItems.forEach((item: any) => {
+                        result.push(renderKOTItem(item));
+                        const children = allChildren.filter((c: any) => c.parent_item_id === item.id);
+                        children.forEach((c: any) => {
+                            result.push(renderKOTItem(c, true));
+                        });
+                    });
+
+                    // Orphans
+                    const rootIds = new Set(rootItems.map((i: any) => i.id));
+                    allChildren.filter(c => !rootIds.has(c.parent_item_id)).forEach((c: any) => {
+                        result.push((
+                            <div key={`orphan-label-${c.id}`} className="text-sm font-bold text-gray-400 uppercase tracking-widest pl-12 -mb-4">
+                                (PART OF DEAL)
+                            </div>
+                        ));
+                        result.push(renderKOTItem(c));
+                    });
+
+                    return result;
+                })()}
             </div>
 
             {/* Customer Information removed for Kitchen Tickets */}

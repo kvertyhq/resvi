@@ -155,16 +155,14 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
     };
 
     const handleModifierComplete = (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: any[], selectedReplacers?: any[]) => {
-        // Calculate the adjustment:
-        // dealOption.price_adjustment is the base cost for this option in the deal.
-        // We add any extra costs from modifiers.
-        // POSModifierModal's totalPrice is item.basePrice + sum(modifiers).
-        // Let's find the item's base price (either from selected variant or the item itself)
-        const selectedVariant = (item as any).selected_variant;
-        const basePrice = selectedVariant ? selectedVariant.price : item.price;
+        // Original Base Price = price of first variant (if any) or default price
+        const originalBasePrice = modMenuItem?.price_variants && modMenuItem.price_variants.length > 0
+            ? Number(modMenuItem.price_variants[0].price)
+            : Number(modMenuItem?.price || 0);
         
-        // The adjustment from modifiers is totalPrice - basePrice
-        const modifierAdjustment = Math.max(0, totalPrice - basePrice);
+        // The adjustment is (totalPrice including chosen variant and extras) - (original base price)
+        const modifierAdjustment = Math.max(0, totalPrice - originalBasePrice);
+        const selectedVariant = (item as any).selected_variant;
         
         const selection: DealSelection = {
             group_id: currentGroup.id,
@@ -369,10 +367,10 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                                 const hasSelection = categorySelections.length > 0;
 
                                 return (
-                                    <button
+                                    <div
                                         key={itemOrCat.id}
                                         onClick={() => setActiveOptionId(itemOrCat.deal_option.id)}
-                                        className={`relative bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 transition-all text-left shadow-sm group h-32 flex flex-col ${
+                                        className={`relative bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 transition-all text-left shadow-sm group h-32 flex flex-col cursor-pointer ${
                                             hasSelection
                                                 ? 'border-[var(--theme-color)] bg-[var(--theme-color)]/5' 
                                                 : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
@@ -428,17 +426,17 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                                                 </span>
                                             )}
                                         </div>
-                                    </button>
+                                    </div>
                                 );
                             }
 
                             const item = itemOrCat;
                             const isSelected = (selections[currentGroup.id] || []).some(s => s.menu_item_id === item.id && s.option_id === item.deal_option.id);
                             return (
-                                <button
+                                <div
                                     key={item.id}
                                     onClick={() => handleItemClick(item, item.deal_option)}
-                                    className={`relative bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 transition-all text-left shadow-sm group h-32 flex flex-col ${
+                                    className={`relative bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 transition-all text-left shadow-sm group h-32 flex flex-col cursor-pointer ${
                                         isSelected 
                                             ? 'border-[var(--theme-color)] ring-2 ring-[var(--theme-color)]/20 shadow-md' 
                                             : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'
@@ -490,7 +488,7 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                                             </div>
                                         )}
                                     </div>
-                                </button>
+                                </div>
                             );
                         })}
                     </div>

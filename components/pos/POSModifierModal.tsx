@@ -432,7 +432,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
         });
 
         const finalMenuItem = selectedVariant
-            ? { ...menuItem, name: `${menuItem.name} (${selectedVariant.name})`, price: selectedVariant.price }
+            ? { ...menuItem, name: `${menuItem.name} (${selectedVariant.name})`, price: selectedVariant.price, selected_variant: selectedVariant }
             : menuItem;
 
         const flatReplacers: any[] = [];

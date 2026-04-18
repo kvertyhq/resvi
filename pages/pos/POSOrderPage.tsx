@@ -1041,9 +1041,8 @@ const POSOrderPage: React.FC = () => {
              return;
         }
 
-        // Prepare local print data (No DB save - for unsaved cart items)
-        const orderData = {
-            type: 'kot',
+        // Use the unified bill printing method
+        await receiptService.printBill(settings.id, {
             items: cartItems,
             subtotal: subtotal,
             tax: tax,
@@ -1051,9 +1050,7 @@ const POSOrderPage: React.FC = () => {
             customer: selectedCustomer,
             tableName: tableName,
             orderType: isWalkIn ? (isPhoneOrder ? 'Phone Order' : 'Walk-In') : 'Table Order',
-        };
-
-        await receiptService.printLocalOrder(settings.id, orderData);
+        }, showAlert);
     };
 
     const completeOrder = async () => {

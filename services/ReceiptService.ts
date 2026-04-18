@@ -292,6 +292,32 @@ class ReceiptService {
 
         if (popup) {
             popup.focus();
+        } else {
+            console.warn('Popup blocked for receipt');
+        }
+    }
+
+    /**
+     * Unified method for printing a bill/estimate via the browser's HTML view.
+     * Use this for "Bill Estimate", "Pro-forma", or fallback prints.
+     */
+    async printBill(restaurantId: string, orderData: {
+        items: any[],
+        subtotal: number,
+        tax: number,
+        total: number,
+        customer?: any,
+        tableName?: string,
+        orderType?: string,
+    }, showAlert?: any) {
+        try {
+            await this.printLocalOrder(restaurantId, {
+                ...orderData,
+                type: 'receipt' // Tells the template to show as a bill/receipt
+            });
+        } catch (error) {
+            console.error('Failed to print bill:', error);
+            if (showAlert) showAlert('Print Error', 'Failed to generate print view.', 'error');
         }
     }
 
@@ -765,7 +791,11 @@ class ReceiptService {
                 // if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
             } else {
                 console.error('Network print failed: invoke is not available');
-                if (showAlert) showAlert('Printer Error', 'Network printing requires the desktop application.', 'error');
+                if (showAlert) {
+                    showAlert('Printer Error', 'Network printing requires the desktop application. Opening browser print instead.', 'warning');
+                }
+                // Fallback to browser print for this order
+                await this.printBrowser(orderId, true, stationId, undefined, isKOT);
             }
         } catch (error: any) {
             console.error('Network print failed:', error);

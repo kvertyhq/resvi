@@ -296,12 +296,30 @@ const POSPaymentPage: React.FC = () => {
                         <span>Back to Order / Tables</span>
                     </button>
 
-                    <button
-                        onClick={() => receiptService.printOrder(order.id, order.restaurant_id, true, payments?.[0]?.payment_method, showAlert)}
-                        className="mt-4 w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 rounded font-bold transition-colors"
-                    >
-                        🖨️ Print Receipt
-                    </button>
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                        <button
+                            onClick={() => receiptService.printOrder(order.id, order.restaurant_id, true, payments?.[0]?.payment_method, showAlert)}
+                            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-600"
+                            title="Print via Network/Driver"
+                        >
+                            🖨️ Receipt
+                        </button>
+                        <button
+                            onClick={() => receiptService.printBill(order.restaurant_id, {
+                                items: order.order_items,
+                                subtotal: order.subtotal,
+                                tax: order.tax_amount,
+                                total: order.total_amount,
+                                customer: order.customer,
+                                tableName: order.table_info?.table_name,
+                                orderType: order.order_type
+                            }, showAlert)}
+                            className="bg-[var(--theme-color)]/10 hover:bg-[var(--theme-color)]/20 text-[var(--theme-color)] py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-[var(--theme-color)]/30"
+                            title="Print via Browser"
+                        >
+                            📄 Bill
+                        </button>
+                    </div>
                 </div>
             </div>
 

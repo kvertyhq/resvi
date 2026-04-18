@@ -1424,6 +1424,22 @@ const POSOrderPage: React.FC = () => {
                                                                 ))}
                                                             </div>
                                                         )}
+                                                        {sel.excluded_toppings && sel.excluded_toppings.length > 0 && (
+                                                            <div className="pl-2 text-[10px] text-red-500 opacity-80">
+                                                                {sel.excluded_toppings.map((e: any, eIdx: number) => (
+                                                                    <div key={eIdx}>✕ {e.name}</div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {sel.selected_replacers && sel.selected_replacers.length > 0 && (
+                                                            <div className="pl-2 text-[10px] text-orange-600 opacity-80">
+                                                                {sel.selected_replacers.map((r: any, rIdx: number) => (
+                                                                    <div key={rIdx}>
+                                                                        {r.is_exclusion_only ? `✕ ${r.name}` : `↔ ${r.name}`}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

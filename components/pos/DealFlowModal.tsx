@@ -154,7 +154,7 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
         }
     };
 
-    const handleModifierComplete = (item: any, selectedModifiers: any[], totalPrice: number) => {
+    const handleModifierComplete = (item: any, selectedModifiers: any[], totalPrice: number, excludedToppings?: any[], selectedReplacers?: any[]) => {
         // Calculate the adjustment:
         // dealOption.price_adjustment is the base cost for this option in the deal.
         // We add any extra costs from modifiers.
@@ -174,6 +174,8 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
             name: item.name,
             price_adjustment: (modDealOption.price_adjustment || 0) + modifierAdjustment,
             modifiers: selectedModifiers,
+            excluded_toppings: excludedToppings,
+            selected_replacers: selectedReplacers,
             selected_variant: selectedVariant
         };
 
@@ -566,6 +568,23 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                     });
                     return formatted;
                 })()}
+                initialExclusions={editingSelectionIdx !== null ? selections[currentGroup.id]?.[editingSelectionIdx]?.excluded_toppings : undefined}
+                initialReplacers={(() => {
+                    if (editingSelectionIdx === null) return undefined;
+                    const selection = selections[currentGroup.id][editingSelectionIdx];
+                    if (!selection.selected_replacers) return undefined;
+
+                    // Group by groupId for legacy replacer groups
+                    const formatted: Record<string, Record<string, boolean>> = {};
+                    selection.selected_replacers.forEach(r => {
+                        if (!r.ingredient_name) { // Legacy replacers don't have ingredient_name
+                            if (!formatted[r.group_id]) formatted[r.group_id] = {};
+                            formatted[r.group_id][r.id] = true;
+                        }
+                    });
+                    return Object.keys(formatted).length > 0 ? formatted : undefined;
+                })()}
+                initialReplacersArray={editingSelectionIdx !== null ? selections[currentGroup.id]?.[editingSelectionIdx]?.selected_replacers : undefined}
             />
         )}
     </div>

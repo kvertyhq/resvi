@@ -56,6 +56,8 @@ export interface DealSelection {
   name: string;
   selected_variant?: any;
   modifiers?: any[];
+  excluded_toppings?: any[]; // added for deal edit prefill
+  selected_replacers?: any[]; // added for deal edit prefill
   price_adjustment: number;
 }
 

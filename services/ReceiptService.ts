@@ -948,14 +948,41 @@ class ReceiptService {
                                     <span>${repl.is_exclusion_only
                                         ? `x ${repl.name}`
                                         : repl.ingredient_name
-                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
+                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? r.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
                                             : `~ ${repl.name}`
                                     }</span>
                                     ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}
                                 </div>
                             `).join('') || '';
 
-                            return modHtml + exclHtml + replHtml;
+                            const selections = item.deal_selections || item.selections || [];
+                            const selectionHtml = selections.length > 0 ? selections.map((sel: any) => {
+                                const selMods = sel.modifiers?.map((m: any) => `
+                                    <div class="small" style="padding-left: ${isChild ? '30px' : '20px'}; font-style: italic; opacity: 0.8;">
+                                        + ${m.name}
+                                    </div>
+                                `).join('') || '';
+                                const selExcls = sel.excluded_toppings?.map((e: any) => `
+                                    <div class="small" style="padding-left: ${isChild ? '30px' : '20px'}; color: red; font-style: italic; opacity: 0.8;">
+                                        - NO ${e.name}
+                                    </div>
+                                `).join('') || '';
+                                const selRepls = sel.selected_replacers?.map((r: any) => `
+                                    <div class="small" style="padding-left: ${isChild ? '30px' : '20px'}; color: #c00; font-style: italic; opacity: 0.8;">
+                                        ${r.is_exclusion_only ? `x ${r.name}` : `~ ${r.name}`}
+                                    </div>
+                                `).join('') || '';
+
+                                return `
+                                    <div class="flex small" style="padding-left: ${isChild ? '20px' : '10px'}; font-weight: 500; margin-top: 2px;">
+                                        <span>&bull; ${sel.name} ${sel.selected_variant ? `(${sel.selected_variant.name})` : ''}</span>
+                                        <span>${(!(stationName || isKOT) && Number(sel.price_adjustment) > 0) ? Number(sel.price_adjustment).toFixed(2) : ''}</span>
+                                    </div>
+                                    ${selMods}${selExcls}${selRepls}
+                                `;
+                            }).join('') : '';
+
+                            return modHtml + exclHtml + replHtml + selectionHtml;
                         };
 
                         return rootItems.map(item => {

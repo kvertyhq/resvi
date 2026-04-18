@@ -15,6 +15,7 @@ import pkg from '../../package.json';
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
     networkIp?: string;
+    bluetoothMac?: string;
     paperWidth: '58mm' | '80mm';
 }
 
@@ -29,10 +30,13 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
     const [settings, setSettings] = useState<PrinterSettings>({
         type: 'browser',
         networkIp: '',
+        bluetoothMac: '',
         paperWidth: '80mm'
     });
     const [discoveredPrinters, setDiscoveredPrinters] = useState<{ ip: string, port: number }[]>([]);
     const [isScanning, setIsScanning] = useState(false);
+    const [discoveredBluetoothPrinters, setDiscoveredBluetoothPrinters] = useState<{ name: string, mac: string }[]>([]);
+    const [isScanningBluetooth, setIsScanningBluetooth] = useState(false);
     const [isPrintingTest, setIsPrintingTest] = useState(false);
 
     // Update state
@@ -115,6 +119,67 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
             console.error('Test print failed:', error);
         } finally {
             setIsPrintingTest(false);
+        }
+    };
+
+    const handleBluetoothTestPrint = async () => {
+        if (!settings.bluetoothMac) return;
+        setIsPrintingTest(true);
+        try {
+            await receiptService.printOrder('TEST', undefined, true, undefined, showAlert);
+        } catch (error) {
+            console.error('Bluetooth test print failed:', error);
+        } finally {
+            setIsPrintingTest(false);
+        }
+    };
+
+    const handleBluetoothScan = async () => {
+        if ((window as any).__TAURI_INTERNALS__) {
+            setIsScanningBluetooth(true);
+            try {
+                const printers = await invoke('scan_bluetooth_printers') as { name: string, mac: string }[];
+                setDiscoveredBluetoothPrinters(printers);
+            } catch (error) {
+                console.error('Bluetooth scan failed:', error);
+                showAlert('Scan Failed', String(error), 'error');
+            } finally {
+                setIsScanningBluetooth(false);
+            }
+        } else {
+            // Web Bluetooth Fallback
+            if (!window.isSecureContext) {
+                showAlert('Security Error', 'Web Bluetooth requires a secure connection (HTTPS or Localhost).', 'error');
+                return;
+            }
+
+            if (!(navigator as any).bluetooth) {
+                showAlert('Not Supported', 'Your browser does not support Web Bluetooth or it is disabled in settings.', 'error');
+                return;
+            }
+
+            try {
+                const device = await (navigator as any).bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [
+                        '000018f0-0000-1000-8000-00805f9b34fb', // Standard Print
+                        '0000ff00-0000-1000-8000-00805f9b34fb', // Generic
+                        '0000af00-0000-1000-8000-00805f9b34fb', // Thermal 1
+                        '0000ae00-0000-1000-8000-00805f9b34fb', // Thermal 2
+                        '49535843-fe7d-4ae5-8fa9-9fafd205e455'  // ISSC
+                    ]
+                });
+                if (device) {
+                    setSettings(s => ({ ...s, bluetoothMac: device.id }));
+                    showAlert('Success', `Paired with ${device.name || 'Bluetooth Printer'}`, 'success');
+                }
+            } catch (error: any) {
+                console.error('Web Bluetooth pairing failed:', error);
+                const msg = error.name === 'NotFoundError' && error.message.includes('disabled')
+                    ? 'Web Bluetooth is globally disabled. Please ensure you are using HTTPS and check browser flags.'
+                    : 'Could not open Bluetooth pairing window or user cancelled.';
+                showAlert('Pairing Failed', msg, 'error');
+            }
         }
     };
 
@@ -326,8 +391,67 @@ const PrinterConfigModal: React.FC<PrinterConfigModalProps> = ({ isOpen, onClose
 
                         {/* Bluetooth Info */}
                         {settings.type === 'bluetooth' && (
-                            <div className="animate-fadeIn text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded">
-                                You will be prompted to pair a Bluetooth device when you print. Supports ESC/POS.
+                            <div className="animate-fadeIn space-y-3">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded">
+                                    {(window as any).__TAURI_INTERNALS__ 
+                                        ? "Desktop Mode: Click Scan to find your paired or nearby Bluetooth printers."
+                                        : "Web Mode: Use the Pair button to select your printer from the browser list."
+                                    }
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Printer {(window as any).__TAURI_INTERNALS__ ? "MAC Address" : "Device ID"}
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.bluetoothMac || ''}
+                                            onChange={(e) => setSettings(s => ({ ...s, bluetoothMac: e.target.value.toUpperCase() }))}
+                                            placeholder="Select a device or type manually"
+                                            className="flex-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase"
+                                        />
+                                        <button
+                                            onClick={handleBluetoothScan}
+                                            disabled={isScanningBluetooth}
+                                            className="flex items-center gap-1 bg-brand-gold text-white px-3 py-2 rounded-md hover:bg-yellow-600 disabled:opacity-50"
+                                        >
+                                            {isScanningBluetooth ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                            {(window as any).__TAURI_INTERNALS__ ? "Scan" : "Pair"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {discoveredBluetoothPrinters.length > 0 && (
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700 max-h-40 overflow-y-auto">
+                                        <p className="text-xs font-bold text-gray-500 mb-2">Discovered Devices:</p>
+                                        <div className="space-y-1">
+                                            {discoveredBluetoothPrinters.map(p => (
+                                                <button
+                                                    key={p.mac}
+                                                    onClick={() => setSettings(s => ({ ...s, bluetoothMac: p.mac }))}
+                                                    className={`w-full text-left text-sm p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded flex justify-between items-center ${settings.bluetoothMac === p.mac ? 'bg-brand-gold/10 border border-brand-gold' : ''}`}
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold">{p.name}</span>
+                                                        <span className="text-[10px] font-mono opacity-60 text-gray-400">{p.mac}</span>
+                                                    </div>
+                                                    {settings.bluetoothMac === p.mac && <CheckCircle2 className="w-4 h-4 text-brand-gold" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="pt-2 grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={handleBluetoothTestPrint}
+                                        disabled={isPrintingTest || !settings.bluetoothMac}
+                                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-brand-gold hover:text-brand-gold transition-all"
+                                    >
+                                        {isPrintingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                        Run Test Print
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

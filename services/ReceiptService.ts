@@ -6,6 +6,7 @@ import { Printer as CapacitorPrinter } from '@bcyesil/capacitor-plugin-printer';
 interface PrinterSettings {
     type: 'browser' | 'bluetooth' | 'network';
     networkIp?: string;
+    bluetoothMac?: string;
     paperWidth: '58mm' | '80mm';
 }
 
@@ -119,7 +120,7 @@ class ReceiptService {
         } else if (settings.type === 'browser') {
             await this.printBrowser(orderId, true, stationId, round, isKOT);
         } else if (settings.type === 'bluetooth') {
-            await this.printBluetooth(orderId, stationId, showAlert);
+            await this.printBluetooth(orderId, settings, stationId, showAlert);
         } else if (settings.type === 'network') {
             await this.printNetwork(orderId, settings, stationId, showAlert, isKOT);
         }
@@ -355,446 +356,431 @@ class ReceiptService {
         }
     }
 
-    private async printBluetooth(orderId: string, stationId?: string, showAlert?: any) {
-        // Placeholder for Bluetooth logic
-        console.log(`Bluetooth print for order ${orderId} (Station: ${stationId})`);
-        const msg = `Bluetooth printing${stationId ? ` for station ${stationId}` : ''} not fully implemented yet.`;
-        if (showAlert) showAlert('Bluetooth Printing', msg, 'info');
-        else console.log(msg);
+    private async printBluetooth(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any) {
+        const mac = settings.bluetoothMac;
+        if (!mac) {
+            if (showAlert) showAlert('Printer Error', 'No Bluetooth Printer selected.', 'error');
+            return;
+        }
+
+        try {
+            // 1. Generate Raw Data
+            const { data: rawData } = await this.generateRawEscPosData(orderId, settings, stationId);
+            if (!rawData || rawData.length === 0) return;
+
+            if ((window as any).__TAURI_INTERNALS__) {
+                // 2a. Tauri Bluetooth Print
+                await invoke('print_raw_to_bluetooth', {
+                    mac: mac,
+                    data: Array.from(new Uint8Array(rawData))
+                });
+            } else if ((navigator as any).bluetooth) {
+                // 2b. Web Bluetooth Print
+                // Handle Web Bluetooth GATT connection and write
+                let device;
+                if ((navigator as any).bluetooth.getDevices) {
+                    const devices = await (navigator as any).bluetooth.getDevices();
+                    device = devices.find((d: any) => d.id === mac);
+                }
+                
+                if (!device) {
+                    // Fallback to requestDevice if getDevices didn't find it
+                    // Note: web bluetooth requestDevice REQUIRES a user gesture, so this might fail if called in background
+                    device = await (navigator as any).bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [
+                            '000018f0-0000-1000-8000-00805f9b34fb', // Standard Print
+                            '0000ff00-0000-1000-8000-00805f9b34fb', // Generic
+                            '0000af00-0000-1000-8000-00805f9b34fb', // Thermal 1
+                            '0000ae00-0000-1000-8000-00805f9b34fb', // Thermal 2
+                            '49535843-fe7d-4ae5-8fa9-9fafd205e455'  // ISSC
+                        ]
+                    });
+                }
+
+                if (!device) throw new Error('Device not found');
+
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                
+                let writeChar;
+                for (const service of services) {
+                    const chars = await service.getCharacteristics();
+                    writeChar = chars.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+                    if (writeChar) break;
+                }
+
+                if (!writeChar) throw new Error('No writeable characteristic found');
+
+                // Write in chunks (typical BLE MTU is small)
+                const chunkSize = 20;
+                for (let i = 0; i < rawData.length; i += chunkSize) {
+                    const chunk = rawData.slice(i, i + chunkSize);
+                    await writeChar.writeValue(new Uint8Array(chunk));
+                }
+            }
+        } catch (error: any) {
+            console.error('Bluetooth print failed:', error);
+            if (showAlert) showAlert('Printer Error', `Bluetooth printing failed: ${error.message || error}`, 'error');
+        }
+    }
+
+    private async generateRawEscPosData(orderId: string, settings: PrinterSettings, stationId?: string, isKOT: boolean = false): Promise<{ data: number[], restaurant: any }> {
+        // Fetch order and items
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                table_info:table_id(table_name),
+                customer:user_id(full_name, phone, address, postcode)
+            `)
+            .eq('id', orderId === 'TEST' ? 'dummy' : orderId)
+            .single();
+
+        if (orderId === 'TEST') {
+            const encoder = new TextEncoder();
+            return {
+                data: [
+                    ...[27, 64], ...[27, 97, 1],
+                    ...encoder.encode("RESVI TEST PRINT\n"),
+                    ...encoder.encode("--------------------------------\n"),
+                    ...encoder.encode("Bluetooth Connection Success!\n"),
+                    ...encoder.encode("\n\n\n"),
+                    ...[29, 86, 66, 0]
+                ],
+                restaurant: {}
+            };
+        }
+
+        if (orderError) throw orderError;
+
+        const { data: restaurant } = await supabase.from('restaurant_settings').select('*').eq('id', order.restaurant_id).single();
+        const { data: receiptSettings } = await supabase.rpc('get_receipt_settings', { p_restaurant_id: order.restaurant_id });
+
+        let query = supabase.from('order_items').select('*').eq('order_id', orderId);
+        if (stationId) query = query.eq('station_id', stationId);
+        const { data: items, error: itemsError } = await query;
+        if (itemsError) throw itemsError;
+
+        if (!items || items.length === 0) return { data: [], restaurant };
+
+        const encoder = new TextEncoder();
+        const lineWidth = settings.paperWidth === '58mm' ? 32 : 42;
+        const divider = "-".repeat(lineWidth) + "\n";
+        const currency = restaurant.currency || '£';
+        const currencyByte = currency === '£' ? 0x9C : (currency === '€' ? 0xD5 : 0x24);
+
+        let data: number[] = [
+            ...[27, 64], // Init
+            ...[27, 116, 19], // Select PC858
+            ...[27, 97, 1], // Center
+        ];
+
+        // 1. Restaurant Header
+        if (restaurant) {
+            const rName = (restaurant.restaurant_name || restaurant.name || 'RESVI').toUpperCase();
+            data.push(...[27, 33, 48], ...encoder.encode(`${rName}\n`), ...[27, 33, 0]);
+            if (restaurant.address_line1) data.push(...encoder.encode(restaurant.address_line1 + "\n"));
+            if (restaurant.phone) data.push(...encoder.encode(restaurant.phone + "\n"));
+        }
+
+        // 2. Order Type & Details
+        let orderTypeLabel = (order.order_type || 'WALK IN').replace('_', ' ').toUpperCase();
+        data.push(
+            ...encoder.encode(divider),
+            ...[27, 33, 16],
+            ...encoder.encode(`${orderTypeLabel.padStart(lineWidth / 2 + orderTypeLabel.length / 2).padEnd(lineWidth).slice(0, lineWidth)}\n`),
+            ...[27, 33, 0],
+            ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
+            ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`)
+        );
+
+        // Customer Details
+        const cName = order.customer?.full_name || order.customer_name || '';
+        const cPhone = order.customer?.phone || order.customer_phone || '';
+        const cAddress = order.customer?.address || order.customer_address || '';
+        const cPostcode = order.customer?.postcode || order.customer_postcode || '';
+
+        if (cName) data.push(...encoder.encode(`${cName.slice(0, lineWidth)}\n`));
+        if (cPhone) data.push(...encoder.encode(`${cPhone.slice(0, lineWidth)}\n`));
+        
+        if (cAddress || cPostcode) {
+            const addr = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`;
+            this.wrapText(addr, lineWidth).forEach(l => data.push(...encoder.encode(l + "\n")));
+        }
+
+        data.push(...encoder.encode(divider));
+
+        // 3. Items
+        const rootItems = items.filter(i => !i.parent_item_id);
+        const allChildren = items.filter(i => i.parent_item_id);
+
+        rootItems.forEach(item => {
+            data.push(...this.renderRawItem(item, false, isKOT, lineWidth, encoder, currencyByte));
+            allChildren.filter(c => c.parent_item_id === item.id).forEach(c => {
+                data.push(...this.renderRawItem(c, true, isKOT, lineWidth, encoder, currencyByte));
+            });
+        });
+
+        // 4. Totals (Skip for KOT)
+        if (!isKOT) {
+            data.push(...[27, 97, 1], ...encoder.encode(divider));
+            const tax = order.metadata?.tax || 0;
+            if (tax > 0) {
+                const taxLabel = "Tax: ";
+                const taxVal = tax.toFixed(2);
+                data.push(...encoder.encode(taxLabel.padStart(lineWidth - taxVal.length - 1)), currencyByte, ...encoder.encode(taxVal + "\n"));
+            }
+
+            const totalLabel = "TOTAL: ";
+            const totalVal = (order.total_amount || 0).toFixed(2);
+            data.push(...[27, 33, 16], ...encoder.encode(totalLabel.padStart(lineWidth - totalVal.length - 1)), currencyByte, ...encoder.encode(totalVal + "\n"), ...[27, 33, 0]);
+            
+            if (receiptSettings?.footer_text) {
+                data.push(...encoder.encode("\n" + receiptSettings.footer_text + "\n"));
+            }
+        } else {
+            data.push(...[27, 97, 1], ...encoder.encode(divider), ...encoder.encode("-- END OF TICKET --\n"));
+        }
+
+        data.push(...encoder.encode("\n\n\n"), ...[29, 86, 66, 0]); // Cut
+
+        return { data, restaurant };
+    }
+
+
+
+    private renderRawItem(item: any, isChild: boolean = false, isKOT: boolean = false, lineWidth: number, encoder: TextEncoder, currencyByte: number) {
+        const innerData: number[] = [];
+        const itemName = item.name_snapshot || item.name || 'Unknown Item';
+        const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
+
+        // Format: Qty(4) + Name(X) + Sym(1) + Price(9) = lineWidth
+        const qtyStr = `${item.quantity}x `.padEnd(4);
+
+        if (isKOT) {
+            // Double width and double height for Kitchen Items
+            const rowLimit = Math.floor(lineWidth / 2); // printer width is halved in double-size mode
+            const wrappedNames = this.wrapText(itemName, rowLimit - qtyStr.length);
+            
+            innerData.push(...[27, 33, 48]); // Double width & height
+            wrappedNames.forEach((line, index) => {
+                if (index === 0) {
+                    innerData.push(...encoder.encode(`${qtyStr.slice(0, 4)}${line}\n`));
+                } else {
+                    innerData.push(...encoder.encode(`    ${line}\n`)); // 4-char indent (matching qty column)
+                }
+            });
+            innerData.push(...[27, 33, 0]); // Normal size
+        } else {
+            // Wrapping item name: first line has qty + name + price, continuation lines indent
+            const prefixWidth = (isChild ? 4 : 4); // Both use 4 chars for qty
+            const nameWidth = lineWidth - prefixWidth - (isChild ? 4 : 0) - 1 - 9; // Indent child name extra
+            
+            const priceValStr = itemPrice.toFixed(2).padStart(9);
+            const wrappedNames = this.wrapText(itemName, nameWidth);
+
+            wrappedNames.forEach((line, index) => {
+                if (index === 0) {
+                    if (isChild) innerData.push(...encoder.encode("  ")); // extra indent for child
+                    innerData.push(...encoder.encode(qtyStr.slice(0, 4)));
+                    innerData.push(...encoder.encode(line.padEnd(nameWidth)));
+                    innerData.push(...encoder.encode(" "));
+                    innerData.push(...encoder.encode(`${priceValStr}\n`));
+                } else {
+                    // Wrap remaining text with indent
+                    const extraIndent = isChild ? 6 : 4;
+                    const continuationLines = this.wrapText(line, lineWidth - extraIndent);
+                    continuationLines.forEach(cl => {
+                        innerData.push(...encoder.encode(" ".repeat(extraIndent) + cl + "\n"));
+                    });
+                }
+            });
+        }
+
+        // Modifiers / Addons
+        const modifiers = item.selected_modifiers || item.selected_addons || [];
+        if (Array.isArray(modifiers) && modifiers.length > 0) {
+            const grouped = modifiers.reduce((acc: any, mod: any) => {
+                const gName = mod.modifier_group_name || mod.group_name || "Extras";
+                if (!acc[gName]) acc[gName] = [];
+                acc[gName].push(mod);
+                return acc;
+            }, {});
+
+            Object.entries(grouped).forEach(([groupName, mods]: [string, any[]]) => {
+                const totalGroupPrice = mods.reduce((sum, m) => sum + (m.price || 0), 0);
+                const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
+                const fullText = `+ ${groupName}: ${names}`;
+                
+                const metaIndent = isChild ? 6 : 4;
+                const nameWidth = lineWidth - metaIndent - 1 - 9; // available for modifier text on first line
+                const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
+                const wrappedLines = this.wrapText(fullText, nameWidth);
+
+                wrappedLines.forEach((line, index) => {
+                    if (index === 0) {
+                        innerData.push(...encoder.encode(" ".repeat(metaIndent)));
+                        innerData.push(...encoder.encode(line.padEnd(nameWidth)));
+                        if (totalGroupPrice > 0 && !isKOT) {
+                            innerData.push(...encoder.encode(" "));
+                            innerData.push(...encoder.encode(`${priceStr}\n`));
+                        } else {
+                            innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n"))); // 1 space + 9 price
+                        }
+                    } else {
+                        const continuationLines = this.wrapText(line, lineWidth - metaIndent);
+                        continuationLines.forEach(cl => {
+                            innerData.push(...encoder.encode(" ".repeat(metaIndent) + cl + "\n"));
+                        });
+                    }
+                });
+            });
+        }
+
+        // Excluded Toppings
+        const exclusions = item.excluded_toppings || [];
+        if (Array.isArray(exclusions) && exclusions.length > 0) {
+            exclusions.forEach((excl: any) => {
+                const icon = isChild ? "    - " : "  - ";
+                const nameWidth = lineWidth - icon.length;
+                let exclStr = `NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
+                if (excl.replacement) {
+                    exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
+                }
+                const wrappedExcl = this.wrapText(exclStr, nameWidth);
+                wrappedExcl.forEach((line, index) => {
+                    if (index === 0) {
+                        innerData.push(...encoder.encode(icon + line + "\n"));
+                    } else {
+                        innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
+                    }
+                });
+            });
+        }
+
+        // Selected Replacers
+        const replacers = item.selected_replacers || [];
+        if (Array.isArray(replacers) && replacers.length > 0) {
+            replacers.forEach((repl: any) => {
+                const replIndent = isChild ? 6 : 4;
+                const nameWidth = lineWidth - replIndent - 1 - 9;
+                let replContent: string;
+                let icon: string;
+                
+                if (repl.is_exclusion_only) {
+                    icon = isChild ? "    x " : "  x ";
+                    replContent = `${repl.name}`;
+                } else if (repl.ingredient_name) {
+                    icon = isChild ? "    x " : "  x ";
+                    const ingName = repl.ingredient_name.toLowerCase().startsWith('no') 
+                        ? repl.ingredient_name 
+                        : `No ${repl.ingredient_name}`;
+                    replContent = `${ingName} -> ${repl.name}`;
+                } else {
+                    icon = isChild ? "    ~ " : "  ~ ";
+                    replContent = `${repl.name}`;
+                }
+
+                const wrappedRepl = this.wrapText(replContent, nameWidth);
+                const replPrice = Number(repl.price_adjustment || 0);
+                const replPriceStr = replPrice > 0 ? replPrice.toFixed(2).padStart(9) : "".padStart(9);
+
+                wrappedRepl.forEach((line, index) => {
+                    if (index === 0) {
+                        innerData.push(...encoder.encode(icon));
+                        innerData.push(...encoder.encode(line.padEnd(nameWidth)));
+                        if (replPrice > 0 && !isKOT) {
+                            innerData.push(...encoder.encode(" "));
+                            innerData.push(...encoder.encode(`${replPriceStr}\n`));
+                        }
+                    } else {
+                        innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
+                    }
+                });
+            });
+        }
+
+        // Deal Selections (Internal Items)
+        const selections = item.deal_selections || item.selections || [];
+        if (Array.isArray(selections) && selections.length > 0) {
+            selections.forEach((sel: any) => {
+                const selIcon = isChild ? "      • " : "    • ";
+                const nameWidth = lineWidth - selIcon.length - 1 - 9;
+                const selName = `${sel.name}${sel.selected_variant ? ` (${sel.selected_variant.name})` : ""}`;
+                const wrappedSelName = this.wrapText(selName, nameWidth);
+                const selPrice = Number(sel.price_adjustment || 0);
+                const selPriceStr = selPrice > 0 ? selPrice.toFixed(2).padStart(9) : "".padStart(9);
+
+                wrappedSelName.forEach((line, index) => {
+                    if (index === 0) {
+                        innerData.push(...encoder.encode(selIcon));
+                        innerData.push(...encoder.encode(line.padEnd(nameWidth)));
+                        if (selPrice > 0 && !isKOT) {
+                            innerData.push(...encoder.encode(" "));
+                            innerData.push(...encoder.encode(`${selPriceStr}\n`));
+                        } else {
+                            innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n")));
+                        }
+                    } else {
+                        innerData.push(...encoder.encode(" ".repeat(selIcon.length) + line + "\n"));
+                    }
+                });
+
+                // Selection Modifiers
+                if (sel.modifiers && sel.modifiers.length > 0) {
+                    sel.modifiers.forEach((m: any) => {
+                        const mIcon = isChild ? "        + " : "      + ";
+                        const mLine = `+ ${m.name}`;
+                        const wrappedM = this.wrapText(mLine, lineWidth - mIcon.length);
+                        wrappedM.forEach(l => innerData.push(...encoder.encode(mIcon + l + "\n")));
+                    });
+                }
+
+                // Selection Exclusions
+                if (sel.excluded_toppings && sel.excluded_toppings.length > 0) {
+                    sel.excluded_toppings.forEach((e: any) => {
+                        const eIcon = isChild ? "        - " : "      - ";
+                        const eLine = `- NO ${e.name}`;
+                        const wrappedE = this.wrapText(eLine, lineWidth - eIcon.length);
+                        wrappedE.forEach(l => innerData.push(...encoder.encode(eIcon + l + "\n")));
+                    });
+                }
+
+                // Selection Replacers
+                if (sel.selected_replacers && sel.selected_replacers.length > 0) {
+                    sel.selected_replacers.forEach((r: any) => {
+                        const rIcon = isChild ? "        x " : "      x ";
+                        const rLine = r.is_exclusion_only ? `x ${r.name}` : `~ ${r.name}`;
+                        const wrappedR = this.wrapText(rLine, lineWidth - rIcon.length);
+                        wrappedR.forEach(l => innerData.push(...encoder.encode(rIcon + l + "\n")));
+                    });
+                }
+            });
+        }
+
+        return innerData;
     }
 
     private async printNetwork(orderId: string, settings: PrinterSettings, stationId?: string, showAlert?: any, isKOT: boolean = false) {
         const ip = settings.networkIp;
         if (!ip) {
             if (showAlert) showAlert('Printer Error', 'No Printer IP configured.', 'error');
-            else console.error('No Printer IP configured.');
             return;
         }
 
-        console.log(`Network print to ${ip} for order ${orderId} (Station: ${stationId}) (KOT: ${isKOT})`);
-
         try {
-            // Fetch order and items for printing
-            const { data: order, error: orderError } = await supabase
-                .from('orders')
-                .select(`
-                    *,
-                    table_info:table_id(table_name),
-                    customer:user_id(full_name, phone, address, postcode)
-                `)
-                .eq('id', orderId)
-                .single();
-
-            if (orderError) throw orderError;
-
-            // Fetch restaurant and receipt settings
-            const { data: restaurant } = await supabase
-                .from('restaurant_settings')
-                .select('*')
-                .eq('id', order.restaurant_id)
-                .single();
-
-            const { data: receiptSettings } = await supabase.rpc('get_receipt_settings', {
-                p_restaurant_id: order.restaurant_id
-            });
-
-            let query = supabase
-                .from('order_items')
-                .select('*')
-                .eq('order_id', orderId);
-
-            if (stationId) {
-                query = query.eq('station_id', stationId);
-            }
-
-            const { data: items, error: itemsError } = await query;
-            if (itemsError) throw itemsError;
-
-            if (!items || items.length === 0) {
-                console.log('No items for this station, skipping print.');
-                return;
-            }
-
-            // 0. Logo (Dynamic from URL)
-            if (receiptSettings?.show_logo) {
-                const logoUrl = receiptSettings.logo_url || restaurant?.logo_url || restaurant?.logo;
-                if (logoUrl) {
-                    try {
-                        console.log('Printing dynamic logo from URL:', logoUrl);
-                        if ((window as any).__TAURI_INTERNALS__) {
-                            await invoke('print_logo_to_network', {
-                                ip: ip,
-                                port: 9100,
-                                url: logoUrl
-                            });
-                        } else {
-                            console.warn('Network logo print skipped: Not in Tauri environment');
-                        }
-                        // Add a small delay for the printer to process the image
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    } catch (logoErr) {
-                        console.error('Failed to print dynamic logo:', logoErr);
-                    }
-                }
-            }
-            // Init data for text
-            const encoder = new TextEncoder();
-            const currency = restaurant.currency || '£';
-            const currencyByte = currency === '£' ? 0x9C : (currency === '€' ? 0xD5 : 0x24); // 0x9C=£ in PC858, 0xD5=€ in PC858, 0x24=$
-
-            const lineWidth = settings.paperWidth === '58mm' ? 32 : 42; // Safer 42 for 80mm
-            const divider = "-".repeat(lineWidth) + "\n";
-
-            let data: number[] = [
-                ...[27, 64], // Init
-                ...[27, 116, 19], // Select PC858 (Euro / UK pound support)
-                ...[27, 97, 1], // Center
-            ];
-
-            // 1. Restaurant Header
-            if (restaurant) {
-                const rName = (restaurant.restaurant_name || restaurant.name || 'RESVI').toUpperCase();
-                const addr1 = restaurant.address_line1 || restaurant.address || '';
-                const addr2 = restaurant.address_line2 || '';
-
-                data = [
-                    ...data,
-                    ...[27, 33, 48], // Double width & height
-                    ...encoder.encode(`${rName}\n`),
-                    ...[27, 33, 0], // Normal size
-                    ...encoder.encode(`${addr1}${addr1 ? '\n' : ''}`),
-                    ...encoder.encode(`${addr2}${addr2 ? '\n' : ''}`),
-                    ...encoder.encode(`${restaurant.phone || ''}\n`),
-                ];
-            }
-
-            // 2. Custom Admin Header
-            if (receiptSettings?.header_text) {
-                data = [
-                    ...data,
-                    ...encoder.encode(divider),
-                    ...encoder.encode(`${receiptSettings.header_text}\n`),
-                ];
-            }
-
-            // Order Type Label
-            let orderTypeLabel = 'WALK IN';
-            if (order.order_type === 'dine_in') orderTypeLabel = 'DINE IN';
-            else if (order.order_type === 'delivery') orderTypeLabel = 'DELIVERY';
-            else if (order.order_type === 'collection') orderTypeLabel = 'COLLECTION';
-            else if (order.order_source === 'online') orderTypeLabel = order.order_type?.toUpperCase() || 'ONLINE';
-
-            data = [
-                ...data,
-                ...encoder.encode(divider),
-                ...[27, 97, 1], // Center
-                ...[27, 33, 16], // Double height for label
-                ...encoder.encode(`${orderTypeLabel.padStart(lineWidth / 2 + orderTypeLabel.length / 2).padEnd(lineWidth).slice(0, lineWidth)}\n`),
-                ...[27, 33, 0], // Normal size
-                ...encoder.encode(`Order: ${order.daily_order_number || orderId.slice(0, 8)}\n`),
-                ...encoder.encode(`Date: ${new Date(order.created_at).toLocaleString()}\n`),
-            ];
-
-            // Customer Details
-            const cName = order.customer?.full_name || order.customer_name || '';
-            const cPhone = order.customer?.phone || order.customer_phone || '';
-            const cAddress = order.customer?.address || order.customer_address || '';
-            const cPostcode = order.customer?.postcode || order.customer_postcode || '';
-
-            if (cName || cPhone || cAddress || cPostcode) {
-                if (cName) {
-                    data.push(...encoder.encode(`${cName.slice(0, lineWidth)}\n`));
-                }
-                if (cPhone) {
-                    data.push(...encoder.encode(`${cPhone.slice(0, lineWidth)}\n`));
-                }
-                
-                if ((order.order_type === 'delivery' || orderTypeLabel === 'DELIVERY') && (cAddress || cPostcode)) {
-                    const fullAddress = `${cAddress}${cAddress && cPostcode ? ', ' : ''}${cPostcode}`;
-                    const addressLines = this.wrapText(fullAddress, lineWidth);
-                    addressLines.forEach(line => {
-                        data.push(...encoder.encode(`${line}\n`));
-                    });
-                }
-            }
-
-            data = [
-                ...data,
-                ...encoder.encode(divider),
-                // REMOVED [27, 97, 0] - Keep Center for aligned block
-            ];
-
-            // 3. Items
-            const rootItems = items.filter(i => !i.parent_item_id);
-            const allChildren = items.filter(i => i.parent_item_id);
-
-            const renderRawItem = (item: any, isChild: boolean = false) => {
-                const innerData: number[] = [];
-                const itemName = item.name_snapshot || item.name || 'Unknown Item';
-                const itemPrice = (item.price_snapshot || item.price || 0) * (item.quantity || 1);
-
-                // Format: Qty(4) + Name(X) + Sym(1) + Price(9) = lineWidth
-                const qtyStr = `${item.quantity}x `.padEnd(4);
-
-                if (isKOT) {
-                    // Double width and double height for Kitchen Items
-                    const rowLimit = Math.floor(lineWidth / 2); // printer width is halved in double-size mode
-                    const wrappedNames = this.wrapText(itemName, rowLimit - qtyStr.length);
-                    
-                    innerData.push(...[27, 33, 48]); // Double width & height
-                    wrappedNames.forEach((line, index) => {
-                        if (index === 0) {
-                            innerData.push(...encoder.encode(`${qtyStr.slice(0, 4)}${line}\n`));
-                        } else {
-                            innerData.push(...encoder.encode(`    ${line}\n`)); // 4-char indent (matching qty column)
-                        }
-                    });
-                    innerData.push(...[27, 33, 0]); // Normal size
-                } else {
-                    // Wrapping item name: first line has qty + name + price, continuation lines indent
-                    const indentStr = isChild ? "    " : "";
-                    const prefixWidth = (isChild ? 4 : 4); // Both use 4 chars for qty
-                    const nameWidth = lineWidth - prefixWidth - (isChild ? 4 : 0) - 1 - 9; // Indent child name extra
-                    
-                    const priceValStr = itemPrice.toFixed(2).padStart(9);
-                    const wrappedNames = this.wrapText(itemName, nameWidth);
-
-                    wrappedNames.forEach((line, index) => {
-                        if (index === 0) {
-                            if (isChild) innerData.push(...encoder.encode("  ")); // extra indent for child
-                            innerData.push(...encoder.encode(qtyStr.slice(0, 4)));
-                            innerData.push(...encoder.encode(line.padEnd(nameWidth)));
-                            innerData.push(...encoder.encode(" "));
-                            innerData.push(...encoder.encode(`${priceValStr}\n`));
-                        } else {
-                            // Wrap remaining text with indent
-                            const extraIndent = isChild ? 6 : 4;
-                            const continuationLines = this.wrapText(line, lineWidth - extraIndent);
-                            continuationLines.forEach(cl => {
-                                innerData.push(...encoder.encode(" ".repeat(extraIndent) + cl + "\n"));
-                            });
-                        }
-                    });
-                }
-
-                if (isChild && !isKOT) {
-                    // Optional label for clarity if needed, but indentation is usually enough
-                }
-
-                // Modifiers / Addons
-                const modifiers = item.selected_modifiers || item.selected_addons || [];
-                if (Array.isArray(modifiers) && modifiers.length > 0) {
-                    const grouped = modifiers.reduce((acc: any, mod: any) => {
-                        const gName = mod.modifier_group_name || mod.group_name || "Extras";
-                        if (!acc[gName]) acc[gName] = [];
-                        acc[gName].push(mod);
-                        return acc;
-                    }, {});
-
-                    Object.entries(grouped).forEach(([groupName, mods]: [string, any[]]) => {
-                        const totalGroupPrice = mods.reduce((sum, m) => sum + (m.price || 0), 0);
-                        const names = mods.map(m => m.name || m.modifier_item_name || m.modifier_name).join(", ");
-                        const fullText = `+ ${groupName}: ${names}`;
-                        
-                        const metaIndent = isChild ? 6 : 4;
-                        const nameWidth = lineWidth - metaIndent - 1 - 9; // available for modifier text on first line
-                        const priceStr = totalGroupPrice > 0 ? totalGroupPrice.toFixed(2).padStart(9) : "".padStart(9);
-                        const wrappedLines = this.wrapText(fullText, nameWidth);
-
-                        wrappedLines.forEach((line, index) => {
-                            if (index === 0) {
-                                innerData.push(...encoder.encode(" ".repeat(metaIndent)));
-                                innerData.push(...encoder.encode(line.padEnd(nameWidth)));
-                                if (totalGroupPrice > 0 && !isKOT) {
-                                    innerData.push(...encoder.encode(" "));
-                                    innerData.push(...encoder.encode(`${priceStr}\n`));
-                                } else {
-                                    innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n"))); // 1 space + 9 price
-                                }
-                            } else {
-                                const continuationLines = this.wrapText(line, lineWidth - metaIndent);
-                                continuationLines.forEach(cl => {
-                                    innerData.push(...encoder.encode(" ".repeat(metaIndent) + cl + "\n"));
-                                });
-                            }
-                        });
-                    });
-                }
-
-                // Excluded Toppings
-                const exclusions = item.excluded_toppings || [];
-                if (Array.isArray(exclusions) && exclusions.length > 0) {
-                    exclusions.forEach((excl: any) => {
-                        const icon = isChild ? "    - " : "  - ";
-                        const nameWidth = lineWidth - icon.length;
-                        let exclStr = `NO ${excl.name}${excl.group_name ? ` (${excl.group_name})` : ""}`;
-                        if (excl.replacement) {
-                            exclStr += ` -> ${excl.replacement.name}${excl.replacement.group_name ? ` (${excl.replacement.group_name})` : ""}`;
-                        }
-                        const wrappedExcl = this.wrapText(exclStr, nameWidth);
-                        wrappedExcl.forEach((line, index) => {
-                            if (index === 0) {
-                                innerData.push(...encoder.encode(icon + line + "\n"));
-                            } else {
-                                innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
-                            }
-                        });
-                    });
-                }
-
-                // Selected Replacers
-                const replacers = item.selected_replacers || [];
-                if (Array.isArray(replacers) && replacers.length > 0) {
-                    replacers.forEach((repl: any) => {
-                        const replIndent = isChild ? 6 : 4;
-                        const nameWidth = lineWidth - replIndent - 1 - 9;
-                        let replContent: string;
-                        let icon: string;
-                        
-                        if (repl.is_exclusion_only) {
-                            icon = isChild ? "    x " : "  x ";
-                            replContent = `${repl.name}`;
-                        } else if (repl.ingredient_name) {
-                            icon = isChild ? "    x " : "  x ";
-                            const ingName = repl.ingredient_name.toLowerCase().startsWith('no') 
-                                ? repl.ingredient_name 
-                                : `No ${repl.ingredient_name}`;
-                            replContent = `${ingName} -> ${repl.name}`;
-                        } else {
-                            icon = isChild ? "    ~ " : "  ~ ";
-                            replContent = `${repl.name}`;
-                        }
-
-                        const wrappedRepl = this.wrapText(replContent, nameWidth);
-                        const replPrice = Number(repl.price_adjustment || 0);
-                        const replPriceStr = replPrice > 0 ? replPrice.toFixed(2).padStart(9) : "".padStart(9);
-
-                        wrappedRepl.forEach((line, index) => {
-                            if (index === 0) {
-                                innerData.push(...encoder.encode(icon));
-                                innerData.push(...encoder.encode(line.padEnd(nameWidth)));
-                                if (replPrice > 0 && !isKOT) {
-                                    innerData.push(...encoder.encode(" "));
-                                    innerData.push(...encoder.encode(`${replPriceStr}\n`));
-                                } else {
-                                    innerData.push(...encoder.encode(isKOT ? "\n" : ((" ".repeat(10)) + "\n")));
-                                }
-                            } else {
-                                innerData.push(...encoder.encode(" ".repeat(icon.length) + line + "\n"));
-                            }
-                        });
-                    });
-                }
-
-                return innerData;
-            };
-
-            rootItems.forEach(item => {
-                data.push(...renderRawItem(item));
-                const children = allChildren.filter(c => c.parent_item_id === item.id);
-                children.forEach(c => {
-                    data.push(...renderRawItem(c, true));
-                });
-            });
-
-            // Handle orphans
-            const rootIds = new Set(rootItems.map(i => i.id));
-            allChildren.filter(c => !rootIds.has(c.parent_item_id)).forEach(c => {
-                data.push(...encoder.encode(" (PART OF DEAL)\n"));
-                data.push(...renderRawItem(c));
-            });
-
-            // 4. Totals Breakdown (Skip for KOT)
-            if (!isKOT) {
-                const subtotal = order.metadata?.subtotal || 0;
-                const tax = order.metadata?.tax || 0;
-                const deliveryFee = order.metadata?.delivery_fee || 0;
-
-                data = [
-                    ...data,
-                    ...[27, 97, 1], // Center for divider
-                    ...encoder.encode(divider),
-                ];
-
-                if (tax > 0 && restaurant.show_tax !== false) {
-                    const taxLabel = "Tax: ";
-                    const taxVal = tax.toFixed(2);
-                    const paddingCount = lineWidth - taxLabel.length - taxVal.length - 1;
-                    data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-                    data.push(...encoder.encode(taxLabel));
-                    data.push(currencyByte);
-                    data.push(...encoder.encode(`${taxVal}\n`));
-                }
-
-                if (deliveryFee > 0) {
-                    const deliveryLabel = "Delivery Fee: ";
-                    const deliveryVal = deliveryFee.toFixed(2);
-                    const paddingCount = lineWidth - deliveryLabel.length - deliveryVal.length - 1;
-                    data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-                    data.push(...encoder.encode(deliveryLabel));
-                    data.push(currencyByte);
-                    data.push(...encoder.encode(`${deliveryVal}\n`));
-                }
-
-                // Big Total - Manual right align within block
-                const totalLabel = "TOTAL: ";
-                const totalVal = (order.total_amount || 0).toFixed(2);
-                const paddingCount = lineWidth - totalLabel.length - totalVal.length - 1;
-
-                data.push(...[27, 33, 16]); // Double height
-                data.push(...encoder.encode(" ".repeat(Math.max(0, paddingCount))));
-                data.push(...encoder.encode(totalLabel));
-                data.push(currencyByte);
-                data.push(...encoder.encode(`${totalVal}\n`));
-                data.push(...[27, 33, 0]); // Reset
-
-                // 5. Custom Admin Footer (includes Thank You if configured)
-                if (receiptSettings?.footer_text) {
-                    data = [
-                        ...data,
-                        ...[27, 97, 1], // Center
-                        ...encoder.encode("\n"),
-                        ...encoder.encode(`${receiptSettings.footer_text}\n`),
-                    ];
-                } else {
-                    // Default footer if no custom one
-                    data = [
-                        ...data,
-                        ...[27, 97, 1], // Center
-                        ...encoder.encode("\nThank you for choosing us!\n"),
-                    ];
-                }
-            } else {
-                // KOT Footer
-                data = [
-                    ...data,
-                    ...[27, 97, 1], // Center
-                    ...encoder.encode(divider),
-                    ...encoder.encode("-- END OF TICKET --\n"),
-                ];
-            }
-
-            // 6. Finishing
-            data = [
-                ...data,
-                ...encoder.encode("\n\n\n"),
-                ...[29, 86, 66, 0] // Cut
-            ];
+            const { data: rawData, restaurant } = await this.generateRawEscPosData(orderId, settings, stationId, isKOT);
+            if (!rawData || rawData.length === 0) return;
 
             // Send to Tauri
             if ((window as any).__TAURI_INTERNALS__) {
                 await invoke('print_raw_to_network', {
                     ip: ip,
                     port: 9100,
-                    data: Array.from(new Uint8Array(data))
+                    data: Array.from(new Uint8Array(rawData))
                 });
-                // if (showAlert) showAlert('Success', `Printed to ${ip}`, 'success');
             } else {
-                console.error('Network print failed: invoke is not available');
-                if (showAlert) {
-                    showAlert('Printer Error', 'Network printing requires the desktop application. Opening browser print instead.', 'warning');
-                }
-                // Fallback to browser print for this order
                 await this.printBrowser(orderId, true, stationId, undefined, isKOT);
             }
         } catch (error: any) {
@@ -948,7 +934,7 @@ class ReceiptService {
                                     <span>${repl.is_exclusion_only
                                         ? `x ${repl.name}`
                                         : repl.ingredient_name
-                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? r.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
+                                            ? `x ${repl.ingredient_name.toLowerCase().startsWith('no') ? repl.ingredient_name : `No ${repl.ingredient_name}`} &rarr; ${repl.name}`
                                             : `~ ${repl.name}`
                                     }</span>
                                     ${(!(stationName || isKOT) && Number(repl.price_adjustment) > 0) ? `<span style="float:right">${Number(repl.price_adjustment).toFixed(2)}</span>` : ''}

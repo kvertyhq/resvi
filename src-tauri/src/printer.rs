@@ -6,11 +6,19 @@ use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use image::{DynamicImage, GenericImageView, Luma};
 use std::io::Cursor;
+use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
+use btleplug::platform::Manager;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DiscoveredPrinter {
     pub ip: String,
     pub port: u16,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiscoveredBluetoothDevice {
+    pub name: String,
+    pub mac: String,
 }
 
 #[tauri::command]
@@ -53,6 +61,75 @@ pub async fn scan_network_printers() -> Result<Vec<DiscoveredPrinter>, String> {
     }
 
     Ok(found_printers)
+}
+
+#[tauri::command]
+pub async fn scan_bluetooth_printers() -> Result<Vec<DiscoveredBluetoothDevice>, String> {
+    let manager = Manager::new().await.map_err(|e| format!("Failed to initialize bluetooth manager: {}", e))?;
+    let adapters = manager.adapters().await.map_err(|e| format!("Failed to get adapters: {}", e))?;
+    let central = adapters.into_iter().nth(0).ok_or("No Bluetooth adapters found")?;
+
+    println!("Starting bluetooth scan...");
+    central.start_scan(ScanFilter::default()).await.map_err(|e| format!("Failed to start scan: {}", e))?;
+
+    // Wait for discovery
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+    let mut found_devices = Vec::new();
+    let peripherals = central.peripherals().await.map_err(|e| format!("Failed to get peripherals: {}", e))?;
+
+    for peripheral in peripherals {
+        let address = peripheral.address().to_string();
+        let properties = peripheral.properties().await.unwrap_or(None);
+        let name = properties.and_then(|p| p.local_name).unwrap_or_else(|| "Unknown Device".to_string());
+        
+        found_devices.push(DiscoveredBluetoothDevice {
+            name,
+            mac: address,
+        });
+    }
+
+    Ok(found_devices)
+}
+
+#[tauri::command]
+pub async fn print_raw_to_bluetooth(mac: String, data: Vec<u8>) -> Result<(), String> {
+    let manager = Manager::new().await.map_err(|e| format!("Failed to initialize bluetooth manager: {}", e))?;
+    let adapters = manager.adapters().await.map_err(|e| format!("Failed to get adapters: {}", e))?;
+    let central = adapters.into_iter().nth(0).ok_or("No Bluetooth adapters found")?;
+
+    let peripherals = central.peripherals().await.map_err(|e| format!("Failed to get peripherals: {}", e))?;
+    
+    // Find the peripheral by address
+    let peripheral = peripherals.into_iter()
+        .find(|p| p.address().to_string() == mac)
+        .ok_or_else(|| format!("Peripheral with MAC {} not found. Make sure it is paired and reachable.", mac))?;
+
+    // Connect
+    if !peripheral.is_connected().await.unwrap_or(false) {
+        peripheral.connect().await.map_err(|e| format!("Failed to connect to printer: {}", e))?;
+    }
+
+    // Discover services
+    peripheral.discover_services().await.map_err(|e| format!("Failed to discover services: {}", e))?;
+
+    // Find the first write-capable characteristic
+    // Common thermal printer characteristic UUIDs could be checked, but we'll look for any Write property.
+    let characteristics = peripheral.characteristics();
+    let write_char = characteristics.iter()
+        .find(|c| c.properties.contains(btleplug::api::CharPropFlags::WRITE) || c.properties.contains(btleplug::api::CharPropFlags::WRITE_WITHOUT_RESPONSE))
+        .ok_or("No writeable characteristic found on this device.")?;
+
+    let write_type = if write_char.properties.contains(btleplug::api::CharPropFlags::WRITE_WITHOUT_RESPONSE) {
+        btleplug::api::WriteType::WithoutResponse
+    } else {
+        btleplug::api::WriteType::WithResponse
+    };
+
+    // Write data
+    peripheral.write(write_char, &data, write_type).await.map_err(|e| format!("Failed to write data to printer: {}", e))?;
+
+    Ok(())
 }
 
 #[tauri::command]

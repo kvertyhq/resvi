@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useAdmin } from '../../context/AdminContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../supabaseClient';
-import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronUp, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw, Package, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, CheckCircle, XCircle, Loader2, Layers, Utensils, ChevronUp, ChevronDown, ChevronRight, Settings2, Copy, Search, RefreshCw, Package, Tag, Send } from 'lucide-react';
 import { Station, StationService } from '../../services/StationService';
 
 // Interfaces based on user schema
@@ -316,8 +316,8 @@ const MenuManagementPage: React.FC = () => {
         const currentMap = isCategory ? selectedCatModifierOrders : selectedModifierOrders;
         const setter = isCategory ? setSelectedCatModifierOrders : setSelectedModifierOrders;
         
-        // Convert map to sorted array of [id, order]
-        const entries = Array.from(currentMap.entries()).sort((a, b) => a[1] - b[1]);
+        // Convert map to sorted array of [id, order] and type it explicitly as tuples
+        const entries = Array.from(currentMap.entries()).sort((a, b) => a[1] - b[1]) as [string, number][];
         const index = entries.findIndex(item => item[0] === id);
         
         if (index === -1) return;
@@ -330,6 +330,84 @@ const MenuManagementPage: React.FC = () => {
         entries[targetIndex][1] = temp;
         
         setter(new Map(entries));
+    };
+
+    // Transfer Item State
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [itemToTransfer, setItemToTransfer] = useState<MenuItem | null>(null);
+    const [transferTargetResId, setTransferTargetResId] = useState('');
+    const [transferTargetCatId, setTransferTargetCatId] = useState('');
+    const [targetCategories, setTargetCategories] = useState<MenuCategory[]>([]);
+    const [isFetchingTargetCats, setIsFetchingTargetCats] = useState(false);
+
+    // Fetch categories for the target restaurant when it changes
+    useEffect(() => {
+        const fetchTargetCats = async () => {
+            if (!transferTargetResId) {
+                setTargetCategories([]);
+                return;
+            }
+            setIsFetchingTargetCats(true);
+            try {
+                const { data, error } = await supabase
+                    .from('menu_categories')
+                    .select('*')
+                    .eq('restaurant_id', transferTargetResId)
+                    .order('order_index');
+                if (error) throw error;
+                setTargetCategories(data || []);
+                if (data && data.length > 0) {
+                    setTransferTargetCatId(data[0].id);
+                } else {
+                    setTransferTargetCatId('');
+                }
+            } catch (err) {
+                console.error("Error fetching target categories:", err);
+                showAlert('Error', 'Failed to fetch categories for the target restaurant.', 'error');
+            } finally {
+                setIsFetchingTargetCats(false);
+            }
+        };
+
+        if (isTransferModalOpen) {
+            fetchTargetCats();
+        }
+    }, [transferTargetResId, isTransferModalOpen]);
+
+    const handleTransferSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!itemToTransfer || !transferTargetResId || !transferTargetCatId) return;
+
+        setLoading(true);
+        try {
+            const itemWithVariants = itemToTransfer as any;
+            const payload = {
+                restaurant_id: transferTargetResId,
+                category_id: transferTargetCatId,
+                name: itemToTransfer.name,
+                description: itemToTransfer.description,
+                price: itemToTransfer.price,
+                is_available: itemToTransfer.is_available,
+                image_url: itemToTransfer.image_url,
+                tags: itemToTransfer.tags,
+                vegetarian: itemToTransfer.vegetarian,
+                spicy_level: itemToTransfer.spicy_level,
+                station_id: null, // Reset station override as IDs differ
+                price_variants: itemWithVariants.price_variants || null,
+                default_topping_ids: [] // Reset as IDs differ
+            };
+
+            const { error } = await supabase.from('menu_items').insert([payload]);
+            if (error) throw error;
+
+            showAlert('Success', `"${itemToTransfer.name}" copied to destination restaurant.`, 'success');
+            setIsTransferModalOpen(false);
+        } catch (err) {
+            console.error("Error transferring item:", err);
+            showAlert('Error', 'Failed to copy item to the target restaurant.', 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Modal State
@@ -1896,20 +1974,58 @@ const MenuManagementPage: React.FC = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button
-                                                            onClick={() => handleDuplicateItem(item)}
-                                                            className="text-blue-600 hover:text-blue-900 mr-4"
-                                                            title="Duplicate Item"
-                                                        >
-                                                            <Copy className="h-5 w-5" />
-                                                        </button>
-                                                        <button onClick={() => openItemModal(item)} className="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit Item"><Edit className="h-5 w-5" /></button>
-                                                        <button onClick={() => handleDeleteItem(item.id)} className="text-red-600 hover:text-red-900" title="Delete Item"><Trash2 className="h-5 w-5" /></button>
+                                                        <div className="flex items-center justify-end">
+                                                            {restaurants.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setItemToTransfer(item);
+                                                                        const target = restaurants.find(r => r.id !== selectedRestaurantId);
+                                                                        if (target) setTransferTargetResId(target.id);
+                                                                        setIsTransferModalOpen(true);
+                                                                    }}
+                                                                    className="text-brand-gold hover:text-yellow-600 mr-4"
+                                                                    title="Copy to another Restaurant"
+                                                                >
+                                                                    <Send className="h-5 w-5" />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDuplicateItem(item)}
+                                                                className="text-blue-600 hover:text-blue-900 mr-4"
+                                                                title="Duplicate Item"
+                                                            >
+                                                                <Copy className="h-5 w-5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => openItemModal(item)} 
+                                                                className="text-indigo-600 hover:text-indigo-900 mr-4" 
+                                                                title="Edit Item"
+                                                            >
+                                                                <Edit className="h-5 w-5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handleDeleteItem(item.id)} 
+                                                                className="text-red-600 hover:text-red-900" 
+                                                                title="Delete Item"
+                                                            >
+                                                                <Trash2 className="h-5 w-5" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
                                         })}
-                                        {items.length === 0 && <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">No items found.</td></tr>}
+                                        {items.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                                                    No items found.
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -3777,6 +3893,75 @@ const MenuManagementPage: React.FC = () => {
                             <div className="flex justify-end space-x-3 pt-8 border-t border-gray-100">
                                 <button type="button" onClick={() => setIsDealModalOpen(false)} className="px-6 py-2.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
                                 <button type="submit" className="px-10 py-2.5 bg-brand-dark-gray text-white rounded-md hover:bg-gray-800 transition-colors font-bold shadow-sm">Save Deal</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Transfer Item Modal */}
+            {isTransferModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-brand-dark-gray p-4 flex justify-between items-center text-white">
+                            <h2 className="text-lg font-bold flex items-center gap-2">
+                                <Send size={20} /> Copy to another Restaurant
+                            </h2>
+                            <button onClick={() => setIsTransferModalOpen(false)} className="text-white hover:text-gray-300">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleTransferSubmit} className="p-6 space-y-4">
+                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-xs text-yellow-800 mb-4">
+                                <p className="font-bold">Note:</p>
+                                <p>This will copy the base item details. Linked modifiers and addons will need to be re-assigned manually in the target restaurant.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Target Restaurant</label>
+                                <select 
+                                    value={transferTargetResId} 
+                                    onChange={(e) => setTransferTargetResId(e.target.value)}
+                                    required
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                >
+                                    <option value="">Select Restaurant</option>
+                                    {restaurants.filter(r => r.id !== selectedRestaurantId).map(r => (
+                                        <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Target Category</label>
+                                <select 
+                                    value={transferTargetCatId} 
+                                    onChange={(e) => setTransferTargetCatId(e.target.value)}
+                                    required
+                                    disabled={!transferTargetResId || isFetchingTargetCats}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 disabled:bg-gray-50 focus:ring-brand-gold focus:border-brand-gold"
+                                >
+                                    {isFetchingTargetCats ? (
+                                        <option>Loading categories...</option>
+                                    ) : targetCategories.length > 0 ? (
+                                        targetCategories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))
+                                    ) : (
+                                        <option value="">No categories found</option>
+                                    )}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4">
+                                <button type="button" onClick={() => setIsTransferModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button 
+                                    type="submit" 
+                                    disabled={!transferTargetCatId || loading}
+                                    className="px-6 py-2 bg-brand-gold text-white rounded-md hover:bg-yellow-600 disabled:opacity-50 font-bold transition-all shadow-sm"
+                                >
+                                    {loading ? 'Copying...' : 'Copy Item'}
+                                </button>
                             </div>
                         </form>
                     </div>

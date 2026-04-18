@@ -407,6 +407,17 @@ const POSOrderPage: React.FC = () => {
         const item = cartItems.find(i => i.tempId === tempId);
         if (!item) return;
 
+        // Handle Deals
+        if (item.isDeal) {
+            const deal = deals.find(d => d.id === item.deal_id);
+            if (!deal) return;
+            
+            setEditingTempId(tempId);
+            setSelectedDeal(deal);
+            setIsDealModalOpen(true);
+            return;
+        }
+
         const menuItem = menuItems.find(mi => mi.id === item.id);
         if (!menuItem) return;
 
@@ -469,20 +480,28 @@ const POSOrderPage: React.FC = () => {
 
         // Correctly handle deals
         if (item.isDeal) {
-            const newDeal: CartItem = {
-                tempId: crypto.randomUUID(),
+            const dealPayload: CartItem = {
+                tempId: editingTempId || crypto.randomUUID(),
                 id: null,
                 name: item.name,
-                basePrice: item.price,
+                basePrice: item.basePrice || item.price,
                 price: finalPrice, // Includes price adjustments from selections
                 quantity: 1,
                 modifiers: [],
                 selections: item.selections,
                 isDeal: true,
-                deal_id: item.id,
+                deal_id: item.deal_id || item.id,
                 course: 'Main',
             };
-            setCartItems(prev => [...prev, newDeal]);
+
+            if (editingTempId) {
+                setCartItems(prev => prev.map(cartItem => 
+                    cartItem.tempId === editingTempId ? dealPayload : cartItem
+                ));
+                setEditingTempId(null);
+            } else {
+                setCartItems(prev => [...prev, dealPayload]);
+            }
             return;
         }
 
@@ -1412,7 +1431,8 @@ const POSOrderPage: React.FC = () => {
                             {/* Render New/Local Items */}
                             {cartItems.map((item) => {
                                 const menuItem = menuItems.find(mi => mi.id === item.id);
-                                const hasOptions = menuItem ? (itemModifiersMap.has(item.id) || (menuItem.price_variants && menuItem.price_variants.length > 1) || menuItem.flags?.includes('half_half')) : false;
+                                // A deal always has options (selections), whereas a regular item has options if it has modifiers or variants
+                                const hasOptions = item.isDeal || (menuItem ? (itemModifiersMap.has(item.id) || (menuItem.price_variants && menuItem.price_variants.length > 1) || menuItem.flags?.includes('half_half')) : false);
 
                                 return (
                                 <div key={item.tempId} className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 flex justify-between group animate-fadeIn transition-colors shadow-sm relative overflow-hidden">

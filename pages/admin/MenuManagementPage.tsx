@@ -126,7 +126,7 @@ interface MenuDealGroupOption {
 }
 
 const MenuManagementPage: React.FC = () => {
-    const { selectedRestaurantId } = useAdmin();
+    const { selectedRestaurantId, restaurants } = useAdmin();
     const { showAlert, showConfirm } = useAlert();
     const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'addons' | 'modifiers' | 'replacers' | 'deals'>('items');
     const [loading, setLoading] = useState(false);
@@ -340,6 +340,11 @@ const MenuManagementPage: React.FC = () => {
     const [targetCategories, setTargetCategories] = useState<MenuCategory[]>([]);
     const [isFetchingTargetCats, setIsFetchingTargetCats] = useState(false);
 
+    // Transfer Deal State
+    const [isTransferDealModalOpen, setIsTransferDealModalOpen] = useState(false);
+    const [dealToTransfer, setDealToTransfer] = useState<MenuDeal | null>(null);
+    const [transferDealTargetResId, setTransferDealTargetResId] = useState('');
+
     // Fetch categories for the target restaurant when it changes
     useEffect(() => {
         const fetchTargetCats = async () => {
@@ -405,6 +410,37 @@ const MenuManagementPage: React.FC = () => {
         } catch (err) {
             console.error("Error transferring item:", err);
             showAlert('Error', 'Failed to copy item to the target restaurant.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTransferDealSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!dealToTransfer || !transferDealTargetResId) return;
+
+        setLoading(true);
+        try {
+            const payload = {
+                restaurant_id: transferDealTargetResId,
+                name: dealToTransfer.name,
+                description: dealToTransfer.description,
+                pricing_type: dealToTransfer.pricing_type,
+                price: dealToTransfer.price,
+                discount_value: dealToTransfer.discount_value,
+                is_available: dealToTransfer.is_available,
+                order_index: dealToTransfer.order_index,
+                image_url: dealToTransfer.image_url || ''
+            };
+
+            const { error } = await supabase.from('menu_deals').insert([payload]);
+            if (error) throw error;
+
+            showAlert('Success', `"${dealToTransfer.name}" copied to destination restaurant.`, 'success');
+            setIsTransferDealModalOpen(false);
+        } catch (err) {
+            console.error("Error transferring deal:", err);
+            showAlert('Error', 'Failed to copy deal to the target restaurant.', 'error');
         } finally {
             setLoading(false);
         }
@@ -1798,6 +1834,21 @@ const MenuManagementPage: React.FC = () => {
                                                                 <ChevronDown size={16} />
                                                             </button>
                                                         </div>
+                                                        {restaurants.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setDealToTransfer(deal);
+                                                                    const target = restaurants.find(r => r.id !== selectedRestaurantId);
+                                                                    if (target) setTransferDealTargetResId(target.id);
+                                                                    setIsTransferDealModalOpen(true);
+                                                                }}
+                                                                className="text-brand-gold hover:text-yellow-600"
+                                                                title="Copy to another Restaurant"
+                                                            >
+                                                                <Send className="h-5 w-5" />
+                                                            </button>
+                                                        )}
                                                         <button onClick={() => openDealModal(deal)} className="text-indigo-600 hover:text-indigo-900" title="Edit Deal"><Edit className="h-5 w-5" /></button>
                                                         <button onClick={() => handleDeleteDeal(deal.id)} className="text-red-600 hover:text-red-900" title="Delete Deal"><Trash2 className="h-5 w-5" /></button>
                                                     </div>
@@ -3961,6 +4012,55 @@ const MenuManagementPage: React.FC = () => {
                                     className="px-6 py-2 bg-brand-gold text-white rounded-md hover:bg-yellow-600 disabled:opacity-50 font-bold transition-all shadow-sm"
                                 >
                                     {loading ? 'Copying...' : 'Copy Item'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Transfer Deal Modal */}
+            {isTransferDealModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-brand-dark-gray p-4 flex justify-between items-center text-white">
+                            <h2 className="text-lg font-bold flex items-center gap-2">
+                                <Send size={20} /> Copy Deal to another Restaurant
+                            </h2>
+                            <button onClick={() => setIsTransferDealModalOpen(false)} className="text-white hover:text-gray-300">
+                                <XCircle className="h-6 w-6" />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleTransferDealSubmit} className="p-6 space-y-4">
+                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-xs text-yellow-800 mb-4">
+                                <p className="font-bold">Note:</p>
+                                <p>This will copy the base deal details (name, price, etc.). The structural groups and specific item selections will need to be re-configured in the target restaurant.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Target Restaurant</label>
+                                <select 
+                                    value={transferDealTargetResId} 
+                                    onChange={(e) => setTransferDealTargetResId(e.target.value)}
+                                    required
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-brand-gold focus:border-brand-gold"
+                                >
+                                    <option value="">Select Restaurant</option>
+                                    {restaurants.filter(r => r.id !== selectedRestaurantId).map(r => (
+                                        <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4">
+                                <button type="button" onClick={() => setIsTransferDealModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+                                <button 
+                                    type="submit" 
+                                    disabled={!transferDealTargetResId || loading}
+                                    className="px-6 py-2 bg-brand-gold text-white rounded-md hover:bg-yellow-600 disabled:opacity-50 font-bold transition-all shadow-sm"
+                                >
+                                    {loading ? 'Copying...' : 'Copy Deal'}
                                 </button>
                             </div>
                         </form>

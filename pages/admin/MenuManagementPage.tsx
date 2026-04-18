@@ -58,6 +58,7 @@ interface ModifierGroup {
     is_multiple: boolean;
     min_selection: number;
     max_selection: number | null;
+    order_index: number;
     items?: ModifierItem[];
 }
 
@@ -121,6 +122,7 @@ interface MenuDealGroupOption {
     menu_item_id: string | null;
     category_id: string | null;
     price_adjustment: number;
+    order_index: number;
 }
 
 const MenuManagementPage: React.FC = () => {
@@ -242,6 +244,92 @@ const MenuManagementPage: React.FC = () => {
             newVariants[newIndex] = temp;
             setPriceVariants(newVariants);
         }
+    };
+
+    const moveDealGroup = (index: number, direction: 'up' | 'down') => {
+        const newGroups = [...dealGroups];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newGroups.length) return;
+        
+        [newGroups[index], newGroups[targetIndex]] = [newGroups[targetIndex], newGroups[index]];
+        setDealGroups(newGroups);
+    };
+
+    const moveDealOption = (gIdx: number, oIdx: number, direction: 'up' | 'down') => {
+        const updated = [...dealGroups];
+        const options = [...(updated[gIdx].options || [])];
+        const targetIndex = direction === 'up' ? oIdx - 1 : oIdx + 1;
+        if (targetIndex < 0 || targetIndex >= options.length) return;
+
+        [options[oIdx], options[targetIndex]] = [options[targetIndex], options[oIdx]];
+        updated[gIdx].options = options;
+        setDealGroups(updated);
+    };
+
+    const handleMoveDeal = async (index: number, direction: 'up' | 'down') => {
+        const newDeals = [...deals];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newDeals.length) return;
+
+        const [movedDeal] = newDeals.splice(index, 1);
+        newDeals.splice(targetIndex, 0, movedDeal);
+
+        // Update indices locally
+        const updatedDeals = newDeals.map((d, i) => ({ ...d, order_index: i }));
+        setDeals(updatedDeals);
+
+        // Save to DB
+        const { error } = await supabase
+            .from('menu_deals')
+            .upsert(updatedDeals.map(d => ({ id: d.id, order_index: d.order_index })));
+
+        if (error) {
+            showAlert('Error', 'Failed to update deal order.', 'error');
+            fetchDeals();
+        }
+    };
+
+    const handleMoveModifierGroup = async (index: number, direction: 'up' | 'down') => {
+        const newGroups = [...modifierGroups];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newGroups.length) return;
+
+        const [movedGroup] = newGroups.splice(index, 1);
+        newGroups.splice(targetIndex, 0, movedGroup);
+
+        // Update indices locally
+        const updatedGroups = newGroups.map((g, i) => ({ ...g, order_index: i }));
+        setModifierGroups(updatedGroups);
+
+        // Save to DB
+        const { error } = await supabase
+            .from('menu_modifiers')
+            .upsert(updatedGroups.map(g => ({ id: g.id, order_index: g.order_index })));
+
+        if (error) {
+            showAlert('Error', 'Failed to update modifier group order.', 'error');
+            fetchModifierGroups();
+        }
+    };
+
+    const moveLinkedModifier = (id: string, direction: 'up' | 'down', isCategory = false) => {
+        const currentMap = isCategory ? selectedCatModifierOrders : selectedModifierOrders;
+        const setter = isCategory ? setSelectedCatModifierOrders : setSelectedModifierOrders;
+        
+        // Convert map to sorted array of [id, order]
+        const entries = Array.from(currentMap.entries()).sort((a, b) => a[1] - b[1]);
+        const index = entries.findIndex(item => item[0] === id);
+        
+        if (index === -1) return;
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= entries.length) return;
+        
+        // Swap values in the sorted array
+        const temp = entries[index][1];
+        entries[index][1] = entries[targetIndex][1];
+        entries[targetIndex][1] = temp;
+        
+        setter(new Map(entries));
     };
 
     // Modal State
@@ -375,7 +463,7 @@ const MenuManagementPage: React.FC = () => {
                 .from('menu_modifiers')
                 .select('*')
                 .eq('restaurant_id', selectedRestaurantId)
-                .order('name');
+                .order('order_index');
 
             if (groups && groups.length > 0) {
                 // Load items for each group
@@ -466,7 +554,8 @@ const MenuManagementPage: React.FC = () => {
                     const { data: allOptions } = await supabase
                         .from('menu_deal_group_options')
                         .select('*')
-                        .in('deal_group_id', allGroups.map(g => g.id));
+                        .in('deal_group_id', allGroups.map(g => g.id))
+                        .order('order_index');
 
                     const dealsWithRelations = dealsData.map(deal => ({
                         ...deal,
@@ -1406,13 +1495,14 @@ const MenuManagementPage: React.FC = () => {
                     if (grpError) throw grpError;
 
                     if (group.options && group.options.length > 0) {
-                        const optionsToInsert = group.options.map(opt => ({
+                        const optionsToInsert = group.options.map((opt, oIdx) => ({
                             deal_group_id: grpData.id,
                             menu_item_id: opt.menu_item_id || null,
                             category_id: opt.category_id || null,
                             price_adjustment: opt.price_adjustment || 0,
                             min_selection: opt.min_selection || 0,
-                            max_selection: opt.max_selection || null
+                            max_selection: opt.max_selection || null,
+                            order_index: oIdx
                         }));
                         await supabase.from('menu_deal_group_options').insert(optionsToInsert);
                     }
@@ -1572,7 +1662,7 @@ const MenuManagementPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {deals.map((deal) => (
+                                        {deals.map((deal, index) => (
                                             <tr key={deal.id}>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                     <div className="flex items-center gap-3">
@@ -1609,8 +1699,30 @@ const MenuManagementPage: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <button onClick={() => openDealModal(deal)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Edit className="h-5 w-5" /></button>
-                                                    <button onClick={() => handleDeleteDeal(deal.id)} className="text-red-600 hover:text-red-900"><Trash2 className="h-5 w-5" /></button>
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        <div className="flex flex-col">
+                                                            <button
+                                                                type="button"
+                                                                disabled={index === 0}
+                                                                onClick={() => handleMoveDeal(index, 'up')}
+                                                                className={`text-gray-400 hover:text-brand-gold ${index === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                title="Move Up"
+                                                            >
+                                                                <ChevronUp size={16} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={index === deals.length - 1}
+                                                                onClick={() => handleMoveDeal(index, 'down')}
+                                                                className={`text-gray-400 hover:text-brand-gold ${index === deals.length - 1 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                title="Move Down"
+                                                            >
+                                                                <ChevronDown size={16} />
+                                                            </button>
+                                                        </div>
+                                                        <button onClick={() => openDealModal(deal)} className="text-indigo-600 hover:text-indigo-900" title="Edit Deal"><Edit className="h-5 w-5" /></button>
+                                                        <button onClick={() => handleDeleteDeal(deal.id)} className="text-red-600 hover:text-red-900" title="Delete Deal"><Trash2 className="h-5 w-5" /></button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1936,7 +2048,7 @@ const MenuManagementPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {modifierGroups.map((group) => (
+                                        {modifierGroups.map((group, index) => (
                                             <React.Fragment key={group.id}>
                                                 <tr className={expandedGroupId === group.id ? 'bg-gray-50' : ''}>
                                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -1959,22 +2071,44 @@ const MenuManagementPage: React.FC = () => {
                                                         {group.items?.length || 0} items
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button
-                                                            onClick={() => openModifierItemModal(group.id, undefined, allUniqueVariantNames)}
-                                                            className="inline-flex items-center px-2 py-1 border border-brand-gold text-xs font-medium rounded text-brand-gold hover:bg-brand-gold hover:text-white transition-colors mr-4"
-                                                            title="Add Item"
-                                                        >
-                                                            <Plus className="h-3 w-3 mr-1" /> Add Item
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDuplicateModifierGroup(group)}
-                                                            className="text-blue-600 hover:text-blue-900 mr-4"
-                                                            title="Duplicate Group"
-                                                        >
-                                                            <Copy className="h-5 w-5" />
-                                                        </button>
-                                                        <button onClick={() => openModifierGroupModal(group)} className="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit Group"><Edit className="h-5 w-5" /></button>
-                                                        <button onClick={() => handleDeleteModifierGroup(group.id)} className="text-red-600 hover:text-red-900" title="Delete Group"><Trash2 className="h-5 w-5" /></button>
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            <div className="flex flex-col">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={index === 0}
+                                                                    onClick={() => handleMoveModifierGroup(index, 'up')}
+                                                                    className={`text-gray-400 hover:text-brand-gold ${index === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                    title="Move Up"
+                                                                >
+                                                                    <ChevronUp size={16} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={index === modifierGroups.length - 1}
+                                                                    onClick={() => handleMoveModifierGroup(index, 'down')}
+                                                                    className={`text-gray-400 hover:text-brand-gold ${index === modifierGroups.length - 1 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                    title="Move Down"
+                                                                >
+                                                                    <ChevronDown size={16} />
+                                                                </button>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => openModifierItemModal(group.id, undefined, allUniqueVariantNames)}
+                                                                className="inline-flex items-center px-2 py-1 border border-brand-gold text-xs font-medium rounded text-brand-gold hover:bg-brand-gold hover:text-white transition-colors"
+                                                                title="Add Item"
+                                                            >
+                                                                <Plus className="h-3 w-3 mr-1" /> Add Item
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDuplicateModifierGroup(group)}
+                                                                className="text-blue-600 hover:text-blue-900"
+                                                                title="Duplicate Group"
+                                                            >
+                                                                <Copy className="h-5 w-5" />
+                                                            </button>
+                                                            <button onClick={() => openModifierGroupModal(group)} className="text-indigo-600 hover:text-indigo-900" title="Edit Group"><Edit className="h-5 w-5" /></button>
+                                                            <button onClick={() => handleDeleteModifierGroup(group.id)} className="text-red-600 hover:text-red-900" title="Delete Group"><Trash2 className="h-5 w-5" /></button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 {/* Expanded Items Drawer */}
@@ -2309,18 +2443,25 @@ const MenuManagementPage: React.FC = () => {
                                                                 </label>
                                                                 {isChecked && (
                                                                     <div className="flex items-center gap-1">
-                                                                        <span className="text-xs text-gray-500">Order:</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            min={0}
-                                                                            value={orderVal}
-                                                                            onChange={(e) => {
-                                                                                const newMap = new Map(selectedCatModifierOrders);
-                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
-                                                                                setSelectedCatModifierOrders(newMap);
-                                                                            }}
-                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
-                                                                        />
+                                                                        <div className="flex flex-col mr-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => moveLinkedModifier(group.id, 'up', true)}
+                                                                                className="text-gray-400 hover:text-brand-gold"
+                                                                            >
+                                                                                <ChevronUp size={12} />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => moveLinkedModifier(group.id, 'down', true)}
+                                                                                className="text-gray-400 hover:text-brand-gold"
+                                                                            >
+                                                                                <ChevronDown size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <span className="text-[10px] font-mono bg-gray-200 px-1.5 py-0.5 rounded text-gray-600 min-w-[20px] text-center">
+                                                                            {orderVal}
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2459,18 +2600,25 @@ const MenuManagementPage: React.FC = () => {
                                                                 </label>
                                                                 {isChecked && (
                                                                     <div className="flex items-center gap-1">
-                                                                        <span className="text-xs text-gray-500">Order:</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            min={0}
-                                                                            value={orderVal}
-                                                                            onChange={(e) => {
-                                                                                const newMap = new Map(selectedModifierOrders);
-                                                                                newMap.set(group.id, parseInt(e.target.value) || 0);
-                                                                                setSelectedModifierOrders(newMap);
-                                                                            }}
-                                                                            className="w-14 border border-gray-300 rounded px-2 py-0.5 text-xs text-center focus:ring-brand-gold focus:border-brand-gold"
-                                                                        />
+                                                                        <div className="flex flex-col mr-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => moveLinkedModifier(group.id, 'up')}
+                                                                                className="text-gray-400 hover:text-brand-gold"
+                                                                            >
+                                                                                <ChevronUp size={12} />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => moveLinkedModifier(group.id, 'down')}
+                                                                                className="text-gray-400 hover:text-brand-gold"
+                                                                            >
+                                                                                <ChevronDown size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <span className="text-[10px] font-mono bg-gray-200 px-1.5 py-0.5 rounded text-gray-600 min-w-[20px] text-center">
+                                                                            {orderVal}
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -3286,13 +3434,33 @@ const MenuManagementPage: React.FC = () => {
                                 <div className="space-y-6">
                                     {dealGroups.map((group, gIdx) => (
                                         <div key={gIdx} className="border border-gray-200 rounded-lg p-5 bg-gray-50 relative shadow-sm">
-                                            <button 
-                                                type="button" 
-                                                onClick={() => setDealGroups(dealGroups.filter((_, i) => i !== gIdx))} 
-                                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <div className="absolute top-4 right-4 flex items-center gap-2">
+                                                <div className="flex flex-col">
+                                                    <button 
+                                                        type="button" 
+                                                        disabled={gIdx === 0}
+                                                        onClick={() => moveDealGroup(gIdx, 'up')} 
+                                                        className={`text-gray-400 hover:text-brand-gold transition-colors ${gIdx === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        <ChevronUp size={16} />
+                                                    </button>
+                                                    <button 
+                                                        type="button" 
+                                                        disabled={gIdx === dealGroups.length - 1}
+                                                        onClick={() => moveDealGroup(gIdx, 'down')} 
+                                                        className={`text-gray-400 hover:text-brand-gold transition-colors ${gIdx === dealGroups.length - 1 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        <ChevronDown size={16} />
+                                                    </button>
+                                                </div>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setDealGroups(dealGroups.filter((_, i) => i !== gIdx))} 
+                                                    className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                                                 <div>
@@ -3538,17 +3706,37 @@ const MenuManagementPage: React.FC = () => {
                                                                     </div>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-right">
-                                                                    <button 
-                                                                        type="button" 
-                                                                        onClick={() => {
-                                                                            const updated = [...dealGroups];
-                                                                            updated[gIdx].options = (updated[gIdx].options || []).filter((_, i) => i !== oIdx);
-                                                                            setDealGroups(updated);
-                                                                        }} 
-                                                                        className="text-gray-400 hover:text-red-500"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
+                                                                    <div className="flex items-center justify-end gap-1">
+                                                                        <div className="flex flex-col">
+                                                                            <button 
+                                                                                type="button" 
+                                                                                disabled={oIdx === 0}
+                                                                                onClick={() => moveDealOption(gIdx, oIdx, 'up')} 
+                                                                                className={`text-gray-400 hover:text-brand-gold ${oIdx === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                            >
+                                                                                <ChevronUp size={12} />
+                                                                            </button>
+                                                                            <button 
+                                                                                type="button" 
+                                                                                disabled={oIdx === (group.options || []).length - 1}
+                                                                                onClick={() => moveDealOption(gIdx, oIdx, 'down')} 
+                                                                                className={`text-gray-400 hover:text-brand-gold ${oIdx === (group.options || []).length - 1 ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                                                            >
+                                                                                <ChevronDown size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <button 
+                                                                            type="button" 
+                                                                            onClick={() => {
+                                                                                const updated = [...dealGroups];
+                                                                                updated[gIdx].options = (updated[gIdx].options || []).filter((_, i) => i !== oIdx);
+                                                                                setDealGroups(updated);
+                                                                            }} 
+                                                                            className="text-gray-400 hover:text-red-500 p-1"
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}

@@ -4,7 +4,7 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
     PieChart, Pie, Cell, Legend 
 } from 'recharts';
-import { ShoppingBag, Phone, BarChart3, Loader2 } from 'lucide-react';
+import { ShoppingBag, Phone, BarChart3, Loader2, RefreshCw } from 'lucide-react';
 import { subDays, format, startOfDay, parseISO } from 'date-fns';
 
 const COLORS = ['#c9a96e', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -115,6 +115,18 @@ const SuperAdminAnalytics: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-fadeIn">
+            <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-gray-800">System Insights</h3>
+                <button 
+                    onClick={() => fetchAnalytics()}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-brand-gold transition-all shadow-sm disabled:opacity-50"
+                >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh Data
+                </button>
+            </div>
+
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center">

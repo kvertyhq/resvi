@@ -505,7 +505,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm p-4">
-            <div className="bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-gray-800 w-full max-w-6xl rounded-2xl shadow-2xl flex flex-col max-h-[96vh] border border-gray-700">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b border-gray-700">
                     <h2 className="text-xl font-bold text-white">{menuItem?.name}</h2>
@@ -629,7 +629,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                     {ingredientEntries.length > 0 && (
                         <div className="border-b border-gray-700 pb-6">
                             <h3 className="font-bold text-lg text-white mb-4">Customise Ingredients</h3>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                                 {ingredientEntries.map(entry => {
                                     const isExcluded = entry.id in ingredientExclusions;
                                     const replacementId = ingredientExclusions[entry.id];
@@ -748,7 +748,7 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
 
                                 {/* Compact chip grid for multi-select groups */}
                                 {group.is_multiple ? (
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                                         {group.items.map((item: any) => {
                                             const modifier = (selections[group.id] || {})[item.id];
                                             const isSelected = !!modifier;
@@ -788,8 +788,8 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                                         })}
                                     </div>
                                 ) : (
-                                    /* Full-row layout for single-select groups */
-                                    <div className="grid grid-cols-1 gap-3">
+                                    /* Grid layout for single-select groups */
+                                    <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                                         {group.items.map((item: any) => {
                                             const modifier = (selections[group.id] || {})[item.id];
                                             const isSelected = !!modifier;
@@ -804,69 +804,79 @@ const POSModifierModal: React.FC<POSModifierModalProps> = ({
                                                     <button
                                                         onClick={() => toggleSelection(group.id, item.id, false)}
                                                         className={`
-                                                            w-full flex justify-between items-center p-3 rounded-lg border transition-all text-left
+                                                            w-full flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all 
+                                                            min-h-[52px] select-none text-center
                                                             ${isSelected
-                                                                ? 'bg-opacity-10 text-white'
+                                                                ? 'text-white shadow-md'
                                                                 : 'bg-gray-700 border-transparent text-gray-300 hover:bg-gray-600'}
                                                         `}
-                                                        style={isSelected ? { borderColor: 'var(--theme-color)' } : {}}
+                                                        style={isSelected ? { backgroundColor: 'color-mix(in srgb, var(--theme-color) 25%, #1f2937)', borderColor: 'var(--theme-color)' } : {}}
                                                     >
-                                                        <span className="font-semibold">{item.name}</span>
-                                                        <div className="flex items-center gap-3">
-                                                            {displayPrice > 0 && (
-                                                                <span className="text-sm opacity-80">{currency}{displayPrice.toFixed(2)}</span>
-                                                            )}
-                                                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? '' : 'border-gray-500'}`} style={isSelected ? { backgroundColor: 'var(--theme-color)', borderColor: 'var(--theme-color)' } : {}}>
-                                                                {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                        <span className="text-xs font-semibold leading-tight">{item.name}</span>
+                                                        {displayPrice > 0 && (
+                                                            <span className="text-[10px] opacity-70 mt-0.5">{currency}{displayPrice.toFixed(2)}</span>
+                                                        )}
+                                                        
+                                                        {isSelected && (
+                                                            <div className="absolute top-1 right-1">
+                                                                <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--theme-color)' }}>
+                                                                    <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" /></svg>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </button>
 
                                                     {isSelected && (
-                                                        <div className="space-y-1">
+                                                        <div className="mt-1">
                                                             {/* Customise toggle */}
                                                             <button
                                                                 onClick={() => toggleCustomise(`${group.id}-${item.id}`)}
-                                                                className="w-full flex items-center justify-end gap-1 text-[11px] font-semibold px-1 py-0.5 transition-colors"
+                                                                className="w-full flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-tighter px-1 py-0.5 transition-colors opacity-80 hover:opacity-100"
                                                                 style={{ color: 'var(--theme-color)' }}
                                                             >
-                                                                Customise
-                                                                <svg className={`w-3 h-3 transition-transform ${expandedCustomise[`${group.id}-${item.id}`] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                Detail
+                                                                <svg className={`w-2.5 h-2.5 transition-transform ${expandedCustomise[`${group.id}-${item.id}`] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                                                                 </svg>
                                                             </button>
 
-                                                            {/* Collapsible Coverage + Intensity */}
+                                                            {/* Collapsible Coverage + Intensity - Absolute overlay for compact grid */}
                                                             {expandedCustomise[`${group.id}-${item.id}`] && (
-                                                                <div className="flex gap-4 p-2 bg-gray-900 rounded-lg">
-                                                                    <div className="flex-1">
-                                                                        <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Coverage</div>
-                                                                        <div className="flex bg-gray-800 rounded-md p-1">
-                                                                            {['whole', 'left', 'right'].map((loc) => (
-                                                                                <button
-                                                                                    key={loc}
-                                                                                    onClick={() => updateModifierDetail(group.id, item.id, 'location', loc)}
-                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${modifier.location === loc ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
-                                                                                        }`}
-                                                                                >
-                                                                                    {loc}
-                                                                                </button>
-                                                                            ))}
+                                                                <div className="absolute top-full left-0 z-10 mt-1 w-64 p-2 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 animate-in fade-in slide-in-from-top-1">
+                                                                    <div className="space-y-3">
+                                                                        <div className="flex justify-between items-center">
+                                                                            <span className="text-[10px] font-black uppercase text-[var(--theme-color)]">{item.name} Detail</span>
+                                                                            <button onClick={() => toggleCustomise(`${group.id}-${item.id}`)} className="text-gray-500 hover:text-white">X</button>
                                                                         </div>
-                                                                    </div>
-                                                                    <div className="flex-[1.5]">
-                                                                        <div className="text-[10px] uppercase text-gray-500 font-bold mb-1 ml-1">Intensity</div>
-                                                                        <div className="flex bg-gray-800 rounded-md p-1">
-                                                                            {['light', 'normal', 'extra', 'double'].map((int) => (
-                                                                                <button
-                                                                                    key={int}
-                                                                                    onClick={() => updateModifierDetail(group.id, item.id, 'intensity', int)}
-                                                                                    className={`flex-1 text-[10px] py-1 rounded capitalize font-bold transition-all ${modifier.intensity === int ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
-                                                                                        }`}
-                                                                                >
-                                                                                    {int}
-                                                                                </button>
-                                                                            ))}
+                                                                        <div>
+                                                                            <div className="text-[9px] uppercase text-gray-500 font-bold mb-1 ml-1">Coverage</div>
+                                                                            <div className="flex bg-gray-800 rounded-md p-1">
+                                                                                {['whole', 'left', 'right'].map((loc) => (
+                                                                                    <button
+                                                                                        key={loc}
+                                                                                        onClick={() => updateModifierDetail(group.id, item.id, 'location', loc)}
+                                                                                        className={`flex-1 text-[9px] py-1 rounded capitalize font-bold transition-all ${modifier.location === loc ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                                            }`}
+                                                                                    >
+                                                                                        {loc}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="text-[9px] uppercase text-gray-500 font-bold mb-1 ml-1">Intensity</div>
+                                                                            <div className="flex bg-gray-800 rounded-md p-1">
+                                                                                {['light', 'normal', 'extra', 'double'].map((int) => (
+                                                                                    <button
+                                                                                        key={int}
+                                                                                        onClick={() => updateModifierDetail(group.id, item.id, 'intensity', int)}
+                                                                                        className={`flex-1 text-[9px] py-1 rounded capitalize font-bold transition-all ${modifier.intensity === int ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-700'
+                                                                                            }`}
+                                                                                    >
+                                                                                        {int}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>

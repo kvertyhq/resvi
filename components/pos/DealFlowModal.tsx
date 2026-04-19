@@ -280,9 +280,9 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-gray-900 w-full max-w-5xl h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-white dark:bg-gray-900 w-[95vw] max-w-[1600px] h-[92vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
-                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <div className="p-3 px-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                     <div>
                         <h2 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                             <Package className="text-[var(--theme-color)]" />
@@ -307,7 +307,7 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                                     setCurrentGroupIdx(idx);
                                     setActiveOptionId(null);
                                 }}
-                                className={`flex-1 py-4 px-2 text-center border-b-4 transition-all flex flex-col items-center gap-1 ${
+                                className={`flex-1 py-2 px-2 text-center border-b-4 transition-all flex flex-col items-center gap-1 ${
                                     isSelected ? 'border-[var(--theme-color)] bg-[var(--theme-color)]/10' : 'border-transparent'
                                 }`}
                             >
@@ -330,7 +330,7 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 dark:bg-gray-900/50">
+                <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50 dark:bg-gray-900/50">
                     {activeOptionId && (
                         <div className="mb-6 flex items-center gap-3 animate-fade-in">
                             <button 
@@ -495,7 +495,7 @@ const DealFlowModal: React.FC<DealFlowModalProps> = ({ deal, isOpen, onClose, on
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900">
+                <div className="p-3 px-6 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900">
                     <button 
                         disabled={currentGroupIdx === 0}
                         onClick={() => {

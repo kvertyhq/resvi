@@ -5,7 +5,8 @@ import { useAlert } from '../../context/AlertContext';
 import UserManagementModal from '../../components/admin/UserManagementModal';
 import OnboardRestaurantModal from '../../components/admin/OnboardRestaurantModal';
 import SuperAdminSMSManagement from '../../components/admin/SuperAdminSMSManagement';
-import { Plus, CreditCard, MessageSquare, Shield, Users, Building2, Copy, Lock, Unlock } from 'lucide-react';
+import SuperAdminAnalytics from '../../components/admin/SuperAdminAnalytics';
+import { Plus, CreditCard, MessageSquare, Shield, Users, Building2, Copy, Lock, Unlock, BarChart3 } from 'lucide-react';
 
 interface Restaurant {
     id: string;
@@ -25,7 +26,7 @@ const SuperAdminDashboard: React.FC = () => {
     const { showAlert } = useAlert();
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'restaurants' | 'sms'>('restaurants');
+    const [activeTab, setActiveTab] = useState<'restaurants' | 'sms' | 'analytics'>('restaurants');
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isCreditsModalOpen, setIsCreditsModalOpen] = useState(false);
@@ -163,6 +164,13 @@ const SuperAdminDashboard: React.FC = () => {
                         <MessageSquare className="w-4 h-4 mr-2" />
                         SMS & Coupons
                     </button>
+                    <button
+                        onClick={() => setActiveTab('analytics')}
+                        className={`px-4 py-2 rounded-md font-medium text-sm flex items-center ${activeTab === 'analytics' ? 'bg-brand-dark-gray text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'}`}
+                    >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Analytics
+                    </button>
 
                 </div>
             </div>
@@ -170,6 +178,8 @@ const SuperAdminDashboard: React.FC = () => {
             {/* Content Area */}
             {activeTab === 'sms' ? (
                 <SuperAdminSMSManagement />
+            ) : activeTab === 'analytics' ? (
+                <SuperAdminAnalytics />
             ) : (
                 <>
                     {/* Stats Overview */}

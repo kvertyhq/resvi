@@ -134,7 +134,7 @@ const POSLayout: React.FC = () => {
                     )}
 
                     <NavLink
-                        to="/pos/walk-in"
+                        to="/pos/order/walk-in"
                         style={({ isActive }) => isActive ? { backgroundColor: 'var(--theme-color)' } : {}}
                         className={({ isActive }) => `p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                         title="Walk-In Orders"
@@ -274,7 +274,7 @@ const POSLayout: React.FC = () => {
                     </NavLink>
                 )}
 
-                <NavLink to="/pos/walk-in" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
+                <NavLink to="/pos/order/walk-in" style={({ isActive }) => isActive ? { color: 'var(--theme-color)' } : {}} className={({ isActive }) => `flex flex-col items-center p-1 sm:p-2 rounded-lg flex-shrink-0 min-w-[3.5rem] ${isActive ? '' : 'text-gray-500 dark:text-gray-400'}`}>
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                     <span className="text-[9px] sm:text-[10px] mt-1 font-bold">Walk-In</span>
                 </NavLink>

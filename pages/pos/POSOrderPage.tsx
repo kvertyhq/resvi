@@ -13,6 +13,7 @@ import POSCategoryTabs from '../../components/pos/POSCategoryTabs';
 import POSMenuGrid from '../../components/pos/POSMenuGrid';
 import POSModifierModal from '../../components/pos/POSModifierModal';
 import DealFlowModal from '../../components/pos/DealFlowModal';
+import WalkInOrderList from '../../components/pos/WalkInOrderList';
 import OrderSuccessModal from '../../components/pos/OrderSuccessModal';
 import OrderUpdatedModal from '../../components/pos/OrderUpdatedModal';
 import POSPaymentModal from '../../components/pos/POSPaymentModal';
@@ -22,7 +23,7 @@ import NotificationModal from '../../components/pos/NotificationModal';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { receiptService } from '../../services/ReceiptService';
-import { Pause, X, Trash2, Printer, Check, Send, ShoppingCart, CreditCard, Pencil } from 'lucide-react';
+import { Pause, X, Trash2, Printer, Check, Send, ShoppingCart, CreditCard, Pencil, RotateCw } from 'lucide-react';
 
 interface CartItem {
     tempId: string; // unique for cart
@@ -100,6 +101,12 @@ const POSOrderPage: React.FC = () => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [currentOrder, setCurrentOrder] = useState<any>(null);
     const [currentMaxRound, setCurrentMaxRound] = useState(0);
+
+    // View State (for Walk-In section)
+    const [viewMode, setViewMode] = useState<'new' | 'active' | 'completed'>('new');
+    const [activeOrderCount, setActiveOrderCount] = useState(0);
+    const [countdown, setCountdown] = useState(10);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1140,15 +1147,17 @@ const POSOrderPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex flex-col gap-2 flex-1">
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => navigate(isWalkIn ? '/pos/walk-in' : '/pos')}
-                                className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                title={isWalkIn ? 'Back to Walk-In Orders' : 'Back to Map'}
-                            >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                            </button>
+                            {!isWalkIn && (
+                                <button
+                                    onClick={() => navigate('/pos')}
+                                    className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors mr-2"
+                                    title="Back to Map"
+                                >
+                                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                </button>
+                            )}
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                 {isWalkIn ? (isPhoneOrder ? `Phone Order (${phoneOrderType || 'takeaway'})` : 'Walk-In Order') : (tableName || 'Unknown Table')}
                                 {phoneOrderTimeslot && (
@@ -1167,8 +1176,42 @@ const POSOrderPage: React.FC = () => {
                                 )}
                             </h2>
 
+                            {isWalkIn && (
+                                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 ml-4">
+                                    <button
+                                        onClick={() => setViewMode('new')}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'new' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-800 dark:hover:text-white'}`}
+                                    >
+                                        New Order
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('active')}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${viewMode === 'active' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-800 dark:hover:text-white'}`}
+                                    >
+                                        <span>Active</span>
+                                        {activeOrderCount > 0 && (
+                                            <span className={`flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] ${viewMode === 'active' ? 'bg-white text-blue-600' : 'bg-blue-500 text-white'}`}>
+                                                {activeOrderCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('completed')}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${viewMode === 'completed' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-800 dark:hover:text-white'}`}
+                                    >
+                                        Completed
+                                    </button>
+                                    <button
+                                        onClick={() => setRefreshKey(prev => prev + 1)}
+                                        className="p-1 px-2 text-gray-500 hover:text-blue-600 transition-colors"
+                                        title="Refresh List"
+                                    >
+                                        <RotateCw size={14} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        {isWalkIn && (
+                        {isWalkIn && viewMode === 'new' && (
                             <div className="relative">
                                 <input
                                     type="text"
@@ -1264,45 +1307,56 @@ const POSOrderPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Split View: Categories Sidebar + Menu Grid */}
-                <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
-                    {/* Categories Sidebar (Scrollable wrapper) */}
-                    <div className="md:w-1/4 md:max-w-[240px] flex flex-col h-auto md:h-full overflow-hidden">
-                        <POSCategoryTabs
-                            categories={categories}
-                            selectedCategory={selectedCategory}
-                            onSelect={setSelectedCategory}
+                {/* Split View OR List View */}
+                {isWalkIn && viewMode !== 'new' ? (
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-inner border border-gray-200 dark:border-gray-800 mt-2">
+                        <WalkInOrderList 
+                            key={`${viewMode}-${refreshKey}`}
+                            filter={viewMode as 'active' | 'completed'} 
+                            onActiveCountChange={setActiveOrderCount}
+                            onCountdownChange={setCountdown}
                         />
                     </div>
+                ) : (
+                    <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
+                        {/* Categories Sidebar (Scrollable wrapper) */}
+                        <div className="md:w-1/4 md:max-w-[240px] flex flex-col h-auto md:h-full overflow-hidden">
+                            <POSCategoryTabs
+                                categories={categories}
+                                selectedCategory={selectedCategory}
+                                onSelect={setSelectedCategory}
+                            />
+                        </div>
 
-                    {/* Right: Menu Grid */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        {menuLoading && categories.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-gray-500">Loading Menu...</div>
-                        ) : (
-                            <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0 relative">
-                                {loading && (
-                                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
-                                    </div>
-                                )}
-                                <POSMenuGrid 
-                                    items={filteredItems.map(item => ({
-                                        ...item,
-                                        hasOptions: itemModifiersMap.has(item.id) || (item.price_variants && item.price_variants.length > 1)
-                                    }))} 
-                                    onItemClick={handleItemClick} 
-                                    onModifierClick={(item) => {
-                                        setEditingTempId(null);
-                                        setInitialModalData({});
-                                        setItemForModal(item);
-                                        setIsModalOpen(true);
-                                    }}
-                                />
-                            </div>
-                        )}
+                        {/* Right: Menu Grid */}
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            {menuLoading && categories.length === 0 ? (
+                                <div className="flex-1 flex items-center justify-center text-gray-500">Loading Menu...</div>
+                            ) : (
+                                <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0 relative">
+                                    {loading && (
+                                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-50 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--theme-color)]"></div>
+                                        </div>
+                                    )}
+                                    <POSMenuGrid 
+                                        items={filteredItems.map(item => ({
+                                            ...item,
+                                            hasOptions: itemModifiersMap.has(item.id) || (item.price_variants && item.price_variants.length > 1)
+                                        }))} 
+                                        onItemClick={handleItemClick} 
+                                        onModifierClick={(item) => {
+                                            setEditingTempId(null);
+                                            setInitialModalData({});
+                                            setItemForModal(item);
+                                            setIsModalOpen(true);
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
             </div>
 

@@ -252,7 +252,7 @@ function App() {
                     </RequirePOSAuth>
                   }>
                     <Route index element={<POSTablesPage />} />
-                    <Route path="walk-in" element={<POSWalkInPage />} />
+                    <Route path="walk-in" element={<Navigate to="/pos/order/walk-in" replace />} />
                     <Route path="online" element={<POSOnlineOrdersPage />} />
                     <Route path="phone-setup" element={<POSPhoneOrderSetupPage />} />
                     <Route path="my-orders" element={<POSMyOrdersPage />} />
